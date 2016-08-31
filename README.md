@@ -1,5 +1,5 @@
 # CAT
-CAT annotation tool for metagenomic contigs
+CAT Contig Annotation Tool
 
 
 Installation
