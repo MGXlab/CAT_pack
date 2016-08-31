@@ -8,6 +8,7 @@ prodigal
 
 NCBI taxonomy tree files
 
+
 Installation
 
 
@@ -65,7 +66,7 @@ $python cat.py input_contigs_file N C
 
 N = numeric, the number of threads you want for the diamond search
 
-C= The bit-score cut off (numeric 0.1 - 1)
+C= The bit-score cut off (float 0.1 - 1)
 
 
 
