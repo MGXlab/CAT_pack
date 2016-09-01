@@ -123,3 +123,14 @@ contigs_prodigal.m8
 (file with diamond blast results)
 
 and other files related to the diamond input.
+
+
+
+
+
+Already have run a blast search and classification of the contigs??
+
+Easy. You simply need to run the script contig_id.py in the bin folder. The input files should be as the ones in the examples folder.
+
+
+
