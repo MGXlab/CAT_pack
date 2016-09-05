@@ -45,8 +45,16 @@ in the file
 cat.py change the follwing lines:
 
 path_to_prodigal="../documentation/prodigal.linux"
+
 path_to_diamond="../documentation/diamond"
+
 path_to_contig_id="contig_id.py"
+
+
+The files related to the NCBI taxonomy tree should be inside the folder documentation. If you already have them elsewhere change the first line of the script contig_id.py
+
+path_to_documentation="../documentation"
+
 
 
 contig_id.py is a python script inside the folder bin , if you run CAT outside this folder. Indicate on this line where this script is.
@@ -130,7 +138,7 @@ and other files related to the diamond input.
 
 Already have run a blast search and classification of the contigs??
 
-Easy. You simply need to run the script contig_id.py in the bin folder. The input files should be as the ones in the examples folder.
+Easy. You simply need to run the script contig_id.py in the bin folder. The input files should be as the ones in the examples folder. 
 
 
 
