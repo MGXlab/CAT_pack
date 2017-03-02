@@ -44,15 +44,15 @@ to this one:
 
 >WP_003131952.1:30S_ribosomal_protein_S18
 
-When dependencies will be downloaded, you need to specify absolute paths to Prodigal and Diamond inside CAT:
+When dependencies will be downloaded, you need to specify absolute paths to Prodigal and Diamond inside CAT (including program itself):
 
 	diamond = '/absolute/path/to/executables/of/diamond'
 
 	prodigal = '/absolute/path/to/executables/of/prodigal'
 
-CAT assumes that taxonomy tree files locate in the working directory, if this is not a case, please specify path to these files in CAT too:
+CAT assumes that taxonomy tree files locate in the working directory, if this is not a case, please specify path to these files in CAT too (without files' names):
 
-	path_to_taxonomy_files=’/path/to/files/folder/’
+	path_to_taxonomy_files=’/absolute/path/to/files/folder/’
 
 Generate Diamond database as described here http://ab.inf.uni-tuebingen.de/data/software/diamond/download/public/manual.pdf
 
