@@ -46,9 +46,9 @@ to this one:
 
 When dependencies will be downloaded, you need to specify absolute paths to Prodigal and Diamond inside CAT (including program itself):
 
-	diamond = '/absolute/path/to/executables/of/diamond'
+	diamond = '/absolute/path/to/executables/of/diamond/diamond'
 
-	prodigal = '/absolute/path/to/executables/of/prodigal'
+	prodigal = '/absolute/path/to/executables/of/prodigal/prodigal'
 
 CAT assumes that taxonomy tree files locate in the working directory, if this is not a case, please specify path to these files in CAT too (without files' names):
 
