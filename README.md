@@ -6,9 +6,11 @@ CAT is a pipeline for taxonomic classification of long sequences implemented in 
 
 ## Dependencies and where to get them
 
-diamond	http://github.com/bbuchfink/diamond
+Python 2.7.12
 
-prodigal	http://github.com/hyattpd/Prodigal
+diamond	http://github.com/bbuchfink/diamond  (tested on version v0.8.31)
+
+prodigal	http://github.com/hyattpd/Prodigal  (tested on version v2.6.3)
 
 NCBI taxonomy tree files:
 
