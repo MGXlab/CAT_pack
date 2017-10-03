@@ -44,6 +44,8 @@ to this one:
 
 >\>WP_003131952.1:30S_ribosomal_protein_S18
 
+This is optional step, CAT will work with original NCBI headers as well.
+
 After that you can generate Diamond database as described here http://ab.inf.uni-tuebingen.de/data/software/diamond/download/public/manual.pdf
 
 When dependencies will be downloaded and installed, you need to specify absolute paths to Prodigal and Diamond as well as to taxonomy tree files inside CAT:
@@ -70,7 +72,7 @@ CAT has just a few constrains:
 
 1. Headers of predicted proteins should have the following form:
 
-	 \>NameOfContigWithoutSpaces(symbols like .:_ are allowed)_**_OrfNumber(only digits)**
+	 \>NameOfContigWithoutSpaces(symbols like .:_ are allowed)_**_OrfNumber(only digits, separated from name by one underline)**
 
 2. File with results of an alignment should be tab-delimited, without header and protein name should be in the first column and bitscore value in the last one:
 
