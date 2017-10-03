@@ -72,7 +72,7 @@ CAT has just a few constrains:
 
 1. Headers of predicted proteins should have the following form:
 
-	 \>NameOfContigWithoutSpaces(symbols like .:_ are allowed)_**_OrfNumber(only digits, separated from name by one underline)**
+	 \>NameOfContigWithoutSpaces(symbols like **. : _** are allowed)_**_OrfNumber(only digits, separated from name by one underline)**
 
 2. File with results of an alignment should be tab-delimited, without header and protein name should be in the first column and bitscore value in the last one:
 
