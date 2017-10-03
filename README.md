@@ -38,11 +38,11 @@ As Diamond save into alignment file only part of header of reference sequence be
 
 This will change headers from this variant:
 
->WP_003131952.1 30S ribosomal protein S18 [Lactococcus lactis]
+\>WP_003131952.1 30S ribosomal protein S18 [Lactococcus lactis]
 
 to this one:
 
->WP_003131952.1:30S_ribosomal_protein_S18
+\>WP_003131952.1:30S_ribosomal_protein_S18
 
 After that you can generate Diamond database as described here http://ab.inf.uni-tuebingen.de/data/software/diamond/download/public/manual.pdf
 
@@ -52,7 +52,7 @@ When dependencies will be downloaded and installed, you need to specify absolute
 
 	prodigal = '/absolute/path/to/executables/of/prodigal/'
 
-	path_to_taxonomy_files=’/absolute/path/to/files/folder/’
+	path_to_taxonomy_files=’/absolute/path/to/files/directory/’
 
 If you made CAT executable and added into PATH environment variable, it could be run using the command like this:
 
