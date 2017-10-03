@@ -30,7 +30,7 @@ From ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/
 
 Before start, please check that reference sequences have headers in the following format (accession number with version):
 
->WP_003131952.1 <and anything else>
+>\>WP_003131952.1 <and anything else>
 
 As Diamond save into alignment file only part of header of reference sequence before the first space, to preserve information about functional annotation we can offer to change NCBI fasta headers with the following command:
 
@@ -38,11 +38,11 @@ As Diamond save into alignment file only part of header of reference sequence be
 
 This will change headers from this variant:
 
-\>WP_003131952.1 30S ribosomal protein S18 [Lactococcus lactis]
+>\>WP_003131952.1 30S ribosomal protein S18 [Lactococcus lactis]
 
 to this one:
 
-\>WP_003131952.1:30S_ribosomal_protein_S18
+>\>WP_003131952.1:30S_ribosomal_protein_S18
 
 After that you can generate Diamond database as described here http://ab.inf.uni-tuebingen.de/data/software/diamond/download/public/manual.pdf
 
@@ -56,7 +56,7 @@ When dependencies will be downloaded and installed, you need to specify absolute
 
 If you made CAT executable and added into PATH environment variable, it could be run using the command like this:
 
-	$ CAT -fna sequences.fna --db reference_database.dmnd --prefix library_one
+	$ CAT --fna sequences.fna --db reference_database.dmnd --prefix library_one
 
 To get help:
 
