@@ -64,13 +64,16 @@ To get help:
 
 ## What if I want to use different ORF caller or aligning tool?
 
-Actually, not a problem. CAT is a universal classification tool and you could apply it to sequences of any origin.
+Actually, not a problem. CAT is a universal classification tool and you can apply it to sequences of any origin.
 
 CAT has just a few constrains:
 
 1) Headers of predicted proteins should have the following form:
 
-> \>NameOfContigWithoutSpaces(symbols like .:_ are allowed)**_OrfNumber(only digits)**
+	 \>NameOfContigWithoutSpaces(symbols like .:_ are allowed)**_OrfNumber(only digits)**
+
+2) File with results of an alignment should be tab-delimited, without header and protein name should be in the first column and bitscore value in the last one:
+	NameOfContigWithoutSpaces**_OrfNumber** <tab> field2 <tab> ... <tab> fieldN <tab> Bitscore 
 
 For more details about analysis algorithm, please see http://biorxiv.org/content/early/2016/09/01/072868
 
