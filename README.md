@@ -6,7 +6,7 @@ CAT is a pipeline for taxonomic classification of long sequences implemented in 
 
 ## Dependencies and where to get them
 
-Python 2.7.12
+Python 3.5.2
 
 diamond	http://github.com/bbuchfink/diamond  (tested on version v0.8.31)
 
@@ -32,9 +32,9 @@ Before start, please check that reference sequences have headers in the followin
 
 >WP_003131952.1 <and anything else>
 
-As Diamond save into alignment file only name of reference sequence before the first space, to preserve information about functional annotation we can offer to change NCBI fasta headers with the following command:
+As Diamond save into alignment file only part of header of reference sequence before the first space, to preserve information about functional annotation we can offer to change NCBI fasta headers with the following command:
 
-	$ perl -wple 's/^(>\S+\.\d+)\s(.+?) \[.*/$1:$2/g; s/ /_/g;' database > database_formatted
+	$ perl -wple 's/^(>\S+\.\d+)\s(.+?) \[.*/$1:$2/g; s/ /_/g; if (length$_ > 200) {s/^(.{200}).*/$1/g};' database > database_formatted
 
 This will change headers from this variant:
 
@@ -44,25 +44,24 @@ to this one:
 
 >WP_003131952.1:30S_ribosomal_protein_S18
 
-When dependencies will be downloaded, you need to specify absolute paths to Prodigal and Diamond inside CAT (including program itself):
+After that you can generate Diamond database as described here http://ab.inf.uni-tuebingen.de/data/software/diamond/download/public/manual.pdf
 
-	diamond = '/absolute/path/to/executables/of/diamond/diamond'
+When dependencies will be downloaded and installed, you need to specify absolute paths to Prodigal and Diamond as well as to taxonomy tree files inside CAT:
 
-	prodigal = '/absolute/path/to/executables/of/prodigal/prodigal'
+	diamond = '/absolute/path/to/executables/of/diamond/'
 
-CAT assumes that taxonomy tree files locate in the working directory, if this is not a case, please specify path to these files in CAT too (without files' names):
+	prodigal = '/absolute/path/to/executables/of/prodigal/'
 
 	path_to_taxonomy_files=’/absolute/path/to/files/folder/’
 
-Generate Diamond database as described here http://ab.inf.uni-tuebingen.de/data/software/diamond/download/public/manual.pdf
+If you made CAT executable and added into PATH environment variable, it could be run using the command like this:
 
-If you added CAT into PATH environment variable, it could be run using the command like this:
-
-	$ CAT -f sequences.fna -db reference_database.dmnd -prefix library_one
+	$ CAT -fna sequences.fna --db reference_database.dmnd --prefix library_one
 
 To get help:
 
 	$ CAT -h
+
 
 For more details about analysis algorithm, please see http://biorxiv.org/content/early/2016/09/01/072868
 
