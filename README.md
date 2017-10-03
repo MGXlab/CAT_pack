@@ -32,7 +32,7 @@ Before start, please check that reference sequences have headers in the followin
 
 >\>WP_003131952.1 <and anything else>
 
-As Diamond save into alignment file only part of header of reference sequence before the first space, to preserve information about functional annotation we can offer to change NCBI fasta headers with the following command:
+As Diamond save into alignment file only part of the header of a reference sequence before the first space, to preserve information about functional annotation we can offer to change NCBI fasta headers with the following command:
 
 	$ perl -wple 's/^(>\S+\.\d+)\s(.+?) \[.*/$1:$2/g; s/ /_/g; if (length$_ > 200) {s/^(.{200}).*/$1/g};' database > database_formatted
 
@@ -62,6 +62,15 @@ To get help:
 
 	$ CAT -h
 
+## What if I want to use different ORF caller or aligning tool?
+
+Actually, not a problem. CAT is a universal classification tool and you could apply it to sequences of any origin.
+
+CAT has just a few constrains:
+
+1) Headers of predicted proteins should have the following form:
+
+> \>NameOfContigWithoutSpaces(symbols like .:_ are allowed)**_OrfNumber(only digits)**
 
 For more details about analysis algorithm, please see http://biorxiv.org/content/early/2016/09/01/072868
 
