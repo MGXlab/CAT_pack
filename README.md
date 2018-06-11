@@ -2,7 +2,7 @@
 
 ## Introduction
 
-CAT is a pipeline for taxonomic classification of long sequences implemented in Python. It uses the software Prodigal for gene prediction and Diamond as an alignment tool. CAT also requires a database of reference sequences which have NCBI accession numbers in the headers (as contemporary NCBI databases have) and corresponding NCBI taxonomy tree files. CAT can be run from two intermediate steps if files are formated appropriately (see examples).
+CAT is a pipeline for taxonomic classification of long sequences bins of sequences implemented in Python. It uses the software Prodigal for gene prediction or translation in 6 frames for sequences with high error rates. Diamond software is used for homology search. CAT also requires a database of reference sequences which have NCBI accession numbers in the headers (as contemporary NCBI databases have) and corresponding NCBI taxonomy tree files. CAT can be run from two intermediate steps if files are formated appropriately (see examples).
 
 ## Dependencies and where to get them
 
@@ -48,13 +48,7 @@ This is an optional step, CAT will work with the original NCBI headers as well.
 
 After that you can generate a Diamond database from reference sequences as described here http://ab.inf.uni-tuebingen.de/data/software/diamond/download/public/manual.pdf
 
-You will need to specify absolute paths to Prodigal and Diamond as well as to the directory with taxonomy tree files inside CAT:
-
-	diamond = '/absolute/path/to/directory/with/diamond/'
-
-	prodigal = '/absolute/path/to/directory/with/prodigal/'
-
-	path_to_taxonomy_files=’/absolute/path/to/files/directory/’
+For convenience, you can specify paths to Prodigal and Diamond as well as to the directory with taxonomy tree files and database inside CAT.
 
 If you made CAT executable and added it in your PATH environment variable, it can be run using the command like this:
 
@@ -68,15 +62,9 @@ To get help:
 
 Actually, not a problem. CAT is a universal classification tool and you can apply it to sequences of any origin.
 
-CAT has just a few constrains:
+CAT has just the only constrain on alignment output file. It has to be tab-delimited file with information about Bitscore in the last field/column:
 
-1. Headers of predicted proteins should have the following form:
-
-	 \>NameOfContigWithoutSpaces(symbols like **. : _** are allowed)_**_OrfNumber(only digits, separated from name by one underline)**
-
-2. A file with results of an alignment should be tab-delimited, without an header. Protein name should be in the first column and bitscore value in the last one:
-
-	NameOfContigWithoutSpaces_**_OrfNumber** \<tab\> field2 \<tab\> ... \<tab\> fieldN \<tab\> **Bitscore**
+	ProteinName \<tab\> field2 \<tab\> ... \<tab\> fieldN \<tab\> **Bitscore**
 
 
 For more details about the algorithm, please see http://biorxiv.org/content/early/2016/09/01/072868
