@@ -2,7 +2,7 @@
 
 ## Introduction
 
-CAT is a pipeline for taxonomic classification of long sequences bins of sequences implemented in Python. It uses the software Prodigal for gene prediction or translation in 6 frames for sequences with high error rates. Diamond software is used for homology search. CAT also requires a database of reference sequences which have NCBI accession numbers in the headers (as contemporary NCBI databases have) and corresponding NCBI taxonomy tree files. CAT can be run from two intermediate steps if files are formated appropriately (see examples).
+CAT is a pipeline for taxonomic classification of long sequences or bins of sequences implemented in Python. It uses the software Prodigal for gene prediction or translation in 6 frames for sequences with high error rates. Diamond software is used for homology search. CAT also requires a database of reference sequences which have NCBI accession numbers in the headers (as contemporary NCBI databases have) and corresponding NCBI taxonomy tree files. CAT can be run from two intermediate steps if files are formated appropriately (see examples).
 
 ## Dependencies and where to get them
 
