@@ -68,7 +68,9 @@ To get help:
 
 Actually, not a problem. CAT is a universal classification tool and you can apply it to sequences of any origin.
 
-CAT has just the only constrain on alignment output file. It has to be tab-delimited file with information about Bitscore in the last field/column:
+If you would like to use protein sequences you already have, you will need to make a tab-delimited file connecting names of contigs (first field) to protein names (second field, one row per protein). 
+
+If you would like to use your own alignment file, please check, that it is a tab-delimited file with information about Bitscore in the last field/column:
 
 	ProteinName \<tab\> field2 \<tab\> ... \<tab\> fieldN \<tab\> **Bitscore**
 
