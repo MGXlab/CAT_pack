@@ -50,9 +50,15 @@ After that you can generate a Diamond database from reference sequences as descr
 
 For convenience, you can specify paths to Prodigal and Diamond as well as to the directory with taxonomy tree files and database inside CAT.
 
-If you made CAT executable and added it in your PATH environment variable, it can be run using the command like this:
+## Usage
 
-	$ CAT --fna sequences.fna --db reference_database.dmnd --prefix library_one
+If you made CAT executable, added it in your PATH environment variable as well as Diamond and Prodigal, and taxonomy files are in a working directory, it can be run in 'contigs annotation' mode as:
+
+	$ CAT --fna sequences.fna --db reference_database.dmnd --prefix CAT_out
+
+And in 'bins annotation' mode:
+
+	$ CAT --bins /path/to/bins/directory/ --db reference_database.dmnd --prefix CAT_out
 
 To get help:
 
