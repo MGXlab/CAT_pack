@@ -144,11 +144,12 @@ def add_names(args):
 
                 continue
                 
-            if line[1].startswith('no taxid found'):
+            if (line[1].startswith('no taxid found') or
+                line[2].startswith('no taxid found')):
                 # ORF has database hits but the accession number is not found
                 # in the taxonomy files.
                 outf.write('{0}\n'.format('\t'.join(line)))
-                
+
                 continue
                 
             lineage = line[lineage_index].split(';')
