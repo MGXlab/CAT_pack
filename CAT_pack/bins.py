@@ -58,10 +58,9 @@ def parse_arguments():
                           metavar='',
                           required=False,
                           type=float,
-                          choices = [i for i in range(101)],
+                          choices = [i for i in range(51)],
                           default=5,
-                          help='b1 parameter. Should be between 0 and 100 '
-                               '(default: 5).')
+                          help='b1 parameter [0-50] (default: 5).')
     optional.add_argument('--b2',
                           dest='b2',
                           metavar='',
@@ -69,8 +68,7 @@ def parse_arguments():
                           type=float,
                           choices = [i / 100 for i in range(0, 100)],
                           default=0.1,
-                          help='b2 parameter. Should be between 0 and 0.99 '
-                               '(default: 0.1).')
+                          help='b2 parameter [0-0.99] (default: 0.1).')
     optional.add_argument('-o',
                           '--out_prefix',
                           dest='out_prefix',
