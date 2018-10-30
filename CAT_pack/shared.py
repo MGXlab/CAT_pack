@@ -79,7 +79,7 @@ def run_diamond(path_to_diamond,
                                'blastp',
                                '-d', diamond_database,
                                '-q', predicted_proteins_fasta,
-                               '-k', '0',
+                               '--top', '50',
                                '-o', diamond_file,
                                '-p', str(nproc),
                                '--quiet'])
