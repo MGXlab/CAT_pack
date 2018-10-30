@@ -51,9 +51,9 @@ def parse_arguments():
                           metavar='',
                           required=False,
                           type=float,
-                          choices = [i for i in range(101)],
+                          choices = [i for i in range(51)],
                           default=10,
-                          help='b1 parameter [0-100] (default: 10).')
+                          help='b1 parameter [0-50] (default: 10).')
     optional.add_argument('--b2',
                           dest='b2',
                           metavar='',
