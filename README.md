@@ -54,6 +54,8 @@ To run CAT on a contig set, each header in the contig fasta file (the part after
 After CAT prepare has constructed the taxonomy and database folders, you can run CAT to annotate your contig set:
 
 ```
+$ chmod +x CAT_pack/CAT
+
 $ CAT contigs -c {contigs fasta} -d {database folder} -t {taxonomy folder}
 ```
 
@@ -154,5 +156,6 @@ Run BAT on a set of MAGs with custom parameter settings and add names to the ORF
 
 ```
 $ CAT bins --b1 5 --b2 0.3 -b ../bins/ -s .fa -d CAT_database/ -t CAT_taxonomy/ -o BAT_run --quiet --no_log
+
 $ CAT add_names -i BAT_run.ORF2LCA.txt -o BAT_run.ORF2LCA.names.txt -t CAT_taxonomy/
 ```
