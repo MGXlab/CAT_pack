@@ -20,6 +20,8 @@ CAT and BAT are currently not supported on other operating systems than Linux.
 No installation is required. If you make 'CAT' in the CAT\_pack directory executable, you can run CAT and BAT by supplying the absolute path:
 
 ```
+$ chmod +x CAT_pack/CAT
+
 $ CAT_pack/CAT --help
 ```
 
