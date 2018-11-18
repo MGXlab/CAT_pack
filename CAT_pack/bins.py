@@ -53,22 +53,24 @@ def parse_arguments():
                           type=str,
                           default='.fna',
                           help='Suffix of bins in bin folder (default: .fna).')
-    optional.add_argument('--b1',
-                          dest='b1',
+    optional.add_argument('-r',
+                          '--range',
+                          dest='r',
                           metavar='',
                           required=False,
                           type=float,
                           choices = [i for i in range(51)],
                           default=5,
-                          help='b1 parameter [0-50] (default: 5).')
-    optional.add_argument('--b2',
-                          dest='b2',
+                          help='r parameter [0-50] (default: 5).')
+    optional.add_argument('-f',
+                          '--fraction',
+                          dest='f',
                           metavar='',
                           required=False,
                           type=float,
                           choices = [i / 100 for i in range(0, 100)],
-                          default=0.1,
-                          help='b2 parameter [0-0.99] (default: 0.1).')
+                          default=0.3,
+                          help='f parameter [0-0.99] (default: 0.3).')
     optional.add_argument('-o',
                           '--out_prefix',
                           dest='out_prefix',
@@ -172,23 +174,23 @@ def import_bins(bin_folder,
             # executables are located, and -s is .faa or .fasta.
             continue
 
-        bin = file.rsplit(bin_suffix, 1)[0]
+        bin_ = file.rsplit(bin_suffix, 1)[0]
 
-        bin2contigs[bin] = []
+        bin2contigs[bin_] = []
 
-        with open('{0}/{1}'.format(bin_folder, file), 'r') as f:
-            for line in f:
+        with open('{0}/{1}'.format(bin_folder, file), 'r') as f1:
+            for line in f1:
                 if line.startswith('>'):
                     contig = line.split(' ')[0].rstrip().lstrip('>')
 
                     # Add bin name in front of the contig name.
-                    new_contig_name = '{0}_{1}'.format(bin, contig)
+                    new_contig_name = '{0}_{1}'.format(bin_, contig)
                     
                     if new_contig_name in contig_names:
                         message = ('ERROR: BAT has encountered {0} twice in '
                                    'bin {1}. Each fasta header should be '
                                    'unique in each bin.'
-                                   ''.format(contig, bin))
+                                   ''.format(contig, bin_))
                         shared.give_user_feedback(message,
                                                   log_file,
                                                   quiet,
@@ -198,7 +200,7 @@ def import_bins(bin_folder,
 
                     contig_names.add(new_contig_name)
 
-                    bin2contigs[bin].append(new_contig_name)
+                    bin2contigs[bin_].append(new_contig_name)
                     
     message = '{0} bins found!'.format(len(bin2contigs))
     shared.give_user_feedback(message, log_file, quiet)
@@ -216,22 +218,22 @@ def make_concatenated_fasta(concatenated_fasta,
 
     files = os.listdir(bin_folder)
 
-    with open(concatenated_fasta, 'w') as outf:
+    with open(concatenated_fasta, 'w') as outf1:
         for file in files:
             if not file.endswith(bin_suffix):
                 continue
 
-            bin = file.rsplit(bin_suffix, 1)[0]
+            bin_ = file.rsplit(bin_suffix, 1)[0]
 
-            with open('{0}/{1}'.format(bin_folder, file), 'r') as f:
-                for line in f:
+            with open('{0}/{1}'.format(bin_folder, file), 'r') as f1:
+                for line in f1:
                     if line.startswith('>'):
                         contig = line.split(' ')[0].rstrip().lstrip('>')
                         
                         # Add bin name in front of the contig name.
-                        outf.write('>{0}_{1}\n'.format(bin, contig))
+                        outf1.write('>{0}_{1}\n'.format(bin_, contig))
                     else:
-                        outf.write(line)
+                        outf1.write(line)
                         
                         
 def bins(args):
@@ -241,8 +243,8 @@ def bins(args):
      database_folder,
      taxonomy_folder,
      bin_suffix,
-     bitscore_fraction_cutoff_1,
-     bitscore_fraction_cutoff_2,
+     one_minus_r,
+     f,
      out_prefix,
      predicted_proteins_fasta,
      diamond_file,
@@ -256,7 +258,7 @@ def bins(args):
         log_file = None
     else:
         log_file = '{0}.log'.format(out_prefix)
-        with open(log_file, 'w') as outf:
+        with open(log_file, 'w') as outf1:
             pass
         
     message = '# CAT v{0}.'.format(about.__version__)
@@ -272,15 +274,15 @@ def bins(args):
                    'Bin folder: {1}/\n'
                    'Taxonomy folder: {2}/\n'
                    'Database folder: {3}/\n'
-                   'b1: {4}\n'
-                   'b2: {5}\n'
-                   'Log file: {6}\n'
+                   'Parameter r: {4}\n'
+                   'Parameter f: {5}\n'
+                   'Log file: {6}\n\n'
                    '-----------------\n'.format(' '.join(sys.argv),
                                                 bin_folder,
                                                 taxonomy_folder,
                                                 database_folder,
-                                                args.b1,
-                                                args.b2,
+                                                args.r,
+                                                args.f,
                                                 log_file))
         shared.give_user_feedback(message, log_file, quiet, show_time=False)
 
@@ -297,15 +299,15 @@ def bins(args):
                    'Bin folder: {1}/\n'
                    'Taxonomy folder: {2}/\n'
                    'Database folder: {3}/\n'
-                   'b1: {4}\n'
-                   'b2: {5}\n'
-                   'Log file: {5}\n'
+                   'Parameter r: {4}\n'
+                   'Parameter f: {5}\n'
+                   'Log file: {5}\n\n'
                    '-----------------\n'.format(' '.join(sys.argv),
                                                 bin_folder,
                                                 taxonomy_folder,
                                                 database_folder,
-                                                args.b1,
-                                                args.b2,
+                                                args.r,
+                                                args.f,
                                                 log_file))
         shared.give_user_feedback(message, log_file, quiet, show_time=False)
 
@@ -321,15 +323,15 @@ def bins(args):
                    'Bin folder: {1}/\n'
                    'Taxonomy folder: {2}/\n'
                    'Database folder: {3}/\n'
-                   'b1: {4}\n'
-                   'b2: {5}\n'
-                   'Log file: {6}\n'
+                   'Parameter r: {4}\n'
+                   'Parameter f: {5}\n'
+                   'Log file: {6}\n\n'
                    '-----------------\n'.format(' '.join(sys.argv),
                                                 bin_folder,
                                                 taxonomy_folder,
                                                 database_folder,
-                                                args.b1,
-                                                args.b2,
+                                                args.r,
+                                                args.f,
                                                 log_file))
         shared.give_user_feedback(message, log_file, quiet, show_time=False)
     elif (predicted_proteins_fasta is None and
@@ -452,7 +454,7 @@ def bins(args):
     
     (ORF2hits,
      all_hits) = shared.parse_diamond_file(diamond_file,
-                                           bitscore_fraction_cutoff_1,
+                                           one_minus_r,
                                            log_file,
                                            quiet)
 
@@ -470,23 +472,23 @@ def bins(args):
                          ORF2LCA_output_file))
     shared.give_user_feedback(message, log_file, quiet)
 
-    with open(bin2classification_output_file, 'w') as outf_b2c, open(ORF2LCA_output_file, 'w') as outf_o2l:
-        outf_b2c.write('# bin\tclassification\tnumber of ORFs in bin\t'
-                       'number of ORFs classification is based on\tlineage\t'
-                       'lineage scores\n')
-        outf_o2l.write('# ORF\tbin\tlineage\tbit-score\n')
+    with open(bin2classification_output_file, 'w') as outf1, open(ORF2LCA_output_file, 'w') as outf2:
+        outf1.write('# bin\tclassification\tnumber of ORFs in bin\t'
+                    'number of ORFs classification is based on\tlineage\t'
+                    'lineage scores\n')
+        outf2.write('# ORF\tbin\tlineage\tbit-score\n')
         
-        for bin in sorted(bin2contigs):
+        for bin_ in sorted(bin2contigs):
             LCAs_ORFs = []
 
-            for contig in sorted(bin2contigs[bin]):
+            for contig in sorted(bin2contigs[bin_]):
                 if contig not in contig2ORFs:
                     continue
 
                 for ORF in contig2ORFs[contig]:
                     if ORF not in ORF2hits:
-                        outf_o2l.write('{0}\t{1}\tORF has no hit to '
-                                       'database.\n'.format(ORF, bin))
+                        outf2.write('{0}\t{1}\tORF has no hit to database.\n'
+                                    ''.format(ORF, bin_))
 
                         continue
 
@@ -496,27 +498,27 @@ def bins(args):
                                                           taxid2parent)
                      
                     if taxid.startswith('no taxid found'):
-                        outf_o2l.write('{0}\t{1}\t{2}\t{3}\n'
-                                       ''.format(ORF,
-                                                 bin,
-                                                 taxid,
-                                                 top_bitscore))
+                        outf2.write('{0}\t{1}\t{2}\t{3}\n'
+                                    ''.format(ORF,
+                                              bin_,
+                                              taxid,
+                                              top_bitscore))
                     else:
                         lineage = tax.find_lineage(taxid, taxid2parent)
                         starred_lineage = tax.star_lineage(lineage,
                                                            taxids_with_multiple_offspring)
 
-                        outf_o2l.write('{0}\t{1}\t{2}\t{3}\n'
-                                       ''.format(ORF,
-                                                 bin,
-                                                 ';'.join(starred_lineage[::-1]),
-                                                 top_bitscore))
+                        outf2.write('{0}\t{1}\t{2}\t{3}\n'
+                                    ''.format(ORF,
+                                              bin_,
+                                              ';'.join(starred_lineage[::-1]),
+                                              top_bitscore))
                                        
                     LCAs_ORFs.append((taxid, top_bitscore))
                     
             if len(LCAs_ORFs) == 0:
-                outf_b2c.write('{0}\tunclassified (no hits to database)\n'
-                               ''.format(bin))
+                outf1.write('{0}\tunclassified (no hits to database)\n'
+                            ''.format(bin_))
 
                 continue
 
@@ -524,25 +526,25 @@ def bins(args):
              lineages_scores,
              based_on_number_of_ORFs) = tax.find_weighted_LCA(LCAs_ORFs,
                                                               taxid2parent,
-                                                              bitscore_fraction_cutoff_2)
+                                                              f)
 
             if lineages == 'no ORFs with taxids found.':
-                outf_b2c.write('{0}\tunclassified '
-                               '(hits not found in taxonomy files)\n'
-                               ''.format(bin))
+                outf1.write('{0}\tunclassified '
+                            '(hits not found in taxonomy files)\n'
+                            ''.format(bin_))
 
                 continue
 
             if lineages == 'no lineage whitelisted.':
-                outf_c2c.write('{0}\tunclassified '
-                               '(no lineage reached b2 parameter threshold)\n'
-                               ''.format(bin))
+                outf1.write('{0}\tunclassified '
+                            '(no lineage reached minimum bit-score support)\n'
+                            ''.format(bin_))
 
                 continue
             
             # The bin has a valid classification.
             total_number_of_ORFs = sum([len(contig2ORFs[contig]) for
-                                        contig in bin2contigs[bin] if
+                                        contig in bin2contigs[bin_] if
                                         contig in contig2ORFs])
             
             for (i, lineage) in enumerate(lineages):
@@ -554,30 +556,30 @@ def bins(args):
                 
                 if len(lineages) == 1:
                     # There is only one classification.
-                    outf_b2c.write('{0}\tclassified\t{1}\t{2}\t{3}\t{4}\n'
-                                   ''.format(bin,
-                                             total_number_of_ORFs,
-                                             based_on_number_of_ORFs,
-                                             ';'.join(starred_lineage[::-1]),
-                                             ';'.join(scores[::-1])))
+                    outf1.write('{0}\tclassified\t{1}\t{2}\t{3}\t{4}\n'
+                                ''.format(bin_,
+                                          total_number_of_ORFs,
+                                          based_on_number_of_ORFs,
+                                          ';'.join(starred_lineage[::-1]),
+                                          ';'.join(scores[::-1])))
                 else:
                     # There are multiple classifications.
-                    outf_b2c.write('{0}\tclassified ({1}/{2})'
-                                   '\t{3}\t{4}\t{5}\t{6}\n'
-                                   ''.format(bin,
-                                             i + 1, len(lineages),
-                                             total_number_of_ORFs,
-                                             based_on_number_of_ORFs,
-                                             ';'.join(starred_lineage[::-1]),
-                                             ';'.join(scores[::-1])))
+                    outf1.write('{0}\tclassified ({1}/{2})'
+                                '\t{3}\t{4}\t{5}\t{6}\n'
+                                ''.format(bin_,
+                                          i + 1, len(lineages),
+                                          total_number_of_ORFs,
+                                          based_on_number_of_ORFs,
+                                          ';'.join(starred_lineage[::-1]),
+                                          ';'.join(scores[::-1])))
                                    
     message = ('\n-----------------\n'
                '[{0}] BAT is done! {1} bins classified.'
                ''.format(datetime.datetime.now(), len(bin2contigs)))
     shared.give_user_feedback(message, log_file, quiet, show_time=False)
   
-    if bitscore_fraction_cutoff_2 < 0.5:
-        message = ('WARNING: since b2 is set to smaller than 0.5, one bin '
+    if f < 0.5:
+        message = ('WARNING: since f is set to smaller than 0.5, one bin '
                    'may have multiple classifications.')
         shared.give_user_feedback(message, log_file, quiet, show_time=False)
         

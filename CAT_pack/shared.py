@@ -19,8 +19,8 @@ def give_user_feedback(message,
         message = '{0}\n'.format(message)
 
     if log_file:
-        with open(log_file, 'a') as outf:
-            outf.write(message)
+        with open(log_file, 'a') as outf1:
+            outf1.write(message)
 
     if not quiet and not error:
         sys.stdout.write(message)
@@ -47,6 +47,7 @@ def run_prodigal(path_to_prodigal,
                                '-a', predicted_proteins_fasta,
                                '-o', predicted_proteins_gff,
                                '-p', 'meta',
+                               '-g', '11',
                                '-q',
                                '-f', 'gff'])
     except:
@@ -80,6 +81,8 @@ def run_diamond(path_to_diamond,
                                '-d', diamond_database,
                                '-q', predicted_proteins_fasta,
                                '--top', '50',
+                               '--matrix', 'BLOSUM62',
+                               '--evalue', '0.001',
                                '-o', diamond_file,
                                '-p', str(nproc),
                                '--quiet'])
@@ -99,8 +102,8 @@ def import_ORFs(predicted_proteins_fasta, log_file, quiet):
 
     contig2ORFs = {}
     
-    with open(predicted_proteins_fasta, 'r') as f:
-        for line in f:
+    with open(predicted_proteins_fasta, 'r') as f1:
+        for line in f1:
             line = line.rstrip()
 
             if line.startswith('>'):
@@ -116,7 +119,7 @@ def import_ORFs(predicted_proteins_fasta, log_file, quiet):
 
 
 def parse_diamond_file(diamond_file,
-                       bitscore_fraction_cutoff_1,
+                       one_minus_r,
                        log_file,
                        quiet):
     message = 'Parsing Diamond file {0}.'.format(diamond_file)
@@ -127,10 +130,10 @@ def parse_diamond_file(diamond_file,
 
     ORF = 'first ORF'
     ORF_done = False
-    with open(diamond_file, 'r') as f:
-        for line in f:
+    with open(diamond_file, 'r') as f1:
+        for line in f1:
             if line.startswith(ORF) and ORF_done == True:
-                # The ORF has already surpassed its minimum allowed bitscore.
+                # The ORF has already surpassed its minimum allowed bit-score.
                 continue
 
             line = line.rstrip().split('\t')
@@ -145,14 +148,14 @@ def parse_diamond_file(diamond_file,
 
             bitscore = float(line[11])
             
-            if bitscore >= bitscore_fraction_cutoff_1 * best_bitscore:
-                # The hit has a high enough bitscore to be included.
+            if bitscore >= one_minus_r * best_bitscore:
+                # The hit has a high enough bit-score to be included.
                 hit = line[1]
 
                 ORF2hits[ORF].append((hit, bitscore))
                 all_hits.add(hit)
             else:
-                # The hit is not included because its bitscore is too low.
+                # The hit is not included because its bit-score is too low.
                 ORF_done = True
                 
     return (ORF2hits, all_hits)

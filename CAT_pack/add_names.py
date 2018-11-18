@@ -87,7 +87,7 @@ def add_names(args):
     shared.give_user_feedback(message, log_file, quiet, show_time=False)
     
     if not os.path.isfile(input_file):
-        message = 'ERROR: input file does not exist.'
+        message = 'ERROR: input file {0} does not exist.'.format(input_file)
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         sys.exit(1)
@@ -102,13 +102,23 @@ def add_names(args):
     message = 'Appending names...'
     shared.give_user_feedback(message, log_file, quiet)
 
-    with open(input_file, 'r') as f:
-        for line in f:
+    with open(input_file, 'r') as f1:
+        for line in f1:
             if line.startswith('#'):
                 line = line.rstrip().split('\t')
 
-                lineage_index = line.index('lineage')
+                try:
+                    lineage_index = line.index('lineage')
+                except:
+                    message = ('ERROR: {0} is not a supported classification '
+                               'file.'.format(input_file))
+                    shared.give_user_feedback(message,
+                                              log_file,
+                                              quiet,
+                                              error=True)
 
+                    sys.exit(1)
+                    
                 try:
                     scores_index = line.index('lineage scores')
                 except:
@@ -118,21 +128,22 @@ def add_names(args):
 
                 break
         else:
-            message = 'ERROR: input file does not have a recognisable header.'
+            message = ('ERROR: {0} is not a supported classification file.'
+                       ''.format(input_file))
             shared.give_user_feedback(message, log_file, quiet, error=True)
 
             sys.exit(1)
             
-    with open(input_file, 'r') as f, open(output_file, 'w') as outf:
-        for line in f:
+    with open(input_file, 'r') as f1, open(output_file, 'w') as outf1:
+        for line in f1:
             line = line.rstrip()
 
             if line.startswith('#'):
                 if only_official:
-                    outf.write('{0}\tsuperkingdom\tphylum\tclass\torder\t'
-                               'family\tgenus\tspecies\n'.format(line))
+                    outf1.write('{0}\tsuperkingdom\tphylum\tclass\torder\t'
+                                'family\tgenus\tspecies\n'.format(line))
                 else:
-                    outf.write('{0}\tfull lineage names\n'.format(line))
+                    outf1.write('{0}\tfull lineage names\n'.format(line))
                     
                 continue
             
@@ -140,18 +151,18 @@ def add_names(args):
 
             if len(line) != full_length:
                 # Entry does not have a full annotation.
-                outf.write('{0}\n'.format('\t'.join(line)))
+                outf1.write('{0}\n'.format('\t'.join(line)))
 
                 continue
-                
+
             if (line[1].startswith('no taxid found') or
                 line[2].startswith('no taxid found')):
                 # ORF has database hits but the accession number is not found
                 # in the taxonomy files.
-                outf.write('{0}\n'.format('\t'.join(line)))
+                outf1.write('{0}\n'.format('\t'.join(line)))
 
                 continue
-                
+            
             lineage = line[lineage_index].split(';')
 
             if scores_index:
@@ -170,7 +181,7 @@ def add_names(args):
                                              taxid2name,
                                              scores)
 
-            outf.write('{0}\t{1}\n'.format('\t'.join(line), '\t'.join(names)))
+            outf1.write('{0}\t{1}\n'.format('\t'.join(line), '\t'.join(names)))
 
     message = 'Names written to {0}!'.format(output_file)
     shared.give_user_feedback(message, log_file, quiet)
@@ -180,8 +191,8 @@ def run():
     args = parse_arguments()
 
     add_names(args)
-
-
+    
+    
 if __name__ == '__main__':
     sys.exit('Please run \'CAT add_names\' to add taxonomic names to CAT or '
              'BAT output files.')

@@ -11,9 +11,9 @@ import shared
 def convert_arguments(args):
     if 'named_input_file' in args:
         # A call from summarise.
-        return (args.contigs_fasta,
-                args.named_input_file,
+        return (args.named_input_file,
                 args.output_file,
+                args.contigs_fasta,
                 args.quiet)
         
     taxonomy_folder = os.path.expanduser(args.taxonomy_folder.rstrip('/'))
@@ -37,8 +37,8 @@ def convert_arguments(args):
                 args.quiet,
                 args.no_log)
     
-    bitscore_fraction_cutoff_1 = (100 - args.b1) / 100
-    bitscore_fraction_cutoff_2 = args.b2
+    one_minus_r = (100 - args.r) / 100
+    f = args.f
 
     if 'bin_suffix' in args:
         # A call from bins.
@@ -49,8 +49,8 @@ def convert_arguments(args):
                 database_folder,
                 taxonomy_folder,
                 bin_suffix,
-                bitscore_fraction_cutoff_1,
-                bitscore_fraction_cutoff_2,
+                one_minus_r,
+                f,
                 args.out_prefix,
                 args.predicted_proteins_fasta,
                 args.diamond_file,
@@ -64,8 +64,8 @@ def convert_arguments(args):
         return (args.contigs_fasta,
                 database_folder,
                 taxonomy_folder,
-                bitscore_fraction_cutoff_1,
-                bitscore_fraction_cutoff_2,
+                one_minus_r,
+                f,
                 args.out_prefix,
                 args.predicted_proteins_fasta,
                 args.diamond_file,
@@ -292,8 +292,8 @@ def check_if_file_is_fasta(file):
     if not os.path.isfile(file):
         return is_fasta
     
-    with open(file, 'r') as f:
-        for line in f:
+    with open(file, 'r') as f1:
+        for line in f1:
             if line.startswith('>'):
                 is_fasta = True
 

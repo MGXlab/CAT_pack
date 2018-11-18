@@ -12,8 +12,8 @@ def import_nodes(nodes_dmp, log_file, quiet):
     taxid2parent = {}
     taxid2rank = {}
 
-    with open(nodes_dmp, 'r') as f:
-        for line in f:
+    with open(nodes_dmp, 'r') as f1:
+        for line in f1:
             line = line.split('\t')
 
             taxid = line[0]
@@ -32,8 +32,8 @@ def import_names(names_dmp, log_file, quiet):
 
     taxid2name = {}
 
-    with open(names_dmp, 'r') as f:
-        for line in f:
+    with open(names_dmp, 'r') as f1:
+        for line in f1:
             line = line.split('\t')
 
             if line[6] == 'scientific name':
@@ -51,8 +51,8 @@ def import_fastaid2LCAtaxid(fastaid2LCAtaxid_file, all_hits, log_file, quiet):
 
     fastaid2LCAtaxid = {}
 
-    with open(fastaid2LCAtaxid_file, 'r') as f:
-        for line in f:
+    with open(fastaid2LCAtaxid_file, 'r') as f1:
+        for line in f1:
             line = line.rstrip().split('\t')
 
             if line[0] in all_hits:
@@ -70,8 +70,8 @@ def import_taxids_with_multiple_offspring(taxids_with_multiple_offspring_file,
 
     taxids_with_multiple_offspring = set()
 
-    with open(taxids_with_multiple_offspring_file, 'r') as f:
-        for line in f:
+    with open(taxids_with_multiple_offspring_file, 'r') as f1:
+        for line in f1:
             line = line.rstrip()
 
             taxids_with_multiple_offspring.add(line)
@@ -154,7 +154,7 @@ def star_lineage(lineage, taxids_with_multiple_offspring):
 
 def find_weighted_LCA(LCAs_ORFs,
                       taxid2parent,
-                      bitscore_fraction_cutoff_2):
+                      f):
     list_of_lineages = []
     list_of_bitscores = []
     based_on_number_of_ORFs = 0
@@ -187,8 +187,7 @@ def find_weighted_LCA(LCAs_ORFs,
 
     whitelisted_lineages = []
     for taxid in taxid2bitscore:
-        if (taxid2bitscore[taxid] / sum(list_of_bitscores) >
-            bitscore_fraction_cutoff_2):
+        if taxid2bitscore[taxid] / sum(list_of_bitscores) > f:
             lineage = find_lineage(taxid, taxid2parent)
 
             whitelisted_lineages.append(lineage)

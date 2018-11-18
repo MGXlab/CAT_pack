@@ -46,22 +46,24 @@ def parse_arguments():
     
     optional = parser.add_argument_group('Optional arguments')
     
-    optional.add_argument('--b1',
-                          dest='b1',
+    optional.add_argument('-r',
+                          '--range',
+                          dest='r',
                           metavar='',
                           required=False,
                           type=float,
                           choices = [i for i in range(51)],
                           default=10,
-                          help='b1 parameter [0-50] (default: 10).')
-    optional.add_argument('--b2',
-                          dest='b2',
+                          help='r parameter [0-50] (default: 10).')
+    optional.add_argument('-f',
+                          '--fraction',
+                          dest='f',
                           metavar='',
                           required=False,
                           type=float,
                           choices = [i / 100 for i in range(0, 100)],
                           default=0.5,
-                          help='b2 parameter [0-0.99] (default: 0.5).')
+                          help='f parameter [0-0.99] (default: 0.5).')
     optional.add_argument('-o',
                           '--out_prefix',
                           dest='out_prefix',
@@ -148,8 +150,8 @@ def import_contig_names(contig_fasta, log_file, quiet):
 
     contig_names = set()
 
-    with open(contig_fasta, 'r') as f:
-        for line in f:
+    with open(contig_fasta, 'r') as f1:
+        for line in f1:
             if line.startswith('>'):
                 contig = line.split(' ')[0].lstrip('>').rstrip()
 
@@ -176,8 +178,8 @@ def contigs(args):
     (contigs_fasta,
      database_folder,
      taxonomy_folder,
-     bitscore_fraction_cutoff_1,
-     bitscore_fraction_cutoff_2,
+     one_minus_r,
+     f,
      out_prefix,
      predicted_proteins_fasta,
      diamond_file,
@@ -191,7 +193,7 @@ def contigs(args):
         log_file = None
     else:
         log_file = '{0}.log'.format(out_prefix)
-        with open(log_file, 'w') as outf:
+        with open(log_file, 'w') as outf1:
             pass
         
     message = '# CAT v{0}.'.format(about.__version__)
@@ -207,15 +209,15 @@ def contigs(args):
                    'Contigs fasta: {1}\n'
                    'Taxonomy folder: {2}/\n'
                    'Database folder: {3}/\n'
-                   'b1: {4}\n'
-                   'b2: {5}\n'
+                   'Parameter r: {4}\n'
+                   'Parameter f: {5}\n'
                    'Log file: {6}\n\n'
                    '-----------------\n'.format(' '.join(sys.argv),
                                                 contigs_fasta,
                                                 taxonomy_folder,
                                                 database_folder,
-                                                args.b1,
-                                                args.b2,
+                                                args.r,
+                                                args.f,
                                                 log_file))
         shared.give_user_feedback(message, log_file, quiet, show_time=False)
 
@@ -232,15 +234,15 @@ def contigs(args):
                    'Contigs fasta: {1}\n'
                    'Taxonomy folder: {2}/\n'
                    'Database folder: {3}/\n'
-                   'b1: {4}\n'
-                   'b2: {5}\n'
+                   'Parameter r: {4}\n'
+                   'Parameter f: {5}\n'
                    'Log file: {5}\n\n'
                    '-----------------\n'.format(' '.join(sys.argv),
                                                 contigs_fasta,
                                                 taxonomy_folder,
                                                 database_folder,
-                                                args.b1,
-                                                args.b2,
+                                                args.r,
+                                                args.f,
                                                 log_file))
         shared.give_user_feedback(message, log_file, quiet, show_time=False)
 
@@ -256,15 +258,15 @@ def contigs(args):
                    'Contigs fasta: {1}\n'
                    'Taxonomy folder: {2}/\n'
                    'Database folder: {3}/\n'
-                   'b1: {4}\n'
-                   'b2: {5}\n'
+                   'Parameter r: {4}\n'
+                   'Parameter f: {5}\n'
                    'Log file: {6}\n\n'
                    '-----------------\n'.format(' '.join(sys.argv),
                                                 contigs_fasta,
                                                 taxonomy_folder,
                                                 database_folder,
-                                                args.b1,
-                                                args.b2,
+                                                args.r,
+                                                args.f,
                                                 log_file))
         shared.give_user_feedback(message, log_file, quiet, show_time=False)
     elif (predicted_proteins_fasta is None and
@@ -369,7 +371,7 @@ def contigs(args):
         
     (ORF2hits,
      all_hits) = shared.parse_diamond_file(diamond_file,
-                                           bitscore_fraction_cutoff_1,
+                                           one_minus_r,
                                            log_file,
                                            quiet)
 
@@ -387,24 +389,24 @@ def contigs(args):
                          ORF2LCA_output_file))
     shared.give_user_feedback(message, log_file, quiet)
     
-    with open(contig2classification_output_file, 'w') as outf_c2c, open(ORF2LCA_output_file, 'w') as outf_o2l:
-        outf_c2c.write('# contig\tclassification\tnumber of ORFs on contig\t'
-                       'number of ORFs classification is based on\tlineage\t'
-                       'lineage scores\n')
-        outf_o2l.write('# ORF\tlineage\tbit-score\n')
+    with open(contig2classification_output_file, 'w') as outf1, open(ORF2LCA_output_file, 'w') as outf2:
+        outf1.write('# contig\tclassification\tnumber of ORFs on contig\t'
+                    'number of ORFs classification is based on\tlineage\t'
+                    'lineage scores\n')
+        outf2.write('# ORF\tlineage\tbit-score\n')
         
         for contig in sorted(contig_names):
             if contig not in contig2ORFs:
-                outf_c2c.write('{0}\tunclassified (no ORFs found)\n'
-                               ''.format(contig))
+                outf1.write('{0}\tunclassified (no ORFs found)\n'
+                            ''.format(contig))
                 
                 continue
 
             LCAs_ORFs = []
             for ORF in contig2ORFs[contig]:
                 if ORF not in ORF2hits:
-                    outf_o2l.write('{0}\tORF has no hit to database.\n'
-                                  ''.format(ORF))
+                    outf2.write('{0}\tORF has no hit to database.\n'
+                                ''.format(ORF))
 
                     continue
                 
@@ -414,24 +416,24 @@ def contigs(args):
                                                       taxid2parent)
                  
                 if taxid.startswith('no taxid found'):
-                    outf_o2l.write('{0}\t{1}\t{2}\n'.format(ORF,
-                                                            taxid,
-                                                            top_bitscore))
+                    outf2.write('{0}\t{1}\t{2}\n'.format(ORF,
+                                                         taxid,
+                                                         top_bitscore))
                 else:
                     lineage = tax.find_lineage(taxid, taxid2parent)
                     starred_lineage = tax.star_lineage(lineage,
                                                        taxids_with_multiple_offspring)
                     
-                    outf_o2l.write('{0}\t{1}\t{2}\n'
-                                   ''.format(ORF,
-                                             ';'.join(starred_lineage[::-1]),
-                                             top_bitscore))
+                    outf2.write('{0}\t{1}\t{2}\n'
+                                ''.format(ORF,
+                                          ';'.join(starred_lineage[::-1]),
+                                          top_bitscore))
                                    
                 LCAs_ORFs.append((taxid, top_bitscore))
                 
             if len(LCAs_ORFs) == 0:
-                outf_c2c.write('{0}\tunclassified (no hits to database)\n'
-                               ''.format(contig))
+                outf1.write('{0}\tunclassified (no hits to database)\n'
+                            ''.format(contig))
 
                 continue
 
@@ -439,19 +441,19 @@ def contigs(args):
              lineages_scores,
              based_on_number_of_ORFs) = tax.find_weighted_LCA(LCAs_ORFs,
                                                               taxid2parent,
-                                                              bitscore_fraction_cutoff_2)
+                                                              f)
              
             if lineages == 'no ORFs with taxids found.':
-                outf_c2c.write('{0}\tunclassified '
-                               '(hits not found in taxnomy files)\n'
-                               ''.format(contig))
+                outf1.write('{0}\tunclassified '
+                            '(hits not found in taxnomy files)\n'
+                            ''.format(contig))
 
                 continue
             
             if lineages == 'no lineage whitelisted.':
-                outf_c2c.write('{0}\tunclassified '
-                               '(no lineage reached b2 parameter threshold)\n'
-                               ''.format(contig))
+                outf1.write('{0}\tunclassified '
+                            '(no lineage reached minimum bit-score support)\n'
+                            ''.format(contig))
 
                 continue
 
@@ -464,30 +466,30 @@ def contigs(args):
                 
                 if len(lineages) == 1:
                     # There is only one classification.
-                    outf_c2c.write('{0}\tclassified\t{1}\t{2}\t{3}\t{4}\n'
-                                   ''.format(contig,
-                                             len(contig2ORFs[contig]),
-                                             based_on_number_of_ORFs,
-                                             ';'.join(starred_lineage[::-1]),
-                                             ';'.join(scores[::-1])))
+                    outf1.write('{0}\tclassified\t{1}\t{2}\t{3}\t{4}\n'
+                                ''.format(contig,
+                                          len(contig2ORFs[contig]),
+                                          based_on_number_of_ORFs,
+                                          ';'.join(starred_lineage[::-1]),
+                                          ';'.join(scores[::-1])))
                 else:
                     # There are multiple classifications.
-                    outf_c2c.write('{0}\tclassified ({1}/{2})'
-                                   '\t{3}\t{4}\t{5}\t{6}\n'
-                                   ''.format(contig,
-                                             i + 1, len(lineages),
-                                             len(contig2ORFs[contig]),
-                                             based_on_number_of_ORFs,
-                                             ';'.join(starred_lineage[::-1]),
-                                             ';'.join(scores[::-1])))
+                    outf1.write('{0}\tclassified ({1}/{2})'
+                                '\t{3}\t{4}\t{5}\t{6}\n'
+                                ''.format(contig,
+                                          i + 1, len(lineages),
+                                          len(contig2ORFs[contig]),
+                                          based_on_number_of_ORFs,
+                                          ';'.join(starred_lineage[::-1]),
+                                          ';'.join(scores[::-1])))
 
     message = ('\n-----------------\n\n'
                '[{0}] CAT is done! {1} contigs classified.'
                ''.format(datetime.datetime.now(), len(contig_names)))
     shared.give_user_feedback(message, log_file, quiet, show_time=False)
 
-    if bitscore_fraction_cutoff_2 < 0.5:
-        message = ('\nWARNING: since b2 is set to smaller than 0.5, one '
+    if f < 0.5:
+        message = ('\nWARNING: since f is set to smaller than 0.5, one '
                    'contig may have multiple classifications.')
         shared.give_user_feedback(message, log_file, quiet, show_time=False)
 

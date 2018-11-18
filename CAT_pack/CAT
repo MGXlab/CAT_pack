@@ -38,7 +38,7 @@ def help():
                '  bins\t\t\tRun BAT on a set of bins.\n'
                '  add_names\t\tAdd taxonomic names to CAT or BAT output '
                'files.\n'
-               '  summarise\t\tSummarise a named CAT contig classification '
+               '  summarise\t\tSummarise a named CAT or BAT classification '
                'file.\n\n'
                'Optional arguments:\n'
                '  -v, --version\t\tPrint version information and exit.\n'

@@ -215,8 +215,8 @@ def import_prot_accession2taxid(prot_accession2taxid_file, log_file, quiet):
     
     prot_accession2taxid = {}
 
-    with gzip.open(prot_accession2taxid_file, 'rb') as f:
-        for line in f:
+    with gzip.open(prot_accession2taxid_file, 'rb') as f1:
+        for line in f1:
             line = line.decode('utf-8')
             line = line.split('\t')
 
@@ -243,8 +243,8 @@ def make_fastaid2LCAtaxid_file(taxonomy_folder,
     
     corrected = 0
     total = 0
-    with gzip.open(nr_file, 'rb') as f, open(fastaid2LCAtaxid_file, 'w') as outf:
-        for line in f:
+    with gzip.open(nr_file, 'rb') as f1, open(fastaid2LCAtaxid_file, 'w') as outf1:
+        for line in f1:
             line = line.decode('utf-8')
             if not line.startswith('>'):
                 continue
@@ -276,7 +276,7 @@ def make_fastaid2LCAtaxid_file(taxonomy_folder,
 
             LCAtaxid = tax.find_LCA(list_of_lineages)
 
-            outf.write('{0}\t{1}\n'.format(fastaid, LCAtaxid))
+            outf1.write('{0}\t{1}\n'.format(fastaid, LCAtaxid))
 
             try:
                 if LCAtaxid != prot_accession2taxid[fastaid]:
@@ -306,8 +306,8 @@ def find_offspring(taxonomy_folder, fastaid2LCAtaxid_file, log_file, quiet):
 
     taxid2offspring = {}
 
-    with open(fastaid2LCAtaxid_file, 'r') as f:
-        for line in f:
+    with open(fastaid2LCAtaxid_file, 'r') as f1:
+        for line in f1:
             line = line.rstrip().split('\t')
 
             taxid = line[1]
@@ -335,10 +335,10 @@ def write_taxids_with_multiple_offspring_file(taxids_with_multiple_offspring_fil
     message = 'Writing {0}.'.format(taxids_with_multiple_offspring_file)
     shared.give_user_feedback(message, log_file, quiet)
 
-    with open(taxids_with_multiple_offspring_file, 'w') as outf:
+    with open(taxids_with_multiple_offspring_file, 'w') as outf1:
         for taxid in taxid2offspring:
             if len(taxid2offspring[taxid]) >= 2:
-                outf.write('{0}\n'.format(taxid))
+                outf1.write('{0}\n'.format(taxid))
                         
                         
 def prepare(step_list,
@@ -420,7 +420,7 @@ def run_fresh(args, date):
         log_file = None
     else:
         log_file = '{0}.CAT_prepare.fresh.log'.format(date)
-        with open(log_file, 'w') as outf:
+        with open(log_file, 'w') as outf1:
             pass
         
     message = '# CAT v{0}.'.format(about.__version__)
@@ -540,7 +540,7 @@ def run_existing(args, date):
         log_file = None
     else:
         log_file = '{0}.CAT_prepare.existing.log'.format(date)
-        with open(log_file, 'w') as outf:
+        with open(log_file, 'w') as outf1:
             pass
         
     message = '# CAT v{0}.'.format(about.__version__)
