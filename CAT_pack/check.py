@@ -2,7 +2,6 @@
 
 import datetime
 import os
-import psutil
 import subprocess
 import sys
 
@@ -80,9 +79,13 @@ def convert_arguments(args):
 def check_memory(GB):
     error = False
 
-    total_memory = psutil.virtual_memory()[0]
-
-    if total_memory / 2 ** 30 < GB:
+    meminfo_file = '/proc/meminfo'
+    with open(meminfo_file, 'r') as f:
+        for line in f:
+            if line.startswith('MemTotal:'):
+                total_memory = int(line.split(' ')[-2])
+                
+    if total_memory / 2 ** 20 < GB:
         error = True
 
     return ('{0:.1f}'.format(total_memory / 2 ** 30), error)

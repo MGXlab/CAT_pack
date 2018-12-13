@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.3.1
+We removed the psutil dependency.
+
 ## 4.3
 Prepare now checks whether the RAM of your computer is large enough. If not, not to worry! We have put preconstructed databases online.
 
