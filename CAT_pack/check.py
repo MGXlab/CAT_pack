@@ -2,6 +2,7 @@
 
 import datetime
 import os
+import psutil
 import subprocess
 import sys
 
@@ -74,8 +75,19 @@ def convert_arguments(args):
                 args.path_to_diamond,
                 args.quiet,
                 args.no_log)
-        
-        
+
+
+def check_memory(GB):
+    error = False
+
+    total_memory = psutil.virtual_memory()[0]
+
+    if total_memory / 2 ** 30 < GB:
+        error = True
+
+    return ('{0:.1f}'.format(total_memory / 2 ** 30), error)
+
+
 def check_out_prefix(out_prefix, log_file, quiet):
     error = False
 

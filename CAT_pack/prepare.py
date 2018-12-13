@@ -430,8 +430,7 @@ def run_fresh(args, date):
                'CAT prepare is running, constructing a fresh database.\n'
                'Rawr!\n\n'
                'WARNING: preparing the database files may take a couple of '
-               'hours.\n'
-               'WARNING: at least 100GB of memory is adviced.\n\n'
+               'hours.\n\n'
                'Supplied command: {0}\n\n'
                'Taxonomy folder: {1}/\n'
                'Database folder: {2}/\n'
@@ -482,6 +481,21 @@ def run_fresh(args, date):
         message = ('Database folder exists already. Database file will be '
                    'downloaded to it / constructed in it.')
         shared.give_user_feedback(message, log_file, quiet)
+        
+    # Check memory.
+    min_mem = 100
+    (total_memory, error) = check.check_memory(min_mem)
+
+    if error:
+        message = ('ERROR: at least {0}GB of memory is needed for a fresh '
+                   'database construction. {1}GB is found on your system. You '
+                   'can either try to find a machine with more memory, or '
+                   'download preconstructed database files from '
+                   'tbb.bio.uu.nl/bastiaan/CAT_prepare/.'
+                   ''.format(min_mem, total_memory))
+        shared.give_user_feedback(message, log_file, quiet, error=True)
+
+        sys.exit(1)
         
     if taxonomy_folder_inspect == [None]:
         os.mkdir(taxonomy_folder)
@@ -554,8 +568,7 @@ def run_existing(args, date):
                'WARNING: note that the database and taxonomy files should be '
                'downloaded preferably at the same date.\n'
                'WARNING: preparing the database files may take a couple of '
-               'hours.\n'
-               'WARNING: at least 100GB of memory is adviced.\n\n'
+               'hours.\n\n'
                'Supplied command: {0}\n\n'
                'Supplied command: {0}\n\n'
                'Taxonomy folder: {1}/\n'
@@ -751,6 +764,23 @@ def run_existing(args, date):
                    'linking to existing folders?')
         shared.give_user_feedback(message, log_file, quiet, show_time=False)
         
+    if ('make_fastaid2LCAtaxid_file' in step_list or
+        'make_taxids_with_multiple_offspring_file' in step_list):
+        # Check memory.
+        min_mem = 100
+        (total_memory, error) = check.check_memory(min_mem)
+        
+        if error:
+            message = ('ERROR: at least {0}GB of memory is needed for the '
+                       'database construction. {1}GB is found on your system. '
+                       'You can either try to find a machine with more '
+                       'memory, or download preconstructed database files '
+                       'from tbb.bio.uu.nl/bastiaan/CAT_prepare/.'
+                       ''.format(min_mem, total_memory))
+            shared.give_user_feedback(message, log_file, quiet, error=True)
+            
+            sys.exit(1)
+            
     if len(step_list) == 0:
         message = ('All necessary files are found. Existing database does not '
                    'need any more work...')
