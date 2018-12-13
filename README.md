@@ -157,7 +157,7 @@ $ CAT summarise -c contigs.fasta -i first_CAT_run.contig2classification.official
 Run the classification algorithm again with custom parameter settings and name the contig classification output with all names in the lineage:
 
 ```
-$ CAT contigs --r 5 --f 0.1 -c contigs.fasta -d CAT_database/ -t CAT_taxonomy/ -p first_CAT_run.predicted_proteins.fasta -a first_CAT_run.alignment.diamond -o second_CAT_run
+$ CAT contigs --range 5 --fraction 0.1 -c contigs.fasta -d CAT_database/ -t CAT_taxonomy/ -p first_CAT_run.predicted_proteins.fasta -a first_CAT_run.alignment.diamond -o second_CAT_run
 
 $ CAT add_names -i second_CAT_run.contig2classification.txt -o  second_CAT_run.contig2classification.names.txt -t CAT_taxonomy/
 ```
@@ -165,7 +165,7 @@ $ CAT add_names -i second_CAT_run.contig2classification.txt -o  second_CAT_run.c
 Run BAT on a set of MAGs with custom parameter settings and add names to the ORF2LCA output file, suppressing verbosity and not writing a log file:
 
 ```
-$ CAT bins --r 10 --f 0.1 -b ../bins/ -s .fa -d CAT_database/ -t CAT_taxonomy/ -o BAT_run --quiet --no_log
+$ CAT bins -r 10 -f 0.1 -b ../bins/ -s .fa -d CAT_database/ -t CAT_taxonomy/ -o BAT_run --quiet --no_log
 
 $ CAT add_names -i BAT_run.ORF2LCA.txt -o BAT_run.ORF2LCA.names.txt -t CAT_taxonomy/
 ```
