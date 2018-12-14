@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.3.2.1
+Minor bug fix.
+
 ## 4.3.2
 A fruity update: CAT and BAT are now macOS compatible!
 

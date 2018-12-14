@@ -97,7 +97,7 @@ def check_memory(Gb):
         # Mem is given in b, convert to Gb.
         total_memory = mem / 2 ** 30
         
-    if total_memory < GB:
+    if total_memory < Gb:
         error = True
         
     return ('{0:.1f}'.format(total_memory), error)
