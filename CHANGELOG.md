@@ -1,7 +1,7 @@
 # Changelog
 
 ## 4.3.2
-A fruity update: CAT and BAT are now Mac OS compatible!
+A fruity update: CAT and BAT are now macOS compatible!
 
 ## 4.3.1
 We removed the psutil dependency.
