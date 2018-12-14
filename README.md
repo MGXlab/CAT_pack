@@ -50,7 +50,7 @@ This will download the taxonomy files from NCBI taxonomy to a taxonomy folder, a
 
 If some of the files are already on your system (say the taxonomy files and the NR database) you can run:
 ```
-$ CAT prepare --existing -d {folder containing NR) -t {folder containing taxonomy files}
+$ CAT prepare --existing -d {folder containing NR} -t {folder containing taxonomy files}
 ```
 
 CAT prepare will try to assess which files need to be downloaded and created and start from that point. CAT prepare only checks if the necessary files are there, not if they are correctly formatted.
