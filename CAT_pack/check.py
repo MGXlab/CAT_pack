@@ -76,19 +76,31 @@ def convert_arguments(args):
                 args.no_log)
 
 
-def check_memory(GB):
+def check_memory(Gb):
     error = False
+    
+    if sys.platform == 'linux' or sys.platform == 'linux2':
+        # It's a Linux!
+        meminfo_file = '/proc/meminfo'
+        with open(meminfo_file, 'r') as f:
+            for line in f:
+                if line.startswith('MemTotal:'):
+                    mem = int(line.split(' ')[-2])
 
-    meminfo_file = '/proc/meminfo'
-    with open(meminfo_file, 'r') as f:
-        for line in f:
-            if line.startswith('MemTotal:'):
-                total_memory = int(line.split(' ')[-2])
-                
-    if total_memory / 2 ** 20 < GB:
+                    # Mem is given in Kb, convert to Gb.
+                    total_memory = mem / 2 ** 20
+    elif sys.platform == 'darwin':
+        # It's a Mac!
+        meminfo = subprocess.check_output(['sysctl', 'hw.memsize'])
+        mem = int(meminfo.decode('utf-8').rstrip().split(' ')[-1])
+        
+        # Mem is given in b, convert to Gb.
+        total_memory = mem / 2 ** 30
+        
+    if total_memory < GB:
         error = True
-
-    return ('{0:.1f}'.format(total_memory / 2 ** 30), error)
+        
+    return ('{0:.1f}'.format(total_memory), error)
 
 
 def check_out_prefix(out_prefix, log_file, quiet):

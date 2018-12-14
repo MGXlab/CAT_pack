@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.3.2
+Mac OS compatibility!
+
 ## 4.3.1
 We removed the psutil dependency.
 

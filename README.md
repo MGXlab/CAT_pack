@@ -10,7 +10,7 @@ Diamond https://github.com/bbuchfink/diamond (tested on version 0.9.14)
 
 Prodigal https://github.com/hyattpd/Prodigal (tested on version 2.6.3)
 
-CAT and BAT are currently not supported on other operating systems than Linux.
+CAT and BAT have been thoroughly tested on Linux systems, and should run on Mac OS as well.
 
 ## Installation
 No installation is required. You can run CAT and BAT by supplying the absolute path:
