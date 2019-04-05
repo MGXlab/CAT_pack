@@ -192,6 +192,12 @@ def contigs(args):
     if no_log:
         log_file = None
     else:
+        # Check out_prefix already as the log file needs to be written to a
+        # valid location.
+        error = check.check_out_prefix(out_prefix, None, quiet)
+        if error:
+            sys.exit(1)
+
         log_file = '{0}.log'.format(out_prefix)
         with open(log_file, 'w') as outf1:
             pass

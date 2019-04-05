@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
 
 __author__ = 'F. A. Bastiaan von Meijenfeldt'
-__version__ = '4.3.3'
-__date__ = 'December 14, 2018'
+__version__ = '4.3.4'
+__date__ = 'April 5, 2019'

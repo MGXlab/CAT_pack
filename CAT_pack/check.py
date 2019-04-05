@@ -169,6 +169,14 @@ def check_prodigal_binaries(path_to_prodigal, log_file, quiet):
 def check_bin_folder(bin_folder, bin_suffix, log_file, quiet):
     error = False
 
+    if not os.path.isdir(bin_folder):
+        message = ('ERROR: can not find the bin folder.')
+        shared.give_user_feedback(message, log_file, quiet, error=True)
+
+        error = True
+
+        return error
+    
     tmp = []
     for file in os.listdir(bin_folder):
         if file.endswith(bin_suffix):

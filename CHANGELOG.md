@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.3.4
+We extended some of the pre-flight checks.
+
 ## 4.3.3
 Minor bug fix.
 
