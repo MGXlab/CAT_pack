@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.4
+We have added DIAMOND specific options. This allows you to use sensitive mode, and tune memory and temporary disk space usage in during alignment! Moreover, you can now force CAT and BAT to overwrite existing files.
+
 ## 4.3.4
 We extended some of the pre-flight checks.
 

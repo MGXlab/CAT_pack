@@ -14,6 +14,7 @@ def convert_arguments(args):
         return (args.named_input_file,
                 args.output_file,
                 args.contigs_fasta,
+                args.force,
                 args.quiet)
         
     taxonomy_folder = os.path.expanduser(args.taxonomy_folder.rstrip('/'))
@@ -24,6 +25,7 @@ def convert_arguments(args):
                 args.output_file,
                 taxonomy_folder,
                 args.only_official,
+                args.force,
                 args.quiet)
         
     database_folder = os.path.expanduser(args.database_folder.rstrip('/'))
@@ -63,6 +65,7 @@ def convert_arguments(args):
                 args.diamond_file,
                 args.path_to_prodigal,
                 args.path_to_diamond,
+                args.force,
                 args.quiet,
                 args.no_log,
                 args.nproc,
@@ -82,6 +85,7 @@ def convert_arguments(args):
                 args.diamond_file,
                 args.path_to_prodigal,
                 args.path_to_diamond,
+                args.force,
                 args.quiet,
                 args.no_log,
                 args.nproc,
@@ -313,22 +317,13 @@ def check_folders_for_run(taxonomy_folder,
     return error
 
 
-def check_output_files(classification_output_file,
-                       ORF2LCA_output_file,
-                       log_file,
-                       quiet):
+def check_output_file(output_file, log_file, quiet):
     error = False
 
-    if os.path.isfile(classification_output_file):
-        message = ('ERROR: output file {0} already exists.'
-                   ''.format(classification_output_file))
-        shared.give_user_feedback(message, log_file, quiet, error=True)
-
-        error= True
-
-    if os.path.isfile(ORF2LCA_output_file):
-        message = ('ERROR: output file {0} already exists.'
-                   ''.format(ORF2LCA_output_file))
+    if os.path.isfile(output_file):
+        message = ('ERROR: output file {0} already exists. You can choose to '
+                   'overwrite existing files with the [--force] argument.'
+                   ''.format(output_file))
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
@@ -336,7 +331,19 @@ def check_output_files(classification_output_file,
     return error
 
 
-def check_if_file_is_fasta(file):
+def check_input_file(input_file, log_file, quiet):
+    error = False
+
+    if not os.path.isfile(input_file):
+        message = 'ERROR: input file {0} does not exist.'.format(input_file)
+        shared.give_user_feedback(message, log_file, quiet, error=True)
+
+        error = True
+
+    return error
+
+
+def check_whether_file_is_fasta(file):
     is_fasta = False
 
     if not os.path.isfile(file):

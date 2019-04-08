@@ -6,7 +6,7 @@ Contig Annotation Tool (CAT) and Bin Annotation Tool (BAT) are pipelines for the
 ## Dependencies and where to get them
 Python 3 https://www.python.org/ (tested on version 3.5.2)
 
-Diamond https://github.com/bbuchfink/diamond (tested on version 0.9.14)
+DIAMOND https://github.com/bbuchfink/diamond (tested on version 0.9.14)
 
 Prodigal https://github.com/hyattpd/Prodigal (tested on version 2.6.3)
 
@@ -46,7 +46,7 @@ $ tar -xvzf CAT_prepare_20181212.tar.gz
 $ CAT prepare --fresh
 ```
 
-This will download the taxonomy files from NCBI taxonomy to a taxonomy folder, and the NR database to a database folder. A Diamond database is constructed from the NR file. CAT prepare also generates a fastaid2LCAtaxid file, as the first accession numbers in the headers of NR are not necessarily the Last Common Ancestor (LCA) of all accession numbers in it. Moreover, the file taxids\_with\_multiple\_offspring is generated. CAT prepare will typically take a few hours to create a fresh database, and will use up to 100GB of memory.
+This will download the taxonomy files from NCBI taxonomy to a taxonomy folder, and the NR database to a database folder. A DIAMOND database is constructed from the NR file. CAT prepare also generates a fastaid2LCAtaxid file, as the first accession numbers in the headers of NR are not necessarily the Last Common Ancestor (LCA) of all accession numbers in it. Moreover, the file taxids\_with\_multiple\_offspring is generated. CAT prepare will typically take a few hours to create a fresh database, and will use up to 100GB of memory.
 
 If some of the files are already on your system (say the taxonomy files and the NR database) you can run:
 ```
@@ -142,7 +142,7 @@ Getting help for running the prepare utility:
 $ CAT prepare --help
 ```
 
-Create a fresh database, run CAT on a contig set with default parameter settings deploying 16 cores for Diamond alignment, name the contig classification output with official names, and create a summary:
+Create a fresh database, run CAT on a contig set with default parameter settings deploying 16 cores for DIAMOND alignment, name the contig classification output with official names, and create a summary:
 
 ```
 $ CAT prepare --fresh -d CAT_database/ -t CAT_taxonomy/

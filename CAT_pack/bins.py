@@ -117,6 +117,11 @@ def parse_arguments():
                           default='diamond',
                           help='Path to DIAMOND binaries. Please supply if '
                                'BAT can not find DIAMOND.')
+    optional.add_argument('--force',
+                          dest='force',
+                          required=False,
+                          action='store_true',
+                          help='Force overwrite existing files.')
     optional.add_argument('-q',
                           '--quiet',
                           dest='quiet',
@@ -286,6 +291,7 @@ def bins(args):
      diamond_file,
      path_to_prodigal,
      path_to_diamond,
+     force,
      quiet,
      no_log,
      nproc,
@@ -390,7 +396,8 @@ def bins(args):
 
         sys.exit(1)
         
-    # Check binaries, taxonomy folder, and database folder, and set parameters.
+    # Check binaries, output files, taxonomy folder and database folder, and
+    # set parameters.
     message = 'Doing some pre-flight checks first.'
     shared.give_user_feedback(message, log_file, quiet, show_time=False)
 
@@ -407,18 +414,36 @@ def bins(args):
         errors.append(check.check_prodigal_binaries(path_to_prodigal,
                                                     log_file,
                                                     quiet))
+
         concatenated_fasta = '{0}.concatenated.fasta'.format(out_prefix)
         predicted_proteins_fasta = ('{0}.concatenated.predicted_proteins.faa'
                                     ''.format(out_prefix))
         predicted_proteins_gff = ('{0}.concatenated.predicted_proteins.gff'
                                   ''.format(out_prefix))
-        
+
+        if not force:
+            errors.append(check.check_output_file(concatenated_fasta,
+                                                  log_file,
+                                                  quiet))
+            errors.append(check.check_output_file(predicted_proteins_fasta,
+                                                  log_file,
+                                                  quiet))
+            errors.append(check.check_output_file(predicted_proteins_gff,
+                                                  log_file,
+                                                  quiet))
+            
     if 'run_diamond' in step_list:
         errors.append(check.check_diamond_binaries(path_to_diamond,
                                                    log_file,
                                                    quiet))
+
         diamond_file = ('{0}.concatenated.alignment.diamond'
                         ''.format(out_prefix))
+
+        if not force:
+            errors.append(check.check_output_file(diamond_file,
+                                                  log_file,
+                                                  quiet))
     else:
         diamond_file = diamond_file
         
@@ -432,13 +457,16 @@ def bins(args):
                                       ''.format(out_prefix))
     ORF2LCA_output_file = '{0}.ORF2LCA.txt'.format(out_prefix)
 
-    errors.append(check.check_output_files(bin2classification_output_file,
-                                           ORF2LCA_output_file,
-                                           log_file,
-                                           quiet))
-
+    if not force:
+        errors.append(check.check_output_file(bin2classification_output_file,
+                                              log_file,
+                                              quiet))
+        errors.append(check.check_output_file(ORF2LCA_output_file,
+                                              log_file,
+                                              quiet))
+        
     if 'run_prodigal' not in step_list:
-        if not check.check_if_file_is_fasta(predicted_proteins_fasta):
+        if not check.check_whether_file_is_fasta(predicted_proteins_fasta):
             message = ('ERROR: {0} is not a fasta file.'
                        ''.format(predicted_proteins_fasta))
             shared.give_user_feedback(message, log_file, quiet, error=True)

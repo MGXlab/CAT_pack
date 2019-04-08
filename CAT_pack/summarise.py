@@ -13,8 +13,8 @@ def parse_arguments():
     parser = argparse.ArgumentParser(prog='CAT summarise',
                                      description='Summarise a named CAT or '
                                                  'BAT classification file.',
-                                     usage='CAT summarise -c -i -o '
-                                           '[-h / --help]',
+                                     usage='CAT summarise -i -o (-c) '
+                                           '[options] [-h / --help]',
                                      add_help=False)
     
     required = parser.add_argument_group('Required arguments')
@@ -39,7 +39,7 @@ def parse_arguments():
                           help='Path to output file.')
     
     optional = parser.add_argument_group('Optional arguments')
-
+    
     optional.add_argument('-c',
                           '--contigs_fasta',
                           dest='contigs_fasta',
@@ -49,6 +49,11 @@ def parse_arguments():
                           help='Path to contigs fasta file. This is required '
                                'if you want to summarise a contig '
                                'classification file.')
+    optional.add_argument('--force',
+                          dest='force',
+                          required=False,
+                          action='store_true',
+                          help='Force overwrite existing files.')
     optional.add_argument('-q',
                           '--quiet',
                           dest='quiet',
@@ -101,19 +106,23 @@ def import_contig_lengths(contigs_fasta, log_file, quiet):
     return contig2length
 
 
-def summarise_contigs(input_file, output_file, contigs_fasta, quiet):
+def summarise_contigs(input_file, output_file, contigs_fasta, force, quiet):
     # Currently summarise does not a allow for a log file.
     log_file = None
     
     message = '# CAT v{0}.'.format(about.__version__)
     shared.give_user_feedback(message, log_file, quiet, show_time=False)
-    
-    if not os.path.isfile(input_file):
-        message = 'ERROR: input file does not exist.'
-        shared.give_user_feedback(message, log_file, quiet, error=True)
 
+    errors = []
+
+    errors.append(check.check_input_file(input_file, log_file, quiet))
+
+    if not force:
+        errors.append(check.check_output_file(output_file, log_file, quiet))
+
+    if True in errors:
         sys.exit(1)
-
+        
     contig2length = import_contig_lengths(contigs_fasta, log_file, quiet)
 
     message = 'Summarising...'
@@ -287,17 +296,21 @@ def summarise_contigs(input_file, output_file, contigs_fasta, quiet):
     shared.give_user_feedback(message, log_file, quiet)
     
     
-def summarise_bins(input_file, output_file, quiet):
+def summarise_bins(input_file, output_file, force, quiet):
     # Currently summarise does not a allow for a log file.
     log_file = None
     
     message = '# CAT v{0}.'.format(about.__version__)
     shared.give_user_feedback(message, log_file, quiet, show_time=False)
     
-    if not os.path.isfile(input_file):
-        message = 'ERROR: input file does not exist.'
-        shared.give_user_feedback(message, log_file, quiet, error=True)
+    errors = []
 
+    errors.append(check.check_input_file(input_file, log_file, quiet))
+
+    if not force:
+        errors.append(check.check_output_file(output_file, log_file, quiet))
+
+    if True in errors:
         sys.exit(1)
         
     message = 'Summarising...'
@@ -433,12 +446,13 @@ def summarise(args):
     (input_file,
      output_file,
      contigs_fasta,
+     force,
      quiet) = check.convert_arguments(args)
     
     if contigs_fasta == None:
-        summarise_bins(input_file, output_file, quiet)
+        summarise_bins(input_file, output_file, force, quiet)
     else:
-        summarise_contigs(input_file, output_file, contigs_fasta, quiet)
+        summarise_contigs(input_file, output_file, contigs_fasta, force, quiet)
         
         
 def run():

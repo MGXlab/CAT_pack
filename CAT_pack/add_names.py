@@ -51,6 +51,11 @@ def parse_arguments():
                           required=False,
                           action='store_true',
                           help='Only output official level names.')
+    optional.add_argument('--force',
+                          dest='force',
+                          required=False,
+                          action='store_true',
+                          help='Force overwrite existing files.')
     optional.add_argument('-q',
                           '--quiet',
                           dest='quiet',
@@ -78,6 +83,7 @@ def add_names(args):
      output_file,
      taxonomy_folder,
      only_official,
+     force,
      quiet) = check.convert_arguments(args)
 
     # Currently add_names does not allow for a log file.
@@ -85,13 +91,17 @@ def add_names(args):
     
     message = '# CAT v{0}.'.format(about.__version__)
     shared.give_user_feedback(message, log_file, quiet, show_time=False)
-    
-    if not os.path.isfile(input_file):
-        message = 'ERROR: input file {0} does not exist.'.format(input_file)
-        shared.give_user_feedback(message, log_file, quiet, error=True)
 
+    errors = []
+
+    errors.append(check.check_input_file(input_file, log_file, quiet))
+
+    if not force:
+        errors.append(check.check_output_file(output_file, log_file, quiet))
+
+    if True in errors:
         sys.exit(1)
-
+        
     (nodes_dmp,
      names_dmp,
      prot_accession2taxid_file) = check.inspect_taxonomy_folder(taxonomy_folder)
