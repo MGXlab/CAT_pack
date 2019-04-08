@@ -36,9 +36,9 @@ To get started with CAT and BAT, you will have to get the database files on your
 ### Downloading the database files.
 To download the database files, find the most recent version on tbb.bio.uu.nl/bastiaan/CAT\_prepare/, download and extract, and you are ready to go!
 ```
-$ wget tbb.bio.uu.nl/bastiaan/CAT_prepare/CAT_prepare_20181212.tar.gz
+$ wget tbb.bio.uu.nl/bastiaan/CAT_prepare/CAT_prepare_20190108.tar.gz
 
-$ tar -xvzf CAT_prepare_20181212.tar.gz
+$ tar -xvzf CAT_prepare_20190108.tar.gz
 ```
 
 ### Generating the database files yourself.
