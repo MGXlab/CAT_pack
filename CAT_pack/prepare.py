@@ -63,23 +63,14 @@ def parse_arguments():
                           default='{0}_taxonomy'.format(date),
                           help='Name of folder to which taxonomy files will '
                                'be downloaded (default: {date}_taxonomy).')
-    optional.add_argument('-n',
-                          '--nproc',
-                          dest='nproc',
-                          metavar='',
-                          required=False,
-                          type=int,
-                          default=multiprocessing.cpu_count(),
-                          help='Number of cores to deploy for Diamond makedb '
-                               '(default: maximum).')
     optional.add_argument('--path_to_diamond',
                           dest='path_to_diamond',
                           metavar='',
                           required=False,
                           type=str,
                           default='diamond',
-                          help='Path to Diamond binaries. Please supply if CAT'
-                               ' prepare can not find Diamond.')
+                          help='Path to DIAMOND binaries. Please supply if CAT'
+                               ' prepare can not find DIAMOND.')
     optional.add_argument('-q',
                           '--quiet',
                           dest='quiet',
@@ -95,7 +86,19 @@ def parse_arguments():
                           '--help',
                           action='help',
                           help='Show this help message and exit.')
+    
+    specific = parser.add_argument_group('DIAMOND specific optional arguments')
 
+    specific.add_argument('-n',
+                          '--nproc',
+                          dest='nproc',
+                          metavar='',
+                          required=False,
+                          type=int,
+                          default=multiprocessing.cpu_count(),
+                          help='Number of cores to deploy by DIAMOND makedb '
+                               '(default: maximum).')
+    
     (args, extra_args) = parser.parse_known_args()
 
     extra_args = [arg for (i, arg) in enumerate(extra_args) if
@@ -187,7 +190,7 @@ def make_diamond_database(path_to_diamond,
                           nproc,
                           log_file,
                           quiet):
-    message = ('Constructing Diamond database {0}.dmnd from {1}. '
+    message = ('Constructing DIAMOND database {0}.dmnd from {1}. '
                'Please be patient...'.format(diamond_database_prefix, nr_file))
     shared.give_user_feedback(message, log_file, quiet)
 
@@ -199,12 +202,12 @@ def make_diamond_database(path_to_diamond,
     try:
         subprocess.check_call(command)
     except:
-        message = 'ERROR: Diamond database could not be created.'
+        message = 'ERROR: DIAMOND database could not be created.'
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         sys.exit(1)
         
-    message = 'Diamond database constructed!'
+    message = 'DIAMOND database constructed!'
     shared.give_user_feedback(message, log_file, quiet)
     
     
@@ -411,10 +414,10 @@ def prepare(step_list,
 def run_fresh(args, date):
     (database_folder,
      taxonomy_folder,
-     nproc,
      path_to_diamond,
      quiet,
-     no_log) = check.convert_arguments(args)
+     no_log,
+     nproc) = check.convert_arguments(args)
     
     if no_log:
         log_file = None
@@ -545,10 +548,10 @@ def run_existing(args, date):
 
     (database_folder,
      taxonomy_folder,
-     nproc,
      path_to_diamond,
      quiet,
-     no_log) = check.convert_arguments(args)
+     no_log,
+     nproc) = check.convert_arguments(args)
     
     if no_log:
         log_file = None
@@ -583,7 +586,7 @@ def run_existing(args, date):
     message = 'Doing some pre-flight checks first.'
     shared.give_user_feedback(message, log_file, quiet, show_time=False)
     
-    # Check Diamond path.
+    # Check DIAMOND path.
     error = check.check_diamond_binaries(path_to_diamond, log_file, quiet)
     if error:
         sys.exit(1)
@@ -712,14 +715,14 @@ def run_existing(args, date):
         shared.give_user_feedback(message, log_file, quiet)
 
     if diamond_database is None:
-        message = ('Diamond database will be constructed from the NR file.'
+        message = ('DIAMOND database will be constructed from the NR file.'
                    ''.format(nr_file))
         shared.give_user_feedback(message, log_file, quiet)
         
         diamond_database_prefix = '{0}/{1}.nr'.format(database_folder, date)
         step_list.append('make_diamond_database')
     else:
-        message = 'Diamond database found: {0}.'.format(diamond_database)
+        message = 'DIAMOND database found: {0}.'.format(diamond_database)
         shared.give_user_feedback(message, log_file, quiet)
         
         diamond_database_prefix = diamond_database.rsplit('.dmnd', 1)[0]

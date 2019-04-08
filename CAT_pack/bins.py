@@ -95,21 +95,12 @@ def parse_arguments():
                           metavar='',
                           required=False,
                           type=str,
-                          help='Path to Diamond alignment table generated '
+                          help='Path to DIAMOND alignment table generated '
                                'during an earlier run of BAT. If supplied, '
-                               'BAT will skip the Diamond alignment step and '
+                               'BAT will skip the DIAMOND alignment step and '
                                'only classify the bins. A concatenated '
                                'predicted proteins fasta file should also be '
                                'supplied with argument [-p / --proteins].')
-    optional.add_argument('-n',
-                          '--nproc',
-                          dest='nproc',
-                          metavar='',
-                          required=False,
-                          type=int,
-                          default=multiprocessing.cpu_count(),
-                          help='Number of cores to deploy by Diamond '
-                               '(default: maximum).')
     optional.add_argument('--path_to_prodigal',
                           dest='path_to_prodigal',
                           metavar='',
@@ -124,8 +115,8 @@ def parse_arguments():
                           required=False,
                           type=str,
                           default='diamond',
-                          help='Path to Diamond binaries. Please supply if '
-                               'BAT can not find Diamond.')
+                          help='Path to DIAMOND binaries. Please supply if '
+                               'BAT can not find DIAMOND.')
     optional.add_argument('-q',
                           '--quiet',
                           dest='quiet',
@@ -141,7 +132,52 @@ def parse_arguments():
                           '--help',
                           action='help',
                           help='Show this help message and exit.')
+    
+    specific = parser.add_argument_group('DIAMOND specific optional arguments')
 
+    specific.add_argument('-n',
+                          '--nproc',
+                          dest='nproc',
+                          metavar='',
+                          required=False,
+                          type=int,
+                          default=multiprocessing.cpu_count(),
+                          help='Number of cores to deploy by DIAMOND '
+                               '(default: maximum).')
+    specific.add_argument('--sensitive',
+                          dest='sensitive',
+                          required=False,
+                          action='store_true',
+                          help='Run DIAMOND in sensitive mode '
+                               '(default: not enabled).')
+    specific.add_argument('--block_size',
+                          dest='block_size',
+                          metavar='',
+                          required=False,
+                          type=float,
+                          default=2.0,
+                          help='DIAMOND block-size parameter. Lower numbers '
+                               'will decrease memory and temporary disk space '
+                               'usage (default: 2.0).')
+    specific.add_argument('--index_chunks',
+                          dest='index_chunks',
+                          metavar='',
+                          required=False,
+                          type=int,
+                          default=4,
+                          help='DIAMOND index-chunks parameter. Set to 1 on '
+                               'high memory machines. The parameter has no '
+                               'effect on temporary disk space usage '
+                               '(default: 4).')
+    specific.add_argument('--tmpdir',
+                          dest='tmpdir',
+                          metavar='',
+                          required=False,
+                          type=str,
+                          help='Directory for temporary DIAMOND files '
+                               '(default: directory to which output files are '
+                               'written).')
+    
     (args, extra_args) = parser.parse_known_args()
 
     extra_args = [arg for (i, arg) in enumerate(extra_args) if
@@ -248,11 +284,15 @@ def bins(args):
      out_prefix,
      predicted_proteins_fasta,
      diamond_file,
-     nproc,
      path_to_prodigal,
      path_to_diamond,
      quiet,
-     no_log) = check.convert_arguments(args)
+     no_log,
+     nproc,
+     sensitive,
+     block_size,
+     index_chunks,
+     tmpdir) = check.convert_arguments(args)
     
     if no_log:
         log_file = None
@@ -322,7 +362,7 @@ def bins(args):
           diamond_file is not None):
         message = ('\n'
                    'BAT is running. Since a predicted protein fasta and '
-                   'Diamond alignment file are supplied, only bin '
+                   'DIAMOND alignment file are supplied, only bin '
                    'classification is carried out.\n'
                    'Rarw!\n\n'
                    'Supplied command: {0}\n\n'
@@ -343,15 +383,14 @@ def bins(args):
     elif (predicted_proteins_fasta is None and
           diamond_file is not None):
         message = ('ERROR: if you want BAT to only classify a set of bins, '
-                   'you should not only supply a Diamond alignment table but '
+                   'you should not only supply a DIAMOND alignment table but '
                    'also a concatenated predicted protein fasta file with '
                    'argument [-p / --proteins].')
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         sys.exit(1)
         
-    # Do binaries, taxonomy folder, and database folder check and 
-    # set parameters.
+    # Check binaries, taxonomy folder, and database folder, and set parameters.
     message = 'Doing some pre-flight checks first.'
     shared.give_user_feedback(message, log_file, quiet, show_time=False)
 
@@ -446,6 +485,10 @@ def bins(args):
                            predicted_proteins_fasta,
                            diamond_file,
                            nproc,
+                           sensitive,
+                           block_size,
+                           index_chunks,
+                           tmpdir,
                            log_file,
                            quiet)
         

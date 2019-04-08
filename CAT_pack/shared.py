@@ -42,14 +42,15 @@ def run_prodigal(path_to_prodigal,
     give_user_feedback(message, log_file, quiet)
 
     try:
-        subprocess.check_call([path_to_prodigal,
-                               '-i', contigs_fasta,
-                               '-a', predicted_proteins_fasta,
-                               '-o', predicted_proteins_gff,
-                               '-p', 'meta',
-                               '-g', '11',
-                               '-q',
-                               '-f', 'gff'])
+        command = [path_to_prodigal,
+                   '-i', contigs_fasta,
+                   '-a', predicted_proteins_fasta,
+                   '-o', predicted_proteins_gff,
+                   '-p', 'meta',
+                   '-g', '11',
+                   '-q',
+                   '-f', 'gff']
+        subprocess.check_call(command)
     except:
         message = 'ERROR: Prodigal finished abnormally.'
         give_user_feedback(message, log_file, quiet, error=True)
@@ -65,29 +66,56 @@ def run_diamond(path_to_diamond,
                 predicted_proteins_fasta,
                 diamond_file,
                 nproc,
+                sensitive,
+                block_size,
+                index_chunks,
+                tmpdir,
                 log_file,
                 quiet):
-    message = ('Homology search with Diamond is starting. Please be patient. '
-               'Do not forget to cite Diamond when using CAT or BAT in your '
+    if not sensitive:
+        mode = 'fast'
+    else:
+        mode = 'sensitive'
+
+    message = ('Homology search with DIAMOND is starting. Please be patient. '
+               'Do not forget to cite DIAMOND when using CAT or BAT in your '
                'publication!\n'
                '\t\t\t\tquery: {0}\n'
-               '\t\t\t\tdatabase: {1}'.format(predicted_proteins_fasta,
-                                              diamond_database))
+               '\t\t\t\tdatabase: {1}\n'
+               '\t\t\t\tmode: {2}\n'
+               '\t\t\t\tnumber of cores: {3}\n'
+               '\t\t\t\tblock-size (billions of letters): {4}\n'
+               '\t\t\t\tindex-chunks: {5}\n'
+               '\t\t\t\ttmpdir: {6}'.format(predicted_proteins_fasta,
+                                            diamond_database,
+                                            mode,
+                                            nproc,
+                                            block_size,
+                                            index_chunks,
+                                            tmpdir))
     give_user_feedback(message, log_file, quiet)
 
     try:
-        subprocess.check_call([path_to_diamond,
-                               'blastp',
-                               '-d', diamond_database,
-                               '-q', predicted_proteins_fasta,
-                               '--top', '50',
-                               '--matrix', 'BLOSUM62',
-                               '--evalue', '0.001',
-                               '-o', diamond_file,
-                               '-p', str(nproc),
-                               '--quiet'])
+        command = [path_to_diamond,
+                   'blastp',
+                   '-d', diamond_database,
+                   '-q', predicted_proteins_fasta,
+                   '--top', '50',
+                   '--matrix', 'BLOSUM62',
+                   '--evalue', '0.001',
+                   '-o', diamond_file,
+                   '-p', str(nproc),
+                   '--block-size', str(block_size),
+                   '--index-chunks', str(index_chunks),
+                   '--tmpdir', tmpdir,
+                   '--quiet']
+
+        if sensitive:
+            command += ['--sensitive']
+
+        subprocess.check_call(command)
     except:
-        message = 'ERROR: Diamond finished abnormally.'
+        message = 'ERROR: DIAMOND finished abnormally.'
         give_user_feedback(message, log_file, quiet, error=True)
 
         sys.exit(1)
@@ -122,7 +150,7 @@ def parse_diamond_file(diamond_file,
                        one_minus_r,
                        log_file,
                        quiet):
-    message = 'Parsing Diamond file {0}.'.format(diamond_file)
+    message = 'Parsing DIAMOND file {0}.'.format(diamond_file)
     give_user_feedback(message, log_file, quiet)
 
     ORF2hits = {}

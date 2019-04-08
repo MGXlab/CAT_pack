@@ -32,48 +32,63 @@ def convert_arguments(args):
         # A call from prepare.
         return (database_folder,
                 taxonomy_folder,
-                args.nproc,
                 args.path_to_diamond,
                 args.quiet,
-                args.no_log)
+                args.no_log,
+                args.nproc)
     
     one_minus_r = (100 - args.r) / 100
-    f = args.f
 
+    if args.tmpdir is None:
+        if '/' in args.out_prefix:
+            tmpdir = out_prefix.rsplit('/', 1)[0]
+        else:
+            tmpdir = './'
+    else:
+        tmpdir = args.tmpdir
+        
     if 'bin_suffix' in args:
         # A call from bins.
         bin_folder = os.path.expanduser(args.bin_folder.rstrip('/'))
         bin_suffix = '.{0}'.format(args.bin_suffix.lstrip('.'))
-
+        
         return (bin_folder,
                 database_folder,
                 taxonomy_folder,
                 bin_suffix,
                 one_minus_r,
-                f,
+                args.f,
                 args.out_prefix,
                 args.predicted_proteins_fasta,
                 args.diamond_file,
-                args.nproc,
                 args.path_to_prodigal,
                 args.path_to_diamond,
                 args.quiet,
-                args.no_log)
+                args.no_log,
+                args.nproc,
+                args.sensitive,
+                args.block_size,
+                args.index_chunks,
+                tmpdir)
     else:
         # A call from contigs.
         return (args.contigs_fasta,
                 database_folder,
                 taxonomy_folder,
                 one_minus_r,
-                f,
+                args.f,
                 args.out_prefix,
                 args.predicted_proteins_fasta,
                 args.diamond_file,
-                args.nproc,
                 args.path_to_prodigal,
                 args.path_to_diamond,
                 args.quiet,
-                args.no_log)
+                args.no_log,
+                args.nproc,
+                args.sensitive,
+                args.block_size,
+                args.index_chunks,
+                tmpdir)
 
 
 def check_memory(Gb):
@@ -134,10 +149,10 @@ def check_diamond_binaries(path_to_diamond, log_file, quiet):
         c = p.communicate()
         output = c[0].decode().rstrip()
 
-        message = 'Diamond found: {0}.'.format(output)
+        message = 'DIAMOND found: {0}.'.format(output)
         shared.give_user_feedback(message, log_file, quiet)
     except OSError:
-        message = ('ERROR: can not find Diamond. Please check whether it is '
+        message = ('ERROR: can not find DIAMOND. Please check whether it is '
                    'installed or path to the binaries is provided.')
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
@@ -276,7 +291,7 @@ def check_folders_for_run(taxonomy_folder,
          taxids_with_multiple_offspring_file) = database_folder_inspect
 
         if diamond_database is None and 'run_diamond' in step_list:
-            message = 'ERROR: Diamond database not found in database folder.'
+            message = 'ERROR: DIAMOND database not found in database folder.'
             shared.give_user_feedback(message, log_file, quiet, error=True)
 
             error = True
