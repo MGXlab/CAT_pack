@@ -168,14 +168,14 @@ def download_prot_accession2taxid_file(prot_accession2taxid_file,
 def download_nr(nr_file, log_file, quiet):
     url = 'ftp://ftp.ncbi.nlm.nih.gov/blast/db/FASTA/nr.gz'
     
-    message = ('Downloading NR database from {0} to {1}.'
+    message = ('Downloading nr database from {0} to {1}.'
                ''.format(url, nr_file))
     shared.give_user_feedback(message, log_file, quiet)
     
     try:
         urllib.request.urlretrieve(url, nr_file)
     except:
-        message = 'ERROR: download of NR database failed.'
+        message = 'ERROR: download of nr database failed.'
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         sys.exit(1)
@@ -304,7 +304,7 @@ def find_offspring(taxonomy_folder, fastaid2LCAtaxid_file, log_file, quiet):
     nodes_dmp = '{0}/nodes.dmp'.format(taxonomy_folder)
     (taxid2parent, taxid2rank) = tax.import_nodes(nodes_dmp, log_file, quiet)
 
-    message = 'Searching NR database for taxids with multiple offspring.'
+    message = 'Searching nr database for taxids with multiple offspring.'
     shared.give_user_feedback(message, log_file, quiet)
 
     taxid2offspring = {}
@@ -673,7 +673,7 @@ def run_existing(args, date):
     if (nr_file is None and
         None in tmp and
         not all([file is None for file in tmp])):
-        message = ('ERROR: Database folder does not contain an NR file, while '
+        message = ('ERROR: Database folder does not contain an nr file, while '
                    'some but not all of the downstream files that depend on '
                    'it are present. In order to prevent strange bugs from '
                    'arising, please remove all files from the database folder '
@@ -703,7 +703,7 @@ def run_existing(args, date):
         
     if nr_file is None:
         if whether_to_download_nr:
-            message = 'NR file will be downloaded to database folder.'
+            message = 'Nr file will be downloaded to database folder.'
             shared.give_user_feedback(message, log_file, quiet)
             
             nr_file = '{0}/{1}.nr.gz'.format(database_folder, date)
@@ -711,11 +711,11 @@ def run_existing(args, date):
         else:
             pass
     else:
-        message = 'NR file found: {0}.'.format(nr_file)
+        message = 'Nr file found: {0}.'.format(nr_file)
         shared.give_user_feedback(message, log_file, quiet)
 
     if diamond_database is None:
-        message = ('DIAMOND database will be constructed from the NR file.'
+        message = ('DIAMOND database will be constructed from the nr file.'
                    ''.format(nr_file))
         shared.give_user_feedback(message, log_file, quiet)
         
