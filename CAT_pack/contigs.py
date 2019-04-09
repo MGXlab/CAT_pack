@@ -391,7 +391,7 @@ def contigs(args):
                                               quiet))
 
     if 'run_prodigal' not in step_list:
-        if not check.check_fasta_file(predicted_proteins_fasta):
+        if not check.check_whether_file_is_fasta(predicted_proteins_fasta):
             message = ('ERROR: {0} is not a fasta file.'
                        ''.format(predicted_proteins_fasta))
             shared.give_user_feedback(message, log_file, quiet, error=True)
