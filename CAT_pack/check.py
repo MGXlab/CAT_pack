@@ -43,7 +43,7 @@ def convert_arguments(args):
 
     if args.tmpdir is None:
         if '/' in args.out_prefix:
-            tmpdir = out_prefix.rsplit('/', 1)[0]
+            tmpdir = args.out_prefix.rsplit('/', 1)[0]
         else:
             tmpdir = './'
     else:

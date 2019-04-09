@@ -2,4 +2,4 @@
 
 __author__ = 'F. A. Bastiaan von Meijenfeldt'
 __version__ = '4.4'
-__date__ = 'April 8, 2019'
+__date__ = 'April 9, 2019'
