@@ -83,6 +83,12 @@ To run BAT on a set of MAGs:
 $ CAT bins -b {bin folder} -d {database folder} -t {taxonomy folder}
 ```
 
+Alternatively BAT can be run on a single MAG:
+
+```
+$ CAT bin -b {bin fasta} -d {database folder} -t {taxonomy folder}
+```
+
 Multiple output files and a log file will be generated. The final classification files will be called 'out.BAT.ORF2LCA.txt' and 'out.BAT.bin2classification.txt'.
 
 Similarly to CAT, BAT can be run from intermidate steps if gene prediction and alignment have already been carried out once:
@@ -142,7 +148,7 @@ Getting help for running the prepare utility:
 $ CAT prepare --help
 ```
 
-Create a fresh database, run CAT on a contig set with default parameter settings deploying 16 cores for DIAMOND alignment, name the contig classification output with official names, and create a summary:
+First, create a fresh database. Next, run CAT on a contig set with default parameter settings deploying 16 cores for DIAMOND alignment. Finally, name the contig classification output with official names, and create a summary:
 
 ```
 $ CAT prepare --fresh -d CAT_database/ -t CAT_taxonomy/
@@ -154,7 +160,7 @@ $ CAT add_names -i first_CAT_run.contig2classification.txt -o first_CAT_run.cont
 $ CAT summarise -c contigs.fasta -i first_CAT_run.contig2classification.official_names.txt -o CAT_first_run.summary.txt
 ```
 
-Run the classification algorithm again with custom parameter settings and name the contig classification output with all names in the lineage:
+Run the classification algorithm again with custom parameter settings, and name the contig classification output with all names in the lineage:
 
 ```
 $ CAT contigs --range 5 --fraction 0.1 -c contigs.fasta -d CAT_database/ -t CAT_taxonomy/ -p first_CAT_run.predicted_proteins.fasta -a first_CAT_run.alignment.diamond -o second_CAT_run
@@ -162,10 +168,18 @@ $ CAT contigs --range 5 --fraction 0.1 -c contigs.fasta -d CAT_database/ -t CAT_
 $ CAT add_names -i second_CAT_run.contig2classification.txt -o  second_CAT_run.contig2classification.names.txt -t CAT_taxonomy/
 ```
 
-Run BAT on a set of MAGs with custom parameter settings and add names to the ORF2LCA output file, suppressing verbosity and not writing a log file:
+First, run BAT on a set of MAGs with custom parameter settings, suppressing verbosity and not writing a log file. Next, add names to the ORF2LCA output file:
 
 ```
 $ CAT bins -r 10 -f 0.1 -b ../bins/ -s .fa -d CAT_database/ -t CAT_taxonomy/ -o BAT_run --quiet --no_log
 
 $ CAT add_names -i BAT_run.ORF2LCA.txt -o BAT_run.ORF2LCA.names.txt -t CAT_taxonomy/
+```
+
+Run BAT on a single MAG. Next, classify the contigs within the MAG individually without generating new protein files or DIAMOND alignments.
+
+```
+$ CAT bin -b ../bins/interesting_MAG.fasta -d CAT_database/ -t CAT_taxonomy/ -o BAT.interesting_MAG
+
+$ CAT contigs -c ../bins/interesting_MAG.fasta -d CAT_database/ -t CAT_taxonomy/ -a BAT.interesting_MAG.alignment.diamond -p BAT.interesting_MAG.predicted_proteins.faa -o CAT.interesting_MAG
 ```

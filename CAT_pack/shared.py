@@ -124,6 +124,31 @@ def run_diamond(path_to_diamond,
     give_user_feedback(message, log_file, quiet)
 
 
+def import_contig_names(fasta_file, log_file, quiet):
+    message = 'Importing contig names from {0}.'.format(fasta_file)
+    give_user_feedback(message, log_file, quiet)
+    
+    contig_names = set()
+    
+    with open(fasta_file, 'r') as f1:
+        for line in f1:
+            if line.startswith('>'):
+                contig = line.split(' ')[0].lstrip('>').rstrip()
+                
+                if contig in contig_names:
+                    message = ('ERROR: it looks like your fasta file contains '
+                               'duplicate headers! The first duplicate '
+                               'encountered is {0}, but there might be more...'
+                               ''.format(contig))
+                    give_user_feedback(message, log_file, quiet, error=True)
+                    
+                    sys.exit(1)
+                    
+                contig_names.add(contig)
+
+    return contig_names
+
+
 def import_ORFs(predicted_proteins_fasta, log_file, quiet):
     message = 'Parsing ORF file {0}'.format(predicted_proteins_fasta)
     give_user_feedback(message, log_file, quiet)

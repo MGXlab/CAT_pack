@@ -13,22 +13,22 @@ import tax
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(prog='CAT bins',
+    parser = argparse.ArgumentParser(prog='CAT bin',
                                      description='Run Bin Annotation Tool '
-                                                 '(BAT) on a set of bins.',
-                                     usage='CAT bins -b -d -t '
+                                                 '(BAT) on a single bin.',
+                                     usage='CAT bin -b -d -t '
                                            '[options] [-h / --help]',
                                      add_help=False)
     
     required = parser.add_argument_group('Required arguments')
 
     required.add_argument('-b',
-                          '--bin_folder',
-                          dest='bin_folder',
+                          '--bin_fasta',
+                          dest='bin_fasta',
                           metavar='',
                           required=True,
                           type=str,
-                          help='Path to directory containing bins.')
+                          help='Path to bin fasta file.')
     required.add_argument('-d',
                           '--database_folder',
                           metavar='',
@@ -45,14 +45,6 @@ def parse_arguments():
 
     optional = parser.add_argument_group('Optional arguments')
     
-    optional.add_argument('-s',
-                          '--bin_suffix',
-                          dest='bin_suffix',
-                          metavar='',
-                          required=False,
-                          type=str,
-                          default='.fna',
-                          help='Suffix of bins in bin folder (default: .fna).')
     optional.add_argument('-r',
                           '--range',
                           dest='r',
@@ -85,9 +77,8 @@ def parse_arguments():
                           metavar='',
                           required=False,
                           type=str,
-                          help='Path to concatenated predicted proteins fasta '
-                               'file generated during an earlier run of BAT. '
-                               'If supplied, BAT will skip the protein '
+                          help='Path to predicted proteins fasta file. If '
+                               'supplied, BAT will skip the protein '
                                'prediction step.')
     optional.add_argument('-a',
                           '--diamond_alignment',
@@ -95,12 +86,11 @@ def parse_arguments():
                           metavar='',
                           required=False,
                           type=str,
-                          help='Path to DIAMOND alignment table generated '
-                               'during an earlier run of BAT. If supplied, '
+                          help='Path to DIAMOND alignment table. If supplied, '
                                'BAT will skip the DIAMOND alignment step and '
-                               'directly classify the bins. A concatenated '
-                               'predicted proteins fasta file should also be '
-                               'supplied with argument [-p / --proteins].')
+                               'directly classify the bin. A predicted '
+                               'proteins fasta file should also be supplied '
+                               'with argument [-p / --proteins].')
     optional.add_argument('--path_to_prodigal',
                           dest='path_to_prodigal',
                           metavar='',
@@ -186,7 +176,7 @@ def parse_arguments():
     (args, extra_args) = parser.parse_known_args()
 
     extra_args = [arg for (i, arg) in enumerate(extra_args) if
-                  (i, arg) != (0, 'bins')]
+                  (i, arg) != (0, 'bin')]
     if len(extra_args) > 0:
         sys.exit('error: too much arguments supplied:\n{0}'
                  ''.format('\n'.join(extra_args)))
@@ -194,88 +184,12 @@ def parse_arguments():
     return args
 
 
-def import_bins(bin_folder,
-                bin_suffix,
-                log_file,
-                quiet):
-    message = 'Importing bins from {0}/.'.format(bin_folder)
-    shared.give_user_feedback(message, log_file, quiet)
-
-    bin2contigs = {}
-    contig_names = set()
-
-    for file_ in os.listdir(bin_folder):
-        if not file_.endswith(bin_suffix):
-            continue
-        
-        if '.concatenated.' in file_:
-            # Skip concatenated contig fasta and predicted protein fasta files
-            # from earlier runs.
-            continue
-        
-        # Keep the suffix in the bin name.
-        bin_ = file_
-
-        bin2contigs[bin_] = []
-
-        with open('{0}/{1}'.format(bin_folder, file_), 'r') as f1:
-            for line in f1:
-                if line.startswith('>'):
-                    contig = line.split(' ')[0].rstrip().lstrip('>')
-
-                    # Add bin name in front of the contig name.
-                    new_contig_name = '{0}_{1}'.format(bin_, contig)
-                    
-                    if new_contig_name in contig_names:
-                        message = ('ERROR: BAT has encountered {0} twice in '
-                                   'bin {1}. Each fasta header should be '
-                                   'unique in each bin.'
-                                   ''.format(contig, bin_))
-                        shared.give_user_feedback(message,
-                                                  log_file,
-                                                  quiet,
-                                                  error=True)
-
-                        sys.exit(1)
-
-                    contig_names.add(new_contig_name)
-
-                    bin2contigs[bin_].append(new_contig_name)
-                    
-    message = '{0} bin(s) found!'.format(len(bin2contigs))
-    shared.give_user_feedback(message, log_file, quiet)
-
-    return (bin2contigs, contig_names)
-
-
-def make_concatenated_fasta(concatenated_fasta,
-                            bin2contigs,
-                            bin_folder,
-                            log_file,
-                            quiet):
-    message = 'Writing {0}.'.format(concatenated_fasta)
-    shared.give_user_feedback(message, log_file, quiet)
-
-    with open(concatenated_fasta, 'w') as outf1:
-        for bin_ in sorted(bin2contigs):
-            with open('{0}/{1}'.format(bin_folder, bin_), 'r') as f1:
-                for line in f1:
-                    if line.startswith('>'):
-                        contig = line.split(' ')[0].rstrip().lstrip('>')
-                        
-                        # add bin name in front of the contig name.
-                        outf1.write('>{0}_{1}\n'.format(bin_, contig))
-                    else:
-                        outf1.write(line)
-                        
-                        
-def bins(args):
+def single_bin(args):
     step_list = []
 
-    (bin_folder,
+    (bin_fasta,
      database_folder,
      taxonomy_folder,
-     bin_suffix,
      one_minus_r,
      f,
      out_prefix,
@@ -315,14 +229,14 @@ def bins(args):
                    'classification are carried out.\n'
                    'Rarw!\n\n'
                    'Supplied command: {0}\n\n'
-                   'Bin folder: {1}/\n'
+                   'Bin fasta: {1}/\n'
                    'Taxonomy folder: {2}/\n'
                    'Database folder: {3}/\n'
                    'Parameter r: {4}\n'
                    'Parameter f: {5}\n'
                    'Log file: {6}\n\n'
                    '-----------------\n'.format(' '.join(sys.argv),
-                                                bin_folder,
+                                                bin_fasta,
                                                 taxonomy_folder,
                                                 database_folder,
                                                 args.r,
@@ -340,14 +254,14 @@ def bins(args):
                    'carried out.\n'
                    'Rarw!\n\n'
                    'Supplied command: {0}\n\n'
-                   'Bin folder: {1}/\n'
+                   'Bin fasta: {1}/\n'
                    'Taxonomy folder: {2}/\n'
                    'Database folder: {3}/\n'
                    'Parameter r: {4}\n'
                    'Parameter f: {5}\n'
                    'Log file: {5}\n\n'
                    '-----------------\n'.format(' '.join(sys.argv),
-                                                bin_folder,
+                                                bin_fasta,
                                                 taxonomy_folder,
                                                 database_folder,
                                                 args.r,
@@ -364,14 +278,14 @@ def bins(args):
                    'classification is carried out.\n'
                    'Rarw!\n\n'
                    'Supplied command: {0}\n\n'
-                   'Bin folder: {1}/\n'
+                   'Bin fasta: {1}/\n'
                    'Taxonomy folder: {2}/\n'
                    'Database folder: {3}/\n'
                    'Parameter r: {4}\n'
                    'Parameter f: {5}\n'
                    'Log file: {6}\n\n'
                    '-----------------\n'.format(' '.join(sys.argv),
-                                                bin_folder,
+                                                bin_fasta,
                                                 taxonomy_folder,
                                                 database_folder,
                                                 args.r,
@@ -380,10 +294,10 @@ def bins(args):
         shared.give_user_feedback(message, log_file, quiet, show_time=False)
     elif (predicted_proteins_fasta is None and
           diamond_file is not None):
-        message = ('ERROR: if you want BAT to directly classify a set of '
-                   'bins, you should not only supply a DIAMOND alignment '
-                   'table but also a concatenated predicted protein fasta '
-                   'file with argument [-p / --proteins].')
+        message = ('ERROR: if you want BAT to directly classify a single bin, '
+                   'you should not only supply a DIAMOND alignment table but '
+                   'also a predicted protein fasta file with argument '
+                   '[-p / --proteins].')
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         sys.exit(1)
@@ -394,29 +308,22 @@ def bins(args):
     shared.give_user_feedback(message, log_file, quiet, show_time=False)
 
     errors = []
-
-    errors.append(check.check_bin_folder(bin_folder,
-                                         bin_suffix,
-                                         log_file,
-                                         quiet))
     
     errors.append(check.check_out_prefix(out_prefix, log_file, quiet))
-    
+
+    errors.append(check.check_bin_fasta(bin_fasta, log_file, quiet))
+            
     if 'run_prodigal' in step_list:
         errors.append(check.check_prodigal_binaries(path_to_prodigal,
                                                     log_file,
                                                     quiet))
 
-        concatenated_fasta = '{0}.concatenated.fasta'.format(out_prefix)
-        predicted_proteins_fasta = ('{0}.concatenated.predicted_proteins.faa'
+        predicted_proteins_fasta = ('{0}.predicted_proteins.faa'
                                     ''.format(out_prefix))
-        predicted_proteins_gff = ('{0}.concatenated.predicted_proteins.gff'
+        predicted_proteins_gff = ('{0}.predicted_proteins.gff'
                                   ''.format(out_prefix))
 
         if not force:
-            errors.append(check.check_output_file(concatenated_fasta,
-                                                  log_file,
-                                                  quiet))
             errors.append(check.check_output_file(predicted_proteins_fasta,
                                                   log_file,
                                                   quiet))
@@ -429,8 +336,7 @@ def bins(args):
                                                    log_file,
                                                    quiet))
 
-        diamond_file = ('{0}.concatenated.alignment.diamond'
-                        ''.format(out_prefix))
+        diamond_file = '{0}.alignment.diamond'.format(out_prefix)
 
         if not force:
             errors.append(check.check_output_file(diamond_file,
@@ -480,20 +386,11 @@ def bins(args):
     shared.give_user_feedback(message, log_file, quiet, show_time=False)
     
     # Start BAT.
-    (bin2contigs, contig_names) = import_bins(bin_folder,
-                                              bin_suffix,
-                                              log_file,
-                                              quiet)
-
+    contig_names = shared.import_contig_names(bin_fasta, log_file, quiet)
+    
     if 'run_prodigal' in step_list:
-        make_concatenated_fasta(concatenated_fasta,
-                                bin2contigs,
-                                bin_folder,
-                                log_file,
-                                quiet)
-
         shared.run_prodigal(path_to_prodigal,
-                            concatenated_fasta,
+                            bin_fasta,
                             predicted_proteins_fasta,
                             predicted_proteins_gff,
                             log_file,
@@ -546,21 +443,24 @@ def bins(args):
                     'number of ORFs classification is based on\tlineage\t'
                     'lineage scores\n')
         outf2.write('# ORF\tbin\tlineage\tbit-score\n')
-        
-        for bin_ in sorted(bin2contigs):
-            LCAs_ORFs = []
 
-            for contig in sorted(bin2contigs[bin_]):
+        # The list contains only a single bin, but I keep the code like this
+        # to make the code consistent across bin and bins.
+        bin_list = [bin_fasta.rsplit('/', 1)[-1]]
+        for bin_ in bin_list:
+            LCAs_ORFs = []
+            
+            for contig in sorted(contig_names):
                 if contig not in contig2ORFs:
                     continue
-
+                
                 for ORF in contig2ORFs[contig]:
                     if ORF not in ORF2hits:
                         outf2.write('{0}\t{1}\tORF has no hit to database.\n'
                                     ''.format(ORF, bin_))
-
+                        
                         continue
-
+                    
                     (taxid,
                      top_bitscore) = tax.find_LCA_for_ORF(ORF2hits[ORF],
                                                           fastaid2LCAtaxid,
@@ -576,13 +476,13 @@ def bins(args):
                         lineage = tax.find_lineage(taxid, taxid2parent)
                         starred_lineage = tax.star_lineage(lineage,
                                                            taxids_with_multiple_offspring)
-
+                        
                         outf2.write('{0}\t{1}\t{2}\t{3}\n'
                                     ''.format(ORF,
                                               bin_,
                                               ';'.join(starred_lineage[::-1]),
                                               top_bitscore))
-                                       
+                                    
                     LCAs_ORFs.append((taxid, top_bitscore))
                     
             if len(LCAs_ORFs) == 0:
@@ -590,20 +490,20 @@ def bins(args):
                             ''.format(bin_))
 
                 continue
-
+            
             (lineages,
              lineages_scores,
              based_on_number_of_ORFs) = tax.find_weighted_LCA(LCAs_ORFs,
                                                               taxid2parent,
                                                               f)
-
+             
             if lineages == 'no ORFs with taxids found.':
                 outf1.write('{0}\tunclassified '
                             '(hits not found in taxonomy files)\n'
                             ''.format(bin_))
 
                 continue
-
+            
             if lineages == 'no lineage whitelisted.':
                 outf1.write('{0}\tunclassified '
                             '(no lineage reached minimum bit-score support)\n'
@@ -613,17 +513,16 @@ def bins(args):
             
             # The bin has a valid classification.
             number_of_classified_bins += 1
-
+            
             total_number_of_ORFs = sum([len(contig2ORFs[contig]) for
-                                        contig in bin2contigs[bin_] if
+                                        contig in contig_names if
                                         contig in contig2ORFs])
             
             for (i, lineage) in enumerate(lineages):
                 starred_lineage = tax.star_lineage(lineage,
                                                    taxids_with_multiple_offspring)
                 
-                scores = ['{0:.2f}'.format(score) for score in
-                          lineages_scores[i]]
+                scores = ['{0:.2f}'.format(score) for score in lineages_scores[i]]
                 
                 if len(lineages) == 1:
                     # There is only one classification.
@@ -645,10 +544,8 @@ def bins(args):
                                           ';'.join(scores[::-1])))
                                    
     message = ('\n-----------------\n'
-               '[{0}] BAT is done! {1}/{2} bins classified.'
-               ''.format(datetime.datetime.now(),
-                         number_of_classified_bins,
-                         len(bin2contigs)))
+               '[{0}] BAT is done! {1}/1 bin classified.'
+               ''.format(datetime.datetime.now(), number_of_classified_bins))
     shared.give_user_feedback(message, log_file, quiet, show_time=False)
   
     if f < 0.5:
@@ -659,10 +556,10 @@ def bins(args):
         
 def run():
     args = parse_arguments()
-
-    bins(args)
+    
+    single_bin(args)
 
 
 if __name__ == '__main__':
     sys.exit('Please run \'CAT bins\' to run Bin Annotation Tool (BAT) on a '
-             'set of bins.')
+             'single bin.')

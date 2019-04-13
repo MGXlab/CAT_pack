@@ -471,8 +471,8 @@ def run_fresh(args, date):
 
     # Check database folder.
     if database_folder_inspect != [None]:
-        if len([file for file in database_folder_inspect if
-                file is not None]) > 0:
+        if len([file_ for file_ in database_folder_inspect if
+                file_ is not None]) > 0:
             message = ('ERROR: database folder {0} exists already and '
                        'contains database files. Please supply a novel or '
                        'empty folder if you want to start fresh.'
@@ -614,8 +614,8 @@ def run_existing(args, date):
         message = ('ERROR: CAT prepare did not find both nodes.dmp and '
                    'names.dmp in the taxonomy folder. They should be '
                    'downloaded together. Remove {0} and try again.'
-                   ''.format([file for file in (nodes_dmp, names_dmp) if
-                              file is not None][0]))
+                   ''.format([file_ for file_ in (nodes_dmp, names_dmp) if
+                              file_ is not None][0]))
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         sys.exit(1)
@@ -672,7 +672,7 @@ def run_existing(args, date):
            taxids_with_multiple_offspring_file)
     if (nr_file is None and
         None in tmp and
-        not all([file is None for file in tmp])):
+        not all([file_ is None for file_ in tmp])):
         message = ('ERROR: Database folder does not contain an nr file, while '
                    'some but not all of the downstream files that depend on '
                    'it are present. In order to prevent strange bugs from '

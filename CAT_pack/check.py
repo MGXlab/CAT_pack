@@ -48,8 +48,28 @@ def convert_arguments(args):
             tmpdir = './'
     else:
         tmpdir = args.tmpdir
-        
-    if 'bin_suffix' in args:
+
+    if 'bin_fasta' in args:
+        # A call from bin.
+        return (args.bin_fasta,
+                database_folder,
+                taxonomy_folder,
+                one_minus_r,
+                args.f,
+                args.out_prefix,
+                args.predicted_proteins_fasta,
+                args.diamond_file,
+                args.path_to_prodigal,
+                args.path_to_diamond,
+                args.force,
+                args.quiet,
+                args.no_log,
+                args.nproc,
+                args.sensitive,
+                args.block_size,
+                args.index_chunks,
+                tmpdir)
+    elif 'bin_suffix' in args:
         # A call from bins.
         bin_folder = os.path.expanduser(args.bin_folder.rstrip('/'))
         bin_suffix = '.{0}'.format(args.bin_suffix.lstrip('.'))
@@ -197,14 +217,48 @@ def check_bin_folder(bin_folder, bin_suffix, log_file, quiet):
         return error
     
     tmp = []
-    for file in os.listdir(bin_folder):
-        if file.endswith(bin_suffix):
-            tmp.append(file)
+    for file_ in os.listdir(bin_folder):
+        if not file_.endswith(bin_suffix):
+            continue
+
+        if '.concatenated.' in file_:
+            # Skip concatenated contig fasta and predicted protein fasta files
+            # from earlier runs.
+            continue
+        
+        tmp.append(file_)
 
     if len(tmp) == 0:
         message = ('ERROR: no bins found with suffix {0} in bin folder. You '
                    'can set the suffix with the [-s / --bin_suffix] argument.'
                    ''.format(bin_suffix))
+        shared.give_user_feedback(message, log_file, quiet, error=True)
+
+        error = True
+    elif len(tmp) == 1:
+        message = ('WARNING: a single bin is found. You can run BAT in single '
+                   'bin mode, with \'CAT bin\' as opposed to \'CAT bins\' for '
+                   'a set of bins. Both modes will give the same results, but '
+                   'you might find single mode more convenient for your '
+                   'workflow!')
+        shared.give_user_feedback(message, log_file, quiet)
+
+    return error
+
+
+def check_bin_fasta(bin_fasta, log_file, quiet):
+    error = False
+
+    if not check_whether_file_is_fasta(bin_fasta):
+        message = 'ERROR: {0} is not a fasta file.'.format(bin_fasta)
+        shared.give_user_feedback(message, log_file, quiet, error=True)
+
+        error = True
+
+    if os.path.isdir(bin_fasta):
+        message = ('ERROR: {0} is a directory. If you want to classify more '
+                   'than 1 bin you can run \'CAT bins\' instead of '
+                   '\'CAT bin\'.'.format(bin_fasta))
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
@@ -220,13 +274,14 @@ def inspect_taxonomy_folder(taxonomy_folder):
     names_dmp = None
     prot_accession2taxid_file = None
 
-    for file in os.listdir(taxonomy_folder):
-        if file == 'nodes.dmp':
-            nodes_dmp = '{0}/{1}'.format(taxonomy_folder, file)
-        elif file == 'names.dmp':
-            names_dmp = '{0}/{1}'.format(taxonomy_folder, file)
-        elif file.endswith('prot.accession2taxid.gz'):
-            prot_accession2taxid_file = '{0}/{1}'.format(taxonomy_folder, file)
+    for file_ in os.listdir(taxonomy_folder):
+        if file_ == 'nodes.dmp':
+            nodes_dmp = '{0}/{1}'.format(taxonomy_folder, file_)
+        elif file_ == 'names.dmp':
+            names_dmp = '{0}/{1}'.format(taxonomy_folder, file_)
+        elif file_.endswith('prot.accession2taxid.gz'):
+            prot_accession2taxid_file = '{0}/{1}'.format(taxonomy_folder,
+                                                         file_)
 
     return (nodes_dmp, names_dmp, prot_accession2taxid_file)
 
@@ -240,17 +295,17 @@ def inspect_database_folder(database_folder):
     fastaid2LCAtaxid_file = None
     taxids_with_multiple_offspring_file = None
 
-    for file in os.listdir(database_folder):
-        if file.endswith('nr.gz'):
-            nr_file = '{0}/{1}'.format(database_folder, file)
-        elif file.endswith('.dmnd'):
-            diamond_database = '{0}/{1}'.format(database_folder, file)
-        elif file.endswith('fastaid2LCAtaxid'):
-            fastaid2LCAtaxid_file = '{0}/{1}'.format(database_folder, file)
-        elif file.endswith('taxids_with_multiple_offspring'):
+    for file_ in os.listdir(database_folder):
+        if file_.endswith('nr.gz'):
+            nr_file = '{0}/{1}'.format(database_folder, file_)
+        elif file_.endswith('.dmnd'):
+            diamond_database = '{0}/{1}'.format(database_folder, file_)
+        elif file_.endswith('fastaid2LCAtaxid'):
+            fastaid2LCAtaxid_file = '{0}/{1}'.format(database_folder, file_)
+        elif file_.endswith('taxids_with_multiple_offspring'):
             taxids_with_multiple_offspring_file = ('{0}/{1}'
                                                    ''.format(database_folder,
-                                                             file))
+                                                             file_))
                                                    
     return (nr_file,
             diamond_database,
@@ -343,13 +398,13 @@ def check_input_file(input_file, log_file, quiet):
     return error
 
 
-def check_whether_file_is_fasta(file):
+def check_whether_file_is_fasta(file_):
     is_fasta = False
 
-    if not os.path.isfile(file):
+    if not os.path.isfile(file_):
         return is_fasta
     
-    with open(file, 'r') as f1:
+    with open(file_, 'r') as f1:
         for line in f1:
             if line.startswith('>'):
                 is_fasta = True

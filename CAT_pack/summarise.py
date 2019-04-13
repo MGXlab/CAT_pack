@@ -463,4 +463,4 @@ def run():
     
 if __name__ == '__main__':
     sys.exit('Please run \'CAT summarise\' to summarise a named CAT contig '
-             'classification file.')
+             'classification file or named BAT bin classification file.')

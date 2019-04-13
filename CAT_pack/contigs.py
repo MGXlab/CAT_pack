@@ -89,7 +89,7 @@ def parse_arguments():
                           type=str,
                           help='Path to DIAMOND alignment table. If supplied, '
                                'CAT will skip the DIAMOND alignment step and '
-                               'only classify the contigs. A predicted '
+                               'directly classify the contigs. A predicted '
                                'proteins fasta file should also be supplied '
                                'with argument [-p / --proteins].')
     optional.add_argument('--path_to_prodigal',
@@ -183,34 +183,6 @@ def parse_arguments():
                  ''.format('\n'.join(extra_args)))
 
     return args
-
-
-def import_contig_names(contig_fasta, log_file, quiet):
-    message = 'Importing contig names from {0}.'.format(contig_fasta)
-    shared.give_user_feedback(message, log_file, quiet)
-
-    contig_names = set()
-
-    with open(contig_fasta, 'r') as f1:
-        for line in f1:
-            if line.startswith('>'):
-                contig = line.split(' ')[0].lstrip('>').rstrip()
-
-                if contig in contig_names:
-                    message = ('ERROR: it looks like your contig set contains '
-                               'duplicate headers! The first duplicate CAT '
-                               'has encountered is {0}, but there might be '
-                               'more...'.format(contig))
-                    shared.give_user_feedback(message,
-                                             log_file,
-                                             quiet,
-                                             error=True)
-
-                    sys.exit(1)
-
-                contig_names.add(contig)
-
-    return contig_names
 
 
 def contigs(args):
@@ -323,7 +295,7 @@ def contigs(args):
         shared.give_user_feedback(message, log_file, quiet, show_time=False)
     elif (predicted_proteins_fasta is None and
           diamond_file is not None):
-        message = ('ERROR: if you want CAT to only do the classification, '
+        message = ('ERROR: if you want CAT to directly do the classification, '
                    'you should not only supply a DIAMOND alignment table but '
                    'also a predicted protein fasta file with argument '
                    '[-p / --proteins].')
@@ -413,7 +385,7 @@ def contigs(args):
     shared.give_user_feedback(message, log_file, quiet, show_time=False)
     
     # Start CAT.
-    contig_names = import_contig_names(contigs_fasta, log_file, quiet)
+    contig_names = shared.import_contig_names(contigs_fasta, log_file, quiet)
     
     if 'run_prodigal' in step_list:
         shared.run_prodigal(path_to_prodigal,
@@ -462,6 +434,8 @@ def contigs(args):
                ''.format(contig2classification_output_file,
                          ORF2LCA_output_file))
     shared.give_user_feedback(message, log_file, quiet)
+
+    number_of_classified_contigs = 0
     
     with open(contig2classification_output_file, 'w') as outf1, open(ORF2LCA_output_file, 'w') as outf2:
         outf1.write('# contig\tclassification\tnumber of ORFs on contig\t'
@@ -477,6 +451,7 @@ def contigs(args):
                 continue
 
             LCAs_ORFs = []
+
             for ORF in contig2ORFs[contig]:
                 if ORF not in ORF2hits:
                     outf2.write('{0}\tORF has no hit to database.\n'
@@ -532,6 +507,8 @@ def contigs(args):
                 continue
 
             # The contig has a valid classification.
+            number_of_classified_contigs += 1
+
             for (i, lineage) in enumerate(lineages):
                 starred_lineage = tax.star_lineage(lineage,
                                                    taxids_with_multiple_offspring)
@@ -558,8 +535,10 @@ def contigs(args):
                                           ';'.join(scores[::-1])))
 
     message = ('\n-----------------\n\n'
-               '[{0}] CAT is done! {1} contigs classified.'
-               ''.format(datetime.datetime.now(), len(contig_names)))
+               '[{0}] CAT is done! {1}/{2} contigs classified.'
+               ''.format(datetime.datetime.now(),
+                         number_of_classified_contigs,
+                         len(contig_names)))
     shared.give_user_feedback(message, log_file, quiet, show_time=False)
 
     if f < 0.5:
