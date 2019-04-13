@@ -1,7 +1,7 @@
 # Changelog
 
 ## 4.5
-BAT can now be run in single bin mode. The familiar `./CAT bins` is still the go-to option if you want to classify multiple MAGs, but if it's only one MAG you are interested in try out `./CAT bin`! An added benefit of single bin mode is that you can use the alignment and predicted protein files of the BAT run to classify individual contigs in the MAG with CAT, or the other way around.
+BAT can now be run in single bin mode. The familiar `./CAT bins` is still the go-to option if you want to classify multiple MAGs, but if it's only one MAG you are interested in try out `./CAT bin`! An added benefit of single bin mode is that you can use the alignment and predicted protein files of the BAT run to classify individual contigs within the MAG with CAT, or the other way around.
 
 ## 4.4
 We have added DIAMOND specific options. This allows you to use sensitive mode, and tune memory and temporary disk space usage during alignment! Moreover, you can now force CAT and BAT to overwrite existing files.
