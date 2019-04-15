@@ -69,7 +69,7 @@ $ CAT contigs -c {contigs fasta} -d {database folder} -t {taxonomy folder}
 
 Multiple output files and a log file will be generated. The final classification files will be called 'out.CAT.ORF2LCA.txt' and 'out.CAT.contig2classification.txt'.
 
-Alternatively, if you already have a predicted proteins fasta file and/or an alignment table for example from previous runs, you can supply them to CAT, which will then skip the steps that have already been done start from there:
+Alternatively, if you already have a predicted proteins fasta file and/or an alignment table for example from previous runs, you can supply them to CAT, which will then skip the steps that have already been done and start from there:
 
 ```
 $ CAT contigs -c {contigs fasta} -d {database folder} -t {taxonomy folder} -p {predicted proteins fasta} -a {alignment file}
