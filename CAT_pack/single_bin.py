@@ -51,9 +51,9 @@ def parse_arguments():
                           metavar='',
                           required=False,
                           type=float,
-                          choices = [i for i in range(51)],
+                          choices = [i for i in range(50)],
                           default=5,
-                          help='r parameter [0-50] (default: 5).')
+                          help='r parameter [0-49] (default: 5).')
     optional.add_argument('-f',
                           '--fraction',
                           dest='f',
@@ -127,9 +127,14 @@ def parse_arguments():
                           '--help',
                           action='help',
                           help='Show this help message and exit.')
+    optional.add_argument('--I_know_what_Im_doing',
+                          dest='I_know_what_Im_doing',
+                          required=False,
+                          action='store_true',
+                          help='Flag for experimental features.')
     
     specific = parser.add_argument_group('DIAMOND specific optional arguments')
-
+    
     specific.add_argument('-n',
                           '--nproc',
                           dest='nproc',
@@ -151,19 +156,19 @@ def parse_arguments():
                           required=False,
                           type=float,
                           default=2.0,
-                          help='DIAMOND block-size parameter. Lower numbers '
-                               'will decrease memory and temporary disk space '
-                               'usage (default: 2.0).')
+                          help='DIAMOND block-size parameter (default: 2.0). '
+                               'Lower numbers will decrease memory and '
+                               'temporary disk space usage.')
     specific.add_argument('--index_chunks',
                           dest='index_chunks',
                           metavar='',
                           required=False,
                           type=int,
                           default=4,
-                          help='DIAMOND index-chunks parameter. Set to 1 on '
-                               'high memory machines. The parameter has no '
-                               'effect on temporary disk space usage '
-                               '(default: 4).')
+                          help='DIAMOND index-chunks parameter (default: 4). '
+                               'Set to 1 on high memory machines. The '
+                               'parameter has no effect on temporary disk '
+                               'space usage.')
     specific.add_argument('--tmpdir',
                           dest='tmpdir',
                           metavar='',
@@ -172,6 +177,19 @@ def parse_arguments():
                           help='Directory for temporary DIAMOND files '
                                '(default: directory to which output files are '
                                'written).')
+    specific.add_argument('--top',
+                          dest='top',
+                          metavar='',
+                          required=False,
+                          type=float,
+                          choices = [i for i in range(51)],
+                          default=50,
+                          help='DIAMOND top parameter [0-50] (default: 50). '
+                               'Governs hits within range of best hit that '
+                               'are written to the alignment file. This is '
+                               'not the [-r / --range] parameter! Can only be '
+                               'set with the [--I_know_what_Im_doing] flag, '
+                               'see README.md.')
     
     (args, extra_args) = parser.parse_known_args()
 
@@ -180,7 +198,14 @@ def parse_arguments():
     if len(extra_args) > 0:
         sys.exit('error: too much arguments supplied:\n{0}'
                  ''.format('\n'.join(extra_args)))
-
+        
+    # Check experimental features.
+    if not args.I_know_what_Im_doing:
+        if args.top < 50:
+            sys.exit('error: --top can only be set lower than 50 in '
+                     'combination with the --I_know_what_Im_doing flag. See '
+                     'README.md as to why this is the case.')
+            
     return args
 
 
@@ -190,6 +215,7 @@ def single_bin(args):
     (bin_fasta,
      database_folder,
      taxonomy_folder,
+     r,
      one_minus_r,
      f,
      out_prefix,
@@ -204,7 +230,8 @@ def single_bin(args):
      sensitive,
      block_size,
      index_chunks,
-     tmpdir) = check.convert_arguments(args)
+     tmpdir,
+     top) = check.convert_arguments(args)
     
     if no_log:
         log_file = None
@@ -370,6 +397,8 @@ def single_bin(args):
             shared.give_user_feedback(message, log_file, quiet, error=True)
 
             errors.append(True)
+
+    errors.append(check.check_top(top, r, log_file, quiet))
             
     if True in errors:
         sys.exit(1)
@@ -413,6 +442,7 @@ def single_bin(args):
                            block_size,
                            index_chunks,
                            tmpdir,
+                           top,
                            log_file,
                            quiet)
         
@@ -483,7 +513,7 @@ def single_bin(args):
                                               ';'.join(starred_lineage[::-1]),
                                               top_bitscore))
                                     
-                    LCAs_ORFs.append((taxid, top_bitscore))
+                    LCAs_ORFs.append((taxid, top_bitscore),)
                     
             if len(LCAs_ORFs) == 0:
                 outf1.write('{0}\tunclassified (no hits to database)\n'

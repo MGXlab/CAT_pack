@@ -48,12 +48,13 @@ def convert_arguments(args):
             tmpdir = './'
     else:
         tmpdir = args.tmpdir
-
+        
     if 'bin_fasta' in args:
         # A call from bin.
         return (args.bin_fasta,
                 database_folder,
                 taxonomy_folder,
+                args.r,
                 one_minus_r,
                 args.f,
                 args.out_prefix,
@@ -68,7 +69,8 @@ def convert_arguments(args):
                 args.sensitive,
                 args.block_size,
                 args.index_chunks,
-                tmpdir)
+                tmpdir,
+                args.top)
     elif 'bin_suffix' in args:
         # A call from bins.
         bin_folder = os.path.expanduser(args.bin_folder.rstrip('/'))
@@ -78,6 +80,7 @@ def convert_arguments(args):
                 database_folder,
                 taxonomy_folder,
                 bin_suffix,
+                args.r,
                 one_minus_r,
                 args.f,
                 args.out_prefix,
@@ -92,12 +95,14 @@ def convert_arguments(args):
                 args.sensitive,
                 args.block_size,
                 args.index_chunks,
-                tmpdir)
+                tmpdir,
+                args.top)
     else:
         # A call from contigs.
         return (args.contigs_fasta,
                 database_folder,
                 taxonomy_folder,
+                args.r,
                 one_minus_r,
                 args.f,
                 args.out_prefix,
@@ -112,9 +117,10 @@ def convert_arguments(args):
                 args.sensitive,
                 args.block_size,
                 args.index_chunks,
-                tmpdir)
-
-
+                tmpdir,
+                args.top)
+        
+        
 def check_memory(Gb):
     error = False
     
@@ -393,6 +399,24 @@ def check_input_file(input_file, log_file, quiet):
         message = 'ERROR: input file {0} does not exist.'.format(input_file)
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
+        error = True
+
+    return error
+
+
+def check_top(top, r, log_file, quiet):
+    error = False
+
+    if top < 50:
+        message = ('WARNING: [--top] is set lower than 50. This might '
+                   'conflict with future runs with higher settings of the '
+                   '[-r / --range] parameter, see README.md.')
+        shared.give_user_feedback(message, log_file, quiet)
+        
+    if top <= r:
+        message = 'ERROR: [--top] should be higher than [-r / --range].'
+        shared.give_user_feedback(message, log_file, quiet, error=True)
+        
         error = True
 
     return error

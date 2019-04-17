@@ -70,6 +70,7 @@ def run_diamond(path_to_diamond,
                 block_size,
                 index_chunks,
                 tmpdir,
+                top,
                 log_file,
                 quiet):
     if not sensitive:
@@ -86,13 +87,15 @@ def run_diamond(path_to_diamond,
                '\t\t\t\tnumber of cores: {3}\n'
                '\t\t\t\tblock-size (billions of letters): {4}\n'
                '\t\t\t\tindex-chunks: {5}\n'
-               '\t\t\t\ttmpdir: {6}'.format(predicted_proteins_fasta,
-                                            diamond_database,
-                                            mode,
-                                            nproc,
-                                            block_size,
-                                            index_chunks,
-                                            tmpdir))
+               '\t\t\t\ttmpdir: {6}\n'
+               '\t\t\t\ttop: {7}'.format(predicted_proteins_fasta,
+                                         diamond_database,
+                                         mode,
+                                         nproc,
+                                         block_size,
+                                         index_chunks,
+                                         tmpdir,
+                                         top))
     give_user_feedback(message, log_file, quiet)
 
     try:
@@ -100,7 +103,7 @@ def run_diamond(path_to_diamond,
                    'blastp',
                    '-d', diamond_database,
                    '-q', predicted_proteins_fasta,
-                   '--top', '50',
+                   '--top', str(top),
                    '--matrix', 'BLOSUM62',
                    '--evalue', '0.001',
                    '-o', diamond_file,
@@ -205,7 +208,7 @@ def parse_diamond_file(diamond_file,
                 # The hit has a high enough bit-score to be included.
                 hit = line[1]
 
-                ORF2hits[ORF].append((hit, bitscore))
+                ORF2hits[ORF].append((hit, bitscore),)
                 all_hits.add(hit)
             else:
                 # The hit is not included because its bit-score is too low.
