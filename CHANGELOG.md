@@ -1,7 +1,7 @@
 # Changelog
 
 ## 4.6
-We have added the DIAMOND `--top` parameter, and the `--I_know_what_Im_doing` flag for experimental features.
+We have added the DIAMOND `--top` parameter and the `--I_know_what_Im_doing` flag for experimental features.
 
 ## 4.5
 BAT can now be run in single bin mode. The familiar `./CAT bins` is still the go-to option if you want to classify multiple MAGs, but if it's only one MAG you are interested in try out `./CAT bin`! An added benefit of single bin mode is that you can use the alignment and predicted protein files of the BAT run to classify individual contigs within the MAG with CAT, or the other way around.
