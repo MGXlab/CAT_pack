@@ -190,8 +190,9 @@ def make_diamond_database(path_to_diamond,
                           nproc,
                           log_file,
                           quiet):
-    message = ('Constructing DIAMOND database {0}.dmnd from {1}. '
-               'Please be patient...'.format(diamond_database_prefix, nr_file))
+    message = ('Constructing DIAMOND database {0}.dmnd from {1} '
+               'using {2} cores. Please be patient...'
+               ''.format(diamond_database_prefix, nr_file, nproc))
     shared.give_user_feedback(message, log_file, quiet)
 
     command = [path_to_diamond, 'makedb',
