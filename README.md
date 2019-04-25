@@ -44,7 +44,7 @@ $ conda install -c bioconda cat
 To get started with CAT and BAT, you will have to get the database files on your system. You can either download preconstructed database files, or generate them yourself which will get you the latest versions of nr and the taxonomy files.
 
 ### Downloading the database files.
-To download the database files, find the most recent version on tbb.bio.uu.nl/bastiaan/CAT\_prepare/, download and extract, and you are ready to go!
+To download the database files, find the most recent version on [tbb.bio.uu.nl/bastiaan/CAT\_prepare/](https://tbb.bio.uu.nl/bastiaan/CAT_prepare/), download and extract, and you are ready to go!
 ```
 $ wget tbb.bio.uu.nl/bastiaan/CAT_prepare/CAT_prepare_20190108.tar.gz
 
