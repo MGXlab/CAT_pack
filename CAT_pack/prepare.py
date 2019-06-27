@@ -121,7 +121,7 @@ def download_taxonomy_files(taxonomy_folder, date, log_file, quiet):
     try:
         urllib.request.urlretrieve(url, tmp_taxonomy_file)
     except:
-        message = 'ERROR: donwload of taxonomy files failed.'
+        message = 'ERROR: download of taxonomy files failed.'
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         sys.exit(1)
