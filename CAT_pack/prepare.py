@@ -293,7 +293,7 @@ def make_fastaid2LCAtaxid_file(taxonomy_folder,
 
     message = ('Done! File {0} is created. '
                '{1} of {2} headers ({3:.1f}%) corrected. Please wait '
-               'patiently for Python to collect carbage.'
+               'patiently for Python to collect garbage.'
                ''.format(fastaid2LCAtaxid_file,
                          corrected,
                          total,
