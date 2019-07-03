@@ -286,7 +286,7 @@ def single_bin(args):
                    'Database folder: {3}/\n'
                    'Parameter r: {4}\n'
                    'Parameter f: {5}\n'
-                   'Log file: {5}\n\n'
+                   'Log file: {6}\n\n'
                    '-----------------\n'.format(' '.join(sys.argv),
                                                 bin_fasta,
                                                 taxonomy_folder,
