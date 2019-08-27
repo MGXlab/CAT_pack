@@ -35,8 +35,7 @@ Alternatively, if you add the files in the CAT\_pack directory to your $PATH var
 $ CAT --version
 ```
 
-*Special note for Mac users: since the Mac OS file system is case-insensitive by default, adding the CAT\_pack directory to your $PATH variable might overwrite the standard unix cat utility.*
-
+*Special note for Mac users: since the Mac OS file system is case-insensitive by default, adding the CAT\_pack directory to your $PATH variable might replace calls to the standard unix cat utility. We advise MAC users to run CAT from its absolute path.*
 
 CAT and BAT can also be installed via Bioconda, thanks to Silas Kieser:
 ```
