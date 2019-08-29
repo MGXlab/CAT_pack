@@ -468,14 +468,13 @@ def contigs(args):
     number_of_classified_contigs = 0
     
     with open(contig2classification_output_file, 'w') as outf1, open(ORF2LCA_output_file, 'w') as outf2:
-        outf1.write('# contig\tclassification\tnumber of ORFs on contig\t'
-                    'number of ORFs classification is based on\tlineage\t'
+        outf1.write('# contig\tclassification\treason\tlineage\t'
                     'lineage scores\n')
         outf2.write('# ORF\tlineage\tbit-score\n')
         
         for contig in sorted(contig_names):
             if contig not in contig2ORFs:
-                outf1.write('{0}\tunclassified (no ORFs found)\n'
+                outf1.write('{0}\tunclassified\tno ORFs found\n'
                             ''.format(contig))
                 
                 continue
@@ -484,7 +483,7 @@ def contigs(args):
 
             for ORF in contig2ORFs[contig]:
                 if ORF not in ORF2hits:
-                    outf2.write('{0}\tORF has no hit to database.\n'
+                    outf2.write('{0}\tORF has no hit to database\n'
                                 ''.format(ORF))
 
                     continue
@@ -511,7 +510,7 @@ def contigs(args):
                 LCAs_ORFs.append((taxid, top_bitscore),)
                 
             if len(LCAs_ORFs) == 0:
-                outf1.write('{0}\tunclassified (no hits to database)\n'
+                outf1.write('{0}\tunclassified\tno hits to database\n'
                             ''.format(contig))
 
                 continue
@@ -523,15 +522,15 @@ def contigs(args):
                                                               f)
              
             if lineages == 'no ORFs with taxids found.':
-                outf1.write('{0}\tunclassified '
-                            '(hits not found in taxnomy files)\n'
+                outf1.write('{0}\tunclassified\t'
+                            'hits not found in taxonomy files\n'
                             ''.format(contig))
 
                 continue
             
             if lineages == 'no lineage whitelisted.':
-                outf1.write('{0}\tunclassified '
-                            '(no lineage reached minimum bit-score support)\n'
+                outf1.write('{0}\tunclassified\t'
+                            'no lineage reached minimum bit-score support\n'
                             ''.format(contig))
 
                 continue
@@ -547,20 +546,22 @@ def contigs(args):
                 
                 if len(lineages) == 1:
                     # There is only one classification.
-                    outf1.write('{0}\tclassified\t{1}\t{2}\t{3}\t{4}\n'
+                    outf1.write('{0}\tclassified\t'
+                                'based on {1}/{2} ORFs\t{3}\t{4}\n'
                                 ''.format(contig,
-                                          len(contig2ORFs[contig]),
                                           based_on_number_of_ORFs,
+                                          len(contig2ORFs[contig]),
                                           ';'.join(starred_lineage[::-1]),
                                           ';'.join(scores[::-1])))
                 else:
                     # There are multiple classifications.
-                    outf1.write('{0}\tclassified ({1}/{2})'
-                                '\t{3}\t{4}\t{5}\t{6}\n'
+                    outf1.write('{0}\tclassified ({1}/{2})\t'
+                                'based on {3}/{4} ORFs\t{5}\t{6}\n'
                                 ''.format(contig,
-                                          i + 1, len(lineages),
-                                          len(contig2ORFs[contig]),
+                                          i + 1,
+                                          len(lineages),
                                           based_on_number_of_ORFs,
+                                          len(contig2ORFs[contig]),
                                           ';'.join(starred_lineage[::-1]),
                                           ';'.join(scores[::-1])))
 

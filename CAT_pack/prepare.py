@@ -633,15 +633,12 @@ def run_existing(args, date):
 
         message = 'Names.dmp found: {0}.'.format(names_dmp)
         shared.give_user_feedback(message, log_file, quiet)
-        
+
     if prot_accession2taxid_file is None:
-        message = ('Prot.accession2taxid file will be downloaded to taxonomy '
-                   'folder.')
+        # Note that the file will only be downloaded if a new
+        # fastaid2LCAtaxid_file needs to be constructed.
+        message = 'Prot.accession2taxid file not found in taxonomy folder.'
         shared.give_user_feedback(message, log_file, quiet)
-        
-        prot_accession2taxid_file = ('{0}/{1}.prot.accession2taxid.gz'
-                                     ''.format(taxonomy_folder, date))
-        step_list.append('download_prot_accession2taxid_file')
     else:
         message = ('Prot.accession2taxid file found: {0}.'
                    ''.format(prot_accession2taxid_file))
@@ -729,6 +726,15 @@ def run_existing(args, date):
         diamond_database_prefix = diamond_database.rsplit('.dmnd', 1)[0]
 
     if fastaid2LCAtaxid_file is None:
+        if prot_accession2taxid_file is None:
+            message = ('Prot.accession2taxid file will be downloaded to '
+                       'taxonomy folder.')
+            shared.give_user_feedback(message, log_file, quiet)
+
+            prot_accession2taxid_file = ('{0}/{1}.prot.accession2taxid.gz'
+                                         ''.format(taxonomy_folder, date))
+            step_list.append('download_prot_accession2taxid_file')
+
         message = 'File fastaid2LCAtaxid will be created.'
         shared.give_user_feedback(message, log_file, quiet)
         
@@ -739,6 +745,10 @@ def run_existing(args, date):
         message = ('Fastaid2LCAtaxid found: {0}.'
                    ''.format(fastaid2LCAtaxid_file))
         shared.give_user_feedback(message, log_file, quiet)
+
+        if prot_accession2taxid_file is None:
+            message = 'Prot.accession2taxid file will not be needed.'
+            shared.give_user_feedback(message, log_file, quiet)
 
     if taxids_with_multiple_offspring_file is None:
         message = 'File taxids_with_multiple_offspring will be created.'

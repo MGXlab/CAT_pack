@@ -51,6 +51,12 @@ def parse_arguments():
                           required=False,
                           action='store_true',
                           help='Only output official level names.')
+    optional.add_argument('--exclude_scores',
+                          dest='exclude_scores',
+                          required=False,
+                          action='store_true',
+                          help='Do not include bit-score support scores in '
+                               'the lineage.')
     optional.add_argument('--force',
                           dest='force',
                           required=False,
@@ -83,6 +89,7 @@ def add_names(args):
      output_file,
      taxonomy_folder,
      only_official,
+     exclude_scores,
      force,
      quiet) = check.convert_arguments(args)
 
@@ -175,7 +182,7 @@ def add_names(args):
             
             lineage = line[lineage_index].split(';')
 
-            if scores_index:
+            if scores_index and not exclude_scores:
                 scores = line[scores_index].split(';')
             else:
                 scores = None

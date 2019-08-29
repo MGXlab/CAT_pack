@@ -130,11 +130,12 @@ Where the lineage is the full taxonomic lineage of the classification of the ORF
 
 The contig2classification and bin2classification output looks like this:
 
-contig or bin | classification | number of ORFs on contig or in bin | number of ORFs classification is based on | lineage | lineage scores
+contig or bin | classification | reason | lineage | lineage scores
 --- | --- | --- | --- | --- | ---
-contig\_1 | classified | 15 | 14 | 1;131567;2;1783272 | 1.00; 1.00; 1.00; 0.78
-contig\_2 | classified (1/2) | 10 | 10 | 1;131567;2;1783272;1798711;1117;307596;307595;1890422;33071;1416614;1183438\* | 1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;0.23;0.23
-contig\_2 | classified (2/2) | 10 | 10 | 1;131567;2;1783272;1798711;1117;307596;307595;1890422;33071;33072 | 1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;0.77
+contig\_1 | classified | based on 14/15 ORFs | 1;131567;2;1783272 | 1.00; 1.00; 1.00; 0.78
+contig\_2 | classified (1/2) | based on 10/10 ORFs | 1;131567;2;1783272;1798711;1117;307596;307595;1890422;33071;1416614;1183438\* | 1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;0.23;0.23
+contig\_2 | classified (2/2) | based on 10/10 ORFs | 1;131567;2;1783272;1798711;1117;307596;307595;1890422;33071;33072 | 1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;0.77
+contig\_3 | unclassified | no ORFs found
 
 Where the lineage scores represent the fraction of bit-score support for each classification. **Contig\_2 has two classifications.** This can happen if the *f* parameter is chosen below 0.5. For an explanation of the **starred classification**, see 'Marking suggestive classifications with an asterisk' below.
 
@@ -148,6 +149,12 @@ This will show you that for example contig\_1 is classified as Terrabacteria gro
 
 ```
 $ CAT add_names -i {ORF2LCA / classification file} -o {output file} -t {taxonomy folder} --only_official
+```
+
+Or, alternatively:
+
+```
+$ CAT add_names -i {ORF2LCA / classification file} -o {output file} -t {taxonomy folder} --only_official --exclude_scores
 ```
 
 If you have named a CAT or BAT classification file with official names, you can get a summary of the classification, where total length and number of ORFs supporting a taxon are calculated for contigs, and the number of MAGs per encountered taxon for MAG classification:
@@ -194,17 +201,17 @@ $ CAT prepare --fresh -d CAT_database/ -t CAT_taxonomy/
 
 $ CAT contigs -c contigs.fasta -d CAT_database/ -t CAT_taxonomy/ -n 16 --out_prefix first_CAT_run
 
-$ CAT add_names -i first_CAT_run.contig2classification.txt -o first_CAT_run.contig2classification.official_names.txt -t CAT_taxonomy/
+$ CAT add_names -i first_CAT_run.contig2classification.txt -o first_CAT_run.contig2classification.official_names.txt -t CAT_taxonomy/ --only_official
 
 $ CAT summarise -c contigs.fasta -i first_CAT_run.contig2classification.official_names.txt -o CAT_first_run.summary.txt
 ```
 
-Run the classification algorithm again with custom parameter settings, and name the contig classification output with all names in the lineage:
+Run the classification algorithm again with custom parameter settings, and name the contig classification output with all names in the lineage, excluding the scores:
 
 ```
 $ CAT contigs --range 5 --fraction 0.1 -c contigs.fasta -d CAT_database/ -t CAT_taxonomy/ -p first_CAT_run.predicted_proteins.fasta -a first_CAT_run.alignment.diamond -o second_CAT_run
 
-$ CAT add_names -i second_CAT_run.contig2classification.txt -o  second_CAT_run.contig2classification.names.txt -t CAT_taxonomy/
+$ CAT add_names -i second_CAT_run.contig2classification.txt -o second_CAT_run.contig2classification.names.txt -t CAT_taxonomy/ --exclude_scores
 ```
 
 First, run BAT on a set of MAGs with custom parameter settings, suppressing verbosity and not writing a log file. Next, add names to the ORF2LCA output file:

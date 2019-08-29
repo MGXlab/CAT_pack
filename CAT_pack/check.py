@@ -25,6 +25,7 @@ def convert_arguments(args):
                 args.output_file,
                 taxonomy_folder,
                 args.only_official,
+                args.exclude_scores,
                 args.force,
                 args.quiet)
         

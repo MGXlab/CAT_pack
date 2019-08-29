@@ -219,7 +219,7 @@ def summarise_contigs(input_file, output_file, contigs_fasta, force, quiet):
 
                 sys.exit(1)
 
-            if line[1].startswith('unclassified'):
+            if line[1] == 'unclassified':
                 length['unclassified'].append(contig2length[contig])
 
                 continue
@@ -236,7 +236,10 @@ def summarise_contigs(input_file, output_file, contigs_fasta, force, quiet):
 
                 length[rank][classification].append(contig2length[contig])
 
-                ORFs[rank][classification].append(int(line[2]))
+                # Note that the total number of ORFs on a contig is reproted,
+                # not only the number of ORFs a classification is based on.
+                ORFs_on_contig = int(line[2].split('/')[1].split(' ')[0])
+                ORFs[rank][classification].append(ORFs_on_contig)
 
     if len(doubles) != 0:
         message = ('ERROR: some contigs have multiple classifications. CAT '
@@ -394,7 +397,7 @@ def summarise_bins(input_file, output_file, force, quiet):
 
             bin_trace.add(bin_)
             
-            if line[1].startswith('unclassified'):
+            if line[1] == 'unclassified':
                 number_of_bins['unclassified'] += 1
                 
                 continue

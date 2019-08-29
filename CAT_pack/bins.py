@@ -572,9 +572,7 @@ def bins(args):
     number_of_classified_bins = 0
 
     with open(bin2classification_output_file, 'w') as outf1, open(ORF2LCA_output_file, 'w') as outf2:
-        outf1.write('# bin\tclassification\tnumber of ORFs in bin\t'
-                    'number of ORFs classification is based on\tlineage\t'
-                    'lineage scores\n')
+        outf1.write('# bin\tclassification\treason\tlineage\tlineage scores\n')
         outf2.write('# ORF\tbin\tlineage\tbit-score\n')
         
         for bin_ in sorted(bin2contigs):
@@ -586,7 +584,7 @@ def bins(args):
 
                 for ORF in contig2ORFs[contig]:
                     if ORF not in ORF2hits:
-                        outf2.write('{0}\t{1}\tORF has no hit to database.\n'
+                        outf2.write('{0}\t{1}\tORF has no hit to database\n'
                                     ''.format(ORF, bin_))
 
                         continue
@@ -616,7 +614,7 @@ def bins(args):
                     LCAs_ORFs.append((taxid, top_bitscore),)
                     
             if len(LCAs_ORFs) == 0:
-                outf1.write('{0}\tunclassified (no hits to database)\n'
+                outf1.write('{0}\tunclassified\tno hits to database\n'
                             ''.format(bin_))
 
                 continue
@@ -628,15 +626,15 @@ def bins(args):
                                                               f)
 
             if lineages == 'no ORFs with taxids found.':
-                outf1.write('{0}\tunclassified '
-                            '(hits not found in taxonomy files)\n'
+                outf1.write('{0}\tunclassified\t'
+                            'hits not found in taxonomy files\n'
                             ''.format(bin_))
 
                 continue
 
             if lineages == 'no lineage whitelisted.':
-                outf1.write('{0}\tunclassified '
-                            '(no lineage reached minimum bit-score support)\n'
+                outf1.write('{0}\tunclassified\t'
+                            'no lineage reached minimum bit-score support\n'
                             ''.format(bin_))
 
                 continue
@@ -657,20 +655,22 @@ def bins(args):
                 
                 if len(lineages) == 1:
                     # There is only one classification.
-                    outf1.write('{0}\tclassified\t{1}\t{2}\t{3}\t{4}\n'
+                    outf1.write('{0}\tclassified\t'
+                                'based on {1}/{2} ORFs\t{3}\t{4}\n'
                                 ''.format(bin_,
-                                          total_number_of_ORFs,
                                           based_on_number_of_ORFs,
+                                          total_number_of_ORFs,
                                           ';'.join(starred_lineage[::-1]),
                                           ';'.join(scores[::-1])))
                 else:
                     # There are multiple classifications.
-                    outf1.write('{0}\tclassified ({1}/{2})'
-                                '\t{3}\t{4}\t{5}\t{6}\n'
+                    outf1.write('{0}\tclassified ({1}/{2})\t'
+                                'based on {3}/{4} ORFs\t{5}\t{6}\n'
                                 ''.format(bin_,
-                                          i + 1, len(lineages),
-                                          total_number_of_ORFs,
+                                          i + 1,
+                                          len(lineages),
                                           based_on_number_of_ORFs,
+                                          total_number_of_ORFs,
                                           ';'.join(starred_lineage[::-1]),
                                           ';'.join(scores[::-1])))
                                    

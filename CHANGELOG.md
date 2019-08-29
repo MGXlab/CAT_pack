@@ -1,5 +1,8 @@
 # Changelog
 
+## 5.0
+We have simplified the output table format: we have added a 'reason' column, which shows the number of ORFs a classification is based on and the total number of predicted ORFs on a contig/MAG. In case of an unclassified sequence, the reason for this is shown in this column as well. Moreover, `add_names` now has an option to exclude the bit-score support scores from the lineage!
+
 ## 4.6
 We have added the DIAMOND `--top` parameter and the `--I_know_what_Im_doing` flag for experimental features.
 
