@@ -7,7 +7,7 @@
 - [Usage](#usage)
 - [Interpreting the output files](#interpreting-the-output-files)
 - [Marking suggestive classifications with an asterisk](#marking-suggestive-classifications-with-an-asterisk)
-- [Optimising running time, RAM, and disk usage](#optimizing-running-time-ram-and-disk-usage)
+- [Optimising running time, RAM, and disk usage](#optimising-running-time-ram-and-disk-usage)
 - [Examples](#examples)
 
 ## Introduction
