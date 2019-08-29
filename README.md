@@ -131,7 +131,7 @@ Where the lineage is the full taxonomic lineage of the classification of the ORF
 The contig2classification and bin2classification output looks like this:
 
 contig or bin | classification | reason | lineage | lineage scores
---- | --- | --- | --- | --- | ---
+--- | --- | --- | --- | ---
 contig\_1 | classified | based on 14/15 ORFs | 1;131567;2;1783272 | 1.00; 1.00; 1.00; 0.78
 contig\_2 | classified (1/2) | based on 10/10 ORFs | 1;131567;2;1783272;1798711;1117;307596;307595;1890422;33071;1416614;1183438\* | 1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;0.23;0.23
 contig\_2 | classified (2/2) | based on 10/10 ORFs | 1;131567;2;1783272;1798711;1117;307596;307595;1890422;33071;33072 | 1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;0.77
