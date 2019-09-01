@@ -20,7 +20,7 @@ DIAMOND https://github.com/bbuchfink/diamond (tested on version 0.9.14)
 
 Prodigal https://github.com/hyattpd/Prodigal (tested on version 2.6.3)
 
-CAT and BAT have been thoroughly tested on Linux systems, and should run on Mac OS as well.
+CAT and BAT have been thoroughly tested on Linux systems, and should run on macOS as well.
 
 ## Installation
 No installation is required. You can run CAT and BAT by supplying the absolute path:
@@ -35,7 +35,7 @@ Alternatively, if you add the files in the CAT\_pack directory to your `$PATH` v
 $ CAT --version
 ```
 
-*Special note for Mac users: since the Mac OS file system is case-insensitive by default, adding the CAT\_pack directory to your `$PATH` variable might replace calls to the standard unix `cat` utility. We advise Mac users to run CAT from its absolute path.*
+*Special note for Mac users: since the macOS file system is case-insensitive by default, adding the CAT\_pack directory to your `$PATH` variable might replace calls to the standard unix `cat` utility. We advise Mac users to run CAT from its absolute path.*
 
 CAT and BAT can also be installed via Bioconda, thanks to Silas Kieser:
 ```
