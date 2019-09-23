@@ -1,6 +1,7 @@
 #!/usr/bin/env/ python3
 
 import datetime
+import decimal
 import os
 import subprocess
 import sys
@@ -39,8 +40,11 @@ def convert_arguments(args):
                 args.quiet,
                 args.no_log,
                 args.nproc)
+
+    r = decimal.Decimal(args.r)
+    f = decimal.Decimal(args.f)
     
-    one_minus_r = (100 - args.r) / 100
+    one_minus_r = (100 - r) / 100
 
     if args.tmpdir is None:
         if '/' in args.out_prefix:
@@ -55,9 +59,9 @@ def convert_arguments(args):
         return (args.bin_fasta,
                 database_folder,
                 taxonomy_folder,
-                args.r,
+                r,
                 one_minus_r,
-                args.f,
+                f,
                 args.out_prefix,
                 args.predicted_proteins_fasta,
                 args.diamond_file,
@@ -81,9 +85,9 @@ def convert_arguments(args):
                 database_folder,
                 taxonomy_folder,
                 bin_suffix,
-                args.r,
+                r,
                 one_minus_r,
-                args.f,
+                f,
                 args.out_prefix,
                 args.predicted_proteins_fasta,
                 args.diamond_file,
@@ -103,9 +107,9 @@ def convert_arguments(args):
         return (args.contigs_fasta,
                 database_folder,
                 taxonomy_folder,
-                args.r,
+                r,
                 one_minus_r,
-                args.f,
+                f,
                 args.out_prefix,
                 args.predicted_proteins_fasta,
                 args.diamond_file,

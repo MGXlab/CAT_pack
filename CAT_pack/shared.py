@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import datetime
+import decimal
 import math
 import subprocess
 import sys
@@ -197,12 +198,12 @@ def parse_diamond_file(diamond_file,
             if not line[0] == ORF:
                 # A new ORF is reached.
                 ORF = line[0]
-                best_bitscore = float(line[11])
+                best_bitscore = decimal.Decimal(line[11])
                 ORF2hits[ORF] = []
 
                 ORF_done = False
 
-            bitscore = float(line[11])
+            bitscore = decimal.Decimal(line[11])
             
             if bitscore >= one_minus_r * best_bitscore:
                 # The hit has a high enough bit-score to be included.

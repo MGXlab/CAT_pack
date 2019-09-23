@@ -1,5 +1,8 @@
 # Changelog
 
+## 5.0.2
+Floating point numbers have been changed to decimals.
+
 ## 5.0.1
 Updated license to MIT.
 
