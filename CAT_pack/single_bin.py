@@ -568,7 +568,6 @@ def single_bin(args):
                                 ''.format(bin_,
                                           i + 1,
                                           len(lineages),
-                                          scores[0],
                                           based_on_number_of_ORFs,
                                           total_number_of_ORFs,
                                           ';'.join(starred_lineage[::-1]),

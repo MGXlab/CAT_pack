@@ -1,5 +1,8 @@
 # Changelog
 
+## 5.0.3
+Bug fix for single bin mode.
+
 ## 5.0.2
 Floating point numbers have been changed to decimals.
 
