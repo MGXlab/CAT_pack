@@ -15,7 +15,9 @@ Contig Annotation Tool (CAT) and Bin Annotation Tool (BAT) are pipelines for the
 
 A paper describing the algorithm together with extensive benchmarks can be found at https://doi.org/10.1186/s13059-019-1817-x. If you use CAT or BAT in your research, it would be great if you could cite us:
 
-*von Meijenfeldt FAB, Arkhipova K, Cambuy DD, Coutinho FH, Dutilh BE. Robust taxonomic classification of uncharted microbial sequences and bins with CAT and BAT. Genome Biology. 2019;20:217.*
+```
+von Meijenfeldt FAB, Arkhipova K, Cambuy DD, Coutinho FH, Dutilh BE. Robust taxonomic classification of uncharted microbial sequences and bins with CAT and BAT. Genome Biology. 2019;20:217.
+```
 
 
 ## Dependencies and where to get them
