@@ -238,6 +238,8 @@ $ CAT add_names -i BAT_run.ORF2LCA.txt -o BAT_run.ORF2LCA.names.txt -t CAT_taxon
 
 ### Identifying contamination/mis-binned contigs within a MAG.
 
+We often use the combination of CAT/BAT to explore possible contamination within a MAG.
+
 Run BAT on a single MAG. Next, classify the contigs within the MAG individually without generating new protein files or DIAMOND alignments.
 
 ```
@@ -245,3 +247,15 @@ $ CAT bin -b ../bins/interesting_MAG.fasta -d CAT_database/ -t CAT_taxonomy/ -o 
 
 $ CAT contigs -c ../bins/interesting_MAG.fasta -d CAT_database/ -t CAT_taxonomy/ -p BAT.interesting_MAG.predicted_proteins.faa -a BAT.interesting_MAG.alignment.diamond -o CAT.interesting_MAG
 ```
+
+Contigs that have a different taxonomic signal than the MAG classification are probably contamination.
+
+Alternatively, you can look at contamination from the MAG perspective, by setting the *f* parameter to a low value:
+
+```
+$ CAT bin -f 0.01 -b ../bins/interesting_MAG.fasta -d CAT_database/ -t CAT_taxonomy/ -o BAT.interesting_MAG
+
+$ CAT add_names -i BAT.interesting_MAG.bin2classification.txt -o BAT.interesting_MAG.bin2classification.names.txt -t CAT_taxonomy/
+```
+
+BAT will output any taxonomic signal with at least 1% support. Low scoring diverging signals are clear signs of contamination!
