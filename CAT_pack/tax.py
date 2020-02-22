@@ -133,6 +133,9 @@ def find_questionable_taxids(lineage, taxids_with_multiple_offspring):
     if lineage == ['1']:
         return questionable_taxids
     
+    if len(lineage) == 2 and lineage[1:] == ['1']:
+        return questionable_taxids 
+    
     for (i, taxid) in enumerate(lineage):
         taxid_parent = lineage[i + 1]
         if taxid_parent in taxids_with_multiple_offspring:
