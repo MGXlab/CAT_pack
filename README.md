@@ -55,15 +55,15 @@ To get started with CAT and BAT, you will have to get the database files on your
 To download the database files, find the most recent version on [tbb.bio.uu.nl/bastiaan/CAT\_prepare/](https://tbb.bio.uu.nl/bastiaan/CAT_prepare/), download and extract, and you are ready to go!
 
 ```
-$ wget tbb.bio.uu.nl/bastiaan/CAT_prepare/CAT_prepare_20190719.tar.gz
+$ wget tbb.bio.uu.nl/bastiaan/CAT_prepare/CAT_prepare_20200304.tar.gz
 
-$ tar -xvzf CAT_prepare_20190719.tar.gz
+$ tar -xvzf CAT_prepare_20200304.tar.gz
 ```
 
 Make sure that your version of DIAMOND is the same as with which the database is constructed. You can find the DIAMOND version within the database log file:
 
 ```
-$ grep version 2019-07-19.CAT_prepare.fresh.log
+$ grep version 2020-03-04.CAT_prepare.fresh.log
 ```
 
 ### Generating the database files yourself.
