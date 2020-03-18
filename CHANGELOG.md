@@ -1,5 +1,8 @@
 # Changelog
 
+## 5.0.4.
+We have added the `--no_stars` flag alongside a minor bug fix.
+
 ## 5.0.3
 Bug fix for single bin mode.
 

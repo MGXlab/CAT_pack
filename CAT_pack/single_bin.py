@@ -107,6 +107,12 @@ def parse_arguments():
                           default='diamond',
                           help='Path to DIAMOND binaries. Please supply if '
                                'BAT can not find DIAMOND.')
+    optional.add_argument('--no_stars',
+                          dest='no_stars',
+                          required=False,
+                          action='store_true',
+                          help='Suppress marking of suggestive '
+                               'classifications.')
     optional.add_argument('--force',
                           dest='force',
                           required=False,
@@ -223,6 +229,7 @@ def single_bin(args):
      diamond_file,
      path_to_prodigal,
      path_to_diamond,
+     no_stars,
      force,
      quiet,
      no_log,
@@ -232,7 +239,7 @@ def single_bin(args):
      index_chunks,
      tmpdir,
      top) = check.convert_arguments(args)
-    
+
     if no_log:
         log_file = None
     else:
@@ -502,13 +509,15 @@ def single_bin(args):
                                               top_bitscore))
                     else:
                         lineage = tax.find_lineage(taxid, taxid2parent)
-                        starred_lineage = tax.star_lineage(lineage,
-                                                           taxids_with_multiple_offspring)
+
+                        if not no_stars:
+                            lineage = tax.star_lineage(lineage,
+                                                       taxids_with_multiple_offspring)
                         
                         outf2.write('{0}\t{1}\t{2}\t{3}\n'
                                     ''.format(ORF,
                                               bin_,
-                                              ';'.join(starred_lineage[::-1]),
+                                              ';'.join(lineage[::-1]),
                                               top_bitscore))
                                     
                     LCAs_ORFs.append((taxid, top_bitscore),)
@@ -547,8 +556,9 @@ def single_bin(args):
                                         contig in contig2ORFs])
             
             for (i, lineage) in enumerate(lineages):
-                starred_lineage = tax.star_lineage(lineage,
-                                                   taxids_with_multiple_offspring)
+                if not no_stars:
+                    lineage = tax.star_lineage(lineage,
+                                               taxids_with_multiple_offspring)
                 
                 scores = ['{0:.2f}'.format(score) for score in lineages_scores[i]]
                 
@@ -559,7 +569,7 @@ def single_bin(args):
                                 ''.format(bin_,
                                           based_on_number_of_ORFs,
                                           total_number_of_ORFs,
-                                          ';'.join(starred_lineage[::-1]),
+                                          ';'.join(lineage[::-1]),
                                           ';'.join(scores[::-1])))
                 else:
                     # There are multiple classifications.
@@ -570,7 +580,7 @@ def single_bin(args):
                                           len(lineages),
                                           based_on_number_of_ORFs,
                                           total_number_of_ORFs,
-                                          ';'.join(starred_lineage[::-1]),
+                                          ';'.join(lineage[::-1]),
                                           ';'.join(scores[::-1])))
                                    
     message = ('\n-----------------\n'
