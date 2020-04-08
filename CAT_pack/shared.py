@@ -48,6 +48,7 @@ def run_prodigal(path_to_prodigal,
                    '-a', predicted_proteins_fasta,
                    '-o', predicted_proteins_gff,
                    '-p', 'meta',
+                   '-g', '11',
                    '-q',
                    '-f', 'gff']
         subprocess.check_call(command)
