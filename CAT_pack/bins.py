@@ -236,6 +236,10 @@ def import_bins(bin_folder,
     contig_names = set()
 
     for file_ in os.listdir(bin_folder):
+        if file_.startswith('.'):
+            # Skip hidden files.
+            continue
+
         if not file_.endswith(bin_suffix):
             continue
         

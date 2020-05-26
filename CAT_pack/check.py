@@ -232,6 +232,10 @@ def check_bin_folder(bin_folder, bin_suffix, log_file, quiet):
     
     tmp = []
     for file_ in os.listdir(bin_folder):
+        if file_.startswith('.'):
+            # Skip hidden files.
+            continue
+
         if not file_.endswith(bin_suffix):
             continue
 
