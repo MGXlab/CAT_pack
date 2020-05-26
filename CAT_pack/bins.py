@@ -238,7 +238,11 @@ def import_bins(bin_folder,
     for file_ in os.listdir(bin_folder):
         if not file_.endswith(bin_suffix):
             continue
-        
+            
+        if file_.startswith('.'):
+            # Skip hidden files
+            continue
+
         if '.concatenated.' in file_:
             # Skip concatenated contig fasta and predicted protein fasta files
             # from earlier runs.
