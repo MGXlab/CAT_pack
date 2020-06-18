@@ -121,7 +121,7 @@ def download_taxonomy_files(taxonomy_folder, date, log_file, quiet):
     try:
         urllib.request.urlretrieve(url, tmp_taxonomy_file)
     except:
-        message = 'ERROR: download of taxonomy files failed.'
+        message = 'download of taxonomy files failed.'
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         sys.exit(1)
@@ -130,7 +130,7 @@ def download_taxonomy_files(taxonomy_folder, date, log_file, quiet):
         with tarfile.open(tmp_taxonomy_file) as tar:
             tar.extractall(taxonomy_folder)
     except:
-        message = ('ERROR: something went wrong while extracting the taxonomy '
+        message = ('something went wrong while extracting the taxonomy '
                    'files.')
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
@@ -154,7 +154,7 @@ def download_prot_accession2taxid_file(prot_accession2taxid_file,
     try:
         urllib.request.urlretrieve(url, prot_accession2taxid_file)
     except:
-        message = 'ERROR: download of prot.accession2taxid.gz failed.'
+        message = 'download of prot.accession2taxid.gz failed.'
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         sys.exit(1)
@@ -175,7 +175,7 @@ def download_nr(nr_file, log_file, quiet):
     try:
         urllib.request.urlretrieve(url, nr_file)
     except:
-        message = 'ERROR: download of nr database failed.'
+        message = 'download of nr database failed.'
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         sys.exit(1)
@@ -203,7 +203,7 @@ def make_diamond_database(path_to_diamond,
     try:
         subprocess.check_call(command)
     except:
-        message = 'ERROR: DIAMOND database could not be created.'
+        message = 'DIAMOND database could not be created.'
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         sys.exit(1)
@@ -455,11 +455,10 @@ def run_fresh(args, date):
     if taxonomy_folder_inspect != [None]:
         if len([file for file in taxonomy_folder_inspect if
                 file is not None]) > 0:
-            message = ('ERROR: taxonomy folder {0} exists already and '
-                       'contains taxonomy files. Please supply a novel or '
-                       'empty folder if you want to start fresh, or run '
-                       'CAT prepare --existing.'
-                       ''.format(taxonomy_folder))
+            message = ('taxonomy folder {0} exists already and contains '
+                       'taxonomy files. Please supply a novel or empty folder '
+                       'if you want to start fresh, or run CAT prepare '
+                       '--existing.'.format(taxonomy_folder))
             shared.give_user_feedback(message, log_file, quiet, error=True)
 
             sys.exit(1)
@@ -474,10 +473,9 @@ def run_fresh(args, date):
     if database_folder_inspect != [None]:
         if len([file_ for file_ in database_folder_inspect if
                 file_ is not None]) > 0:
-            message = ('ERROR: database folder {0} exists already and '
-                       'contains database files. Please supply a novel or '
-                       'empty folder if you want to start fresh.'
-                       ''.format(database_folder))
+            message = ('database folder {0} exists already and contains '
+                       'database files. Please supply a novel or empty folder '
+                       'if you want to start fresh.'.format(database_folder))
             shared.give_user_feedback(message, log_file, quiet, error=True)
 
             sys.exit(1)
@@ -491,9 +489,9 @@ def run_fresh(args, date):
     (total_memory, error) = check.check_memory(min_mem)
 
     if error:
-        message = ('ERROR: at least {0}GB of memory is needed for a fresh '
-                   'database construction. {1}GB is found on your system. You '
-                   'can either try to find a machine with more memory, or '
+        message = ('at least {0}GB of memory is needed for a fresh database '
+                   'construction. {1}GB is found on your system. You can '
+                   'either try to find a machine with more memory, or '
                    'download preconstructed database files from '
                    'tbb.bio.uu.nl/bastiaan/CAT_prepare/.'
                    ''.format(min_mem, total_memory))
@@ -612,9 +610,9 @@ def run_existing(args, date):
         
     if ((nodes_dmp is None and names_dmp is not None) or
         (nodes_dmp is not None and names_dmp is None)):
-        message = ('ERROR: CAT prepare did not find both nodes.dmp and '
-                   'names.dmp in the taxonomy folder. They should be '
-                   'downloaded together. Remove {0} and try again.'
+        message = ('CAT prepare did not find both nodes.dmp and names.dmp in '
+                   'the taxonomy folder. They should be downloaded together. '
+                   'Remove {0} and try again.'
                    ''.format([file_ for file_ in (nodes_dmp, names_dmp) if
                               file_ is not None][0]))
         shared.give_user_feedback(message, log_file, quiet, error=True)
@@ -671,21 +669,20 @@ def run_existing(args, date):
     if (nr_file is None and
         None in tmp and
         not all([file_ is None for file_ in tmp])):
-        message = ('ERROR: Database folder does not contain an nr file, while '
-                   'some but not all of the downstream files that depend on '
-                   'it are present. In order to prevent strange bugs from '
-                   'arising, please remove all files from the database folder '
-                   'and try again.')
+        message = ('database folder does not contain an nr file, while some '
+                   'but not all of the downstream files that depend on it are '
+                   'present. In order to prevent strange bugs from arising, '
+                   'remove all files from the database folder and try again.')
         shared.give_user_feedback(message, log_file, quiet, error=True)
         
         sys.exit(1)
 
     if (fastaid2LCAtaxid_file is None and
         taxids_with_multiple_offspring_file is not None):
-        message = ('ERROR: file taxids_with_multiple_offspring exists but '
+        message = ('file taxids_with_multiple_offspring exists but '
                    'fastaid2LCAtaxid is not found in the database folder '
                    'whilst taxids_with_multiple_offspring depends on it. In '
-                   'order to prevent strange bugs from arising, please remove '
+                   'order to prevent strange bugs from arising, remove '
                    '{0} and try again.'
                    ''.format(taxids_with_multiple_offspring_file))
         shared.give_user_feedback(message, log_file, quiet, error=True)
@@ -785,7 +782,7 @@ def run_existing(args, date):
         (total_memory, error) = check.check_memory(min_mem)
         
         if error:
-            message = ('ERROR: at least {0}GB of memory is needed for the '
+            message = ('at least {0}GB of memory is needed for the '
                        'database construction. {1}GB is found on your system. '
                        'You can either try to find a machine with more '
                        'memory, or download preconstructed database files '

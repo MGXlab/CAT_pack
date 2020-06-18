@@ -261,22 +261,7 @@ def contigs(args):
     if predicted_proteins_fasta is None and diamond_file is None:
         message = ('\n'
                    'CAT is running. Protein prediction, alignment, and contig '
-                   'classification are carried out.\n'
-                   'Rarw!\n\n'
-                   'Supplied command: {0}\n\n'
-                   'Contigs fasta: {1}\n'
-                   'Taxonomy folder: {2}/\n'
-                   'Database folder: {3}/\n'
-                   'Parameter r: {4}\n'
-                   'Parameter f: {5}\n'
-                   'Log file: {6}\n\n'
-                   '-----------------\n'.format(' '.join(sys.argv),
-                                                contigs_fasta,
-                                                taxonomy_folder,
-                                                database_folder,
-                                                args.r,
-                                                args.f,
-                                                log_file))
+                   'classification are carried out.')
         shared.give_user_feedback(message, log_file, quiet, show_time=False)
 
         step_list.append('run_prodigal')
@@ -286,22 +271,7 @@ def contigs(args):
         message = ('\n'
                    'CAT is running. Since a predicted protein fasta is '
                    'supplied, only alignment and contig classification are '
-                   'carried out.\n'
-                   'Rarw!\n\n'
-                   'Supplied command: {0}\n\n'
-                   'Contigs fasta: {1}\n'
-                   'Taxonomy folder: {2}/\n'
-                   'Database folder: {3}/\n'
-                   'Parameter r: {4}\n'
-                   'Parameter f: {5}\n'
-                   'Log file: {6}\n\n'
-                   '-----------------\n'.format(' '.join(sys.argv),
-                                                contigs_fasta,
-                                                taxonomy_folder,
-                                                database_folder,
-                                                args.r,
-                                                args.f,
-                                                log_file))
+                   'carried out.')
         shared.give_user_feedback(message, log_file, quiet, show_time=False)
 
         step_list.append('run_diamond')
@@ -310,32 +280,35 @@ def contigs(args):
         message = ('\n'
                    'CAT is running. Since a predicted protein fasta and '
                    'DIAMOND alignment file are supplied, only contig '
-                   'classification is carried out.\n'
-                   'Rarw!\n\n'
-                   'Supplied command: {0}\n\n'
-                   'Contigs fasta: {1}\n'
-                   'Taxonomy folder: {2}/\n'
-                   'Database folder: {3}/\n'
-                   'Parameter r: {4}\n'
-                   'Parameter f: {5}\n'
-                   'Log file: {6}\n\n'
-                   '-----------------\n'.format(' '.join(sys.argv),
-                                                contigs_fasta,
-                                                taxonomy_folder,
-                                                database_folder,
-                                                args.r,
-                                                args.f,
-                                                log_file))
+                   'classification is carried out.')
         shared.give_user_feedback(message, log_file, quiet, show_time=False)
     elif (predicted_proteins_fasta is None and
           diamond_file is not None):
-        message = ('ERROR: if you want CAT to directly do the classification, '
-                   'you should not only supply a DIAMOND alignment table but '
-                   'also a predicted protein fasta file with argument '
+        message = ('if you want CAT to directly do the classification, you '
+                   'should not only supply a DIAMOND alignment table but also '
+                   'a predicted protein fasta file with argument '
                    '[-p / --proteins].')
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         sys.exit(1)
+
+    # Print variables.
+    message = ('Rarw!\n\n'
+               'Supplied command: {0}\n\n'
+               'Contigs fasta: {1}\n'
+               'Taxonomy folder: {2}/\n'
+               'Database folder: {3}/\n'
+               'Parameter r: {4}\n'
+               'Parameter f: {5}\n'
+               'Log file: {6}\n\n'
+               '-----------------\n'.format(' '.join(sys.argv),
+                                            contigs_fasta,
+                                            taxonomy_folder,
+                                            database_folder,
+                                            args.r,
+                                            args.f,
+                                            log_file))
+    shared.give_user_feedback(message, log_file, quiet, show_time=False)
 
     # Check binaries, output files, taxonomy folder and database folder, and
     # set parameters.
@@ -398,7 +371,7 @@ def contigs(args):
 
     if 'run_prodigal' not in step_list:
         if not check.check_whether_file_is_fasta(predicted_proteins_fasta):
-            message = ('ERROR: {0} is not a fasta file.'
+            message = ('{0} is not a fasta file.'
                        ''.format(predicted_proteins_fasta))
             shared.give_user_feedback(message, log_file, quiet, error=True)
 

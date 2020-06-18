@@ -161,7 +161,7 @@ def check_out_prefix(out_prefix, log_file, quiet):
 
     if '/' in out_prefix:
         if out_prefix.endswith('/'):
-            message = ('ERROR: prefix for output files ({0}) appears to be a '
+            message = ('prefix for output files ({0}) appears to be a '
                        'directory.'.format(out_prefix))
             shared.give_user_feedback(message, log_file, quiet, error=True)
 
@@ -169,8 +169,8 @@ def check_out_prefix(out_prefix, log_file, quiet):
 
         directory = out_prefix.rsplit('/', 1)[0]
         if not os.path.isdir(directory):
-            message = ('ERROR: can not find output directory {0} to which '
-                       'output files should be written.'.format(directory))
+            message = ('can not find output directory {0} to which output '
+                       'files should be written.'.format(directory))
             shared.give_user_feedback(message, log_file, quiet, error=True)
 
             error = True
@@ -190,7 +190,7 @@ def check_diamond_binaries(path_to_diamond, log_file, quiet):
         message = 'DIAMOND found: {0}.'.format(output)
         shared.give_user_feedback(message, log_file, quiet)
     except OSError:
-        message = ('ERROR: can not find DIAMOND. Please check whether it is '
+        message = ('can not find DIAMOND. Please check whether it is '
                    'installed or path to the binaries is provided.')
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
@@ -210,7 +210,7 @@ def check_prodigal_binaries(path_to_prodigal, log_file, quiet):
         message = 'Prodigal found: {0}.'.format(output)
         shared.give_user_feedback(message, log_file, quiet)
     except OSError:
-        message = ('ERROR: can not find Prodigal. Please check whether it is '
+        message = ('can not find Prodigal. Please check whether it is '
                    'installed or path to the binaries is provided.')
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
@@ -223,7 +223,7 @@ def check_bin_folder(bin_folder, bin_suffix, log_file, quiet):
     error = False
 
     if not os.path.isdir(bin_folder):
-        message = ('ERROR: can not find the bin folder.')
+        message = 'can not find the bin folder.'
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
@@ -247,8 +247,8 @@ def check_bin_folder(bin_folder, bin_suffix, log_file, quiet):
         tmp.append(file_)
 
     if len(tmp) == 0:
-        message = ('ERROR: no bins found with suffix {0} in bin folder. You '
-                   'can set the suffix with the [-s / --bin_suffix] argument.'
+        message = ('no bins found with suffix {0} in bin folder. You can set '
+                   'the suffix with the [-s / --bin_suffix] argument.'
                    ''.format(bin_suffix))
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
@@ -268,15 +268,15 @@ def check_bin_fasta(bin_fasta, log_file, quiet):
     error = False
 
     if not check_whether_file_is_fasta(bin_fasta):
-        message = 'ERROR: {0} is not a fasta file.'.format(bin_fasta)
+        message = '{0} is not a fasta file.'.format(bin_fasta)
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
 
     if os.path.isdir(bin_fasta):
-        message = ('ERROR: {0} is a directory. If you want to classify more '
-                   'than 1 bin you can run \'CAT bins\' instead of '
-                   '\'CAT bin\'.'.format(bin_fasta))
+        message = ('{0} is a directory. If you want to classify more than 1 '
+                   'bin you can run \'CAT bins\' instead of \'CAT bin\'.'
+                   ''.format(bin_fasta))
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
@@ -339,7 +339,7 @@ def check_folders_for_run(taxonomy_folder,
 
     taxonomy_folder_inspect = inspect_taxonomy_folder(taxonomy_folder)
     if taxonomy_folder_inspect == [None]:
-        message = 'ERROR: can not find the taxonomy folder.'
+        message = 'can not find the taxonomy folder.'
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
@@ -349,7 +349,7 @@ def check_folders_for_run(taxonomy_folder,
          prot_accession2taxid_file) = taxonomy_folder_inspect
 
         if nodes_dmp is None or names_dmp is None:
-            message = ('ERROR: nodes.dmp and / or names.dmp not found in the '
+            message = ('nodes.dmp and / or names.dmp not found in the '
                        'taxonomy folder.')
             shared.give_user_feedback(message, log_file, quiet, error=True)
 
@@ -357,7 +357,7 @@ def check_folders_for_run(taxonomy_folder,
 
     database_folder_inspect = inspect_database_folder(database_folder)
     if database_folder_inspect == [None]:
-        message = 'ERROR: can not find the database folder.'
+        message = 'can not find the database folder.'
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
@@ -368,21 +368,20 @@ def check_folders_for_run(taxonomy_folder,
          taxids_with_multiple_offspring_file) = database_folder_inspect
 
         if diamond_database is None and 'run_diamond' in step_list:
-            message = 'ERROR: DIAMOND database not found in database folder.'
+            message = 'DIAMOND database not found in database folder.'
             shared.give_user_feedback(message, log_file, quiet, error=True)
 
             error = True
 
         if fastaid2LCAtaxid_file is None:
-            message = ('ERROR: file fastaid2LCAtaxid is not found in database '
-                       'folder.' )
+            message = 'file fastaid2LCAtaxid is not found in database folder.'
             shared.give_user_feedback(message, log_file, quiet, error=True)
 
             error = True
 
         if taxids_with_multiple_offspring_file is None:
-            message = ('ERROR: file taxids_with_multiple_offspring not found '
-                       'in database folder.')
+            message = ('file taxids_with_multiple_offspring not found in '
+                       'database folder.')
             shared.give_user_feedback(message, log_file, quiet, error=True)
 
             error = True
@@ -394,7 +393,7 @@ def check_output_file(output_file, log_file, quiet):
     error = False
 
     if os.path.isfile(output_file):
-        message = ('ERROR: output file {0} already exists. You can choose to '
+        message = ('output file {0} already exists. You can choose to '
                    'overwrite existing files with the [--force] argument.'
                    ''.format(output_file))
         shared.give_user_feedback(message, log_file, quiet, error=True)
@@ -408,7 +407,7 @@ def check_input_file(input_file, log_file, quiet):
     error = False
 
     if not os.path.isfile(input_file):
-        message = 'ERROR: input file {0} does not exist.'.format(input_file)
+        message = 'input file {0} does not exist.'.format(input_file)
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
@@ -426,7 +425,7 @@ def check_top(top, r, log_file, quiet):
         shared.give_user_feedback(message, log_file, quiet)
         
     if top <= r:
-        message = 'ERROR: [--top] should be higher than [-r / --range].'
+        message = '[--top] should be higher than [-r / --range].'
         shared.give_user_feedback(message, log_file, quiet, error=True)
         
         error = True
@@ -456,11 +455,10 @@ def check_whether_ORFs_are_based_on_contigs(contig_names,
                                             quiet):
     for contig in contig2ORFs:
         if contig not in contig_names:
-            message = ('ERROR: found a protein in the predicted proteins '
-                       'fasta file that can not be traced back to one of the '
-                       'contigs in the contigs fasta file: {0}. Proteins '
-                       'should be named contig_name_#.'
-                       ''.format(contig2ORFs[contig][0]))
+            message = ('found a protein in the predicted proteins fasta file '
+                       'that can not be traced back to one of the contigs in '
+                       'the contigs fasta file: {0}. Proteins should be named '
+                       'contig_name_#.'.format(contig2ORFs[contig][0]))
             shared.give_user_feedback(message, log_file, quiet, error=True)
 
             sys.exit(1)

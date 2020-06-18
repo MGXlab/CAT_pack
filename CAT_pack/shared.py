@@ -12,12 +12,15 @@ def give_user_feedback(message,
                        quiet=False,
                        show_time=True,
                        error=False):
-    time = datetime.datetime.now()
-
     if show_time:
-        message = '[{0}] {1}\n'.format(time, message)
-    else:
-        message = '{0}\n'.format(message)
+        time = datetime.datetime.now()
+
+        message = '[{0}] {1}'.format(time, message)
+
+    if error:
+        message = 'ERROR: {0}'.format(message)
+
+    message = '{0}\n'.format(message)
 
     if log_file:
         with open(log_file, 'a') as outf1:
@@ -53,7 +56,7 @@ def run_prodigal(path_to_prodigal,
                    '-f', 'gff']
         subprocess.check_call(command)
     except:
-        message = 'ERROR: Prodigal finished abnormally.'
+        message = 'Prodigal finished abnormally.'
         give_user_feedback(message, log_file, quiet, error=True)
 
         sys.exit(1)
@@ -119,7 +122,7 @@ def run_diamond(path_to_diamond,
 
         subprocess.check_call(command)
     except:
-        message = 'ERROR: DIAMOND finished abnormally.'
+        message = 'DIAMOND finished abnormally.'
         give_user_feedback(message, log_file, quiet, error=True)
 
         sys.exit(1)
@@ -140,7 +143,7 @@ def import_contig_names(fasta_file, log_file, quiet):
                 contig = line.split(' ')[0].lstrip('>').rstrip()
                 
                 if contig in contig_names:
-                    message = ('ERROR: it looks like your fasta file contains '
+                    message = ('it looks like your fasta file contains '
                                'duplicate headers! The first duplicate '
                                'encountered is {0}, but there might be more...'
                                ''.format(contig))

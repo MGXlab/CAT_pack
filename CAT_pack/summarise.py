@@ -94,7 +94,7 @@ def import_contig_lengths(contigs_fasta, log_file, quiet):
                 try:
                     contig2length[contig] += len(line)
                 except:
-                    message = ('ERROR: {0} is not a contigs fasta'
+                    message = ('{0} is not a contigs fasta'
                                ''.format(contigs_fasta))
                     shared.give_user_feedback(message,
                                               log_file,
@@ -134,7 +134,7 @@ def summarise_contigs(input_file, output_file, contigs_fasta, force, quiet):
                 line = line.split('\t')
                 
                 if line[0] != '# contig':
-                    message = ('ERROR: {0} is not a CAT classification file.'
+                    message = ('{0} is not a CAT classification file.'
                                ''.format(input_file))
                     shared.give_user_feedback(message,
                                               log_file,
@@ -142,12 +142,11 @@ def summarise_contigs(input_file, output_file, contigs_fasta, force, quiet):
                                               error=True)
 
                     if line[0] == '# bin':
-                        message = ('ERROR: {0} appears to be a BAT '
-                                   'classification file. If you want to '
-                                   'summarise bin classifications, just '
-                                   'don\'t supply a contigs fasta and '
-                                   'everything should be fine!'
-                                   ''.format(input_file))
+                        message = ('{0} appears to be a BAT classification '
+                                   'file. If you want to summarise bin '
+                                   'classifications, simply don\'t supply a '
+                                   'contigs fasta and everything should be '
+                                   'fine!'.format(input_file))
                         shared.give_user_feedback(message,
                                                   log_file,
                                                   quiet,
@@ -158,9 +157,9 @@ def summarise_contigs(input_file, output_file, contigs_fasta, force, quiet):
                 try:
                     superkingdom_index = line.index('superkingdom')
                 except:
-                    message = ('ERROR: official ranks not found in header of '
-                               '{0}. Make sure that the CAT classification '
-                               'file is named with official ranks with \'CAT '
+                    message = ('official ranks not found in header of {0}. '
+                               'Make sure that the CAT classification file is '
+                               'named with official ranks with \'CAT '
                                'add_names --only_official\'.'
                                ''.format(input_file))
                     shared.give_user_feedback(message,
@@ -172,7 +171,7 @@ def summarise_contigs(input_file, output_file, contigs_fasta, force, quiet):
 
                 break
         else:
-            message = 'ERROR: input file does not have a recognisable header.'
+            message = 'input file does not have a recognisable header.'
             shared.give_user_feedback(message, log_file, quiet, error=True)
 
             sys.exit(1)
@@ -211,8 +210,8 @@ def summarise_contigs(input_file, output_file, contigs_fasta, force, quiet):
             contig_trace.add(contig)
             
             if contig not in contig2length:
-                message = ('ERROR: contig {0} in CAT classification file is '
-                           'not found in supplied contigs fasta file. Are you '
+                message = ('contig {0} in CAT classification file is not '
+                           'found in supplied contigs fasta file. Are you '
                            'sure the CAT classification file is based on the '
                            'contigs fasta?'.format(contig))
                 shared.give_user_feedback(message, log_file, quiet, error=True)
@@ -242,19 +241,17 @@ def summarise_contigs(input_file, output_file, contigs_fasta, force, quiet):
                 ORFs[rank][classification].append(ORFs_on_contig)
 
     if len(doubles) != 0:
-        message = ('ERROR: some contigs have multiple classifications. CAT '
-                   'summarise currently does not allow for this. Contigs with '
-                   'multiple classifications: {0}.'
-                   ''.format(', '.join(list(doubles))))
+        message = ('some contigs have multiple classifications. CAT summarise '
+                   'currently does not allow for this. Contigs with multiple '
+                   'classifications: {0}.'.format(', '.join(list(doubles))))
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         sys.exit(1)
         
     if n != len(contig2length):
-        message = ('ERROR: the number of classified contigs is not the same '
-                   'as the number of contigs in contigs fasta. Are you sure '
-                   'the CAT classification file is based on the contigs '
-                   'fasta?')
+        message = ('the number of classified contigs is not the same as the '
+                   'number of contigs in contigs fasta. Are you sure the CAT '
+                   'classification file is based on the contigs fasta?')
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         sys.exit(1)
@@ -325,7 +322,7 @@ def summarise_bins(input_file, output_file, force, quiet):
                 line = line.split('\t')
                 
                 if line[0] != '# bin':
-                    message = ('ERROR: {0} is not a BAT classification file.'
+                    message = ('{0} is not a BAT classification file.'
                                ''.format(input_file))
                     shared.give_user_feedback(message,
                                               log_file,
@@ -333,11 +330,10 @@ def summarise_bins(input_file, output_file, force, quiet):
                                               error=True)
 
                     if line[0] == '# contig':
-                        message = ('ERROR: {0} appears to be a CAT '
-                                   'classification file. If you want to '
-                                   'summarise contig classifications, please '
-                                   'supply a contigs fasta.'
-                                   ''.format(input_file))
+                        message = ('{0} appears to be a CAT classification '
+                                   'file. If you want to summarise contig '
+                                   'classifications, please supply a contigs '
+                                   'fasta.'.format(input_file))
                         shared.give_user_feedback(message,
                                                   log_file,
                                                   quiet,
@@ -348,9 +344,9 @@ def summarise_bins(input_file, output_file, force, quiet):
                 try:
                     superkingdom_index = line.index('superkingdom')
                 except:
-                    message = ('ERROR: official ranks not found in header of '
-                               '{0}. Make sure that the BAT classification '
-                               'file is named with official ranks with \'CAT '
+                    message = ('official ranks not found in header of {0}. '
+                               'Make sure that the BAT classification file is '
+                               'named with official ranks with \'CAT '
                                'add_names --only_official\'.'
                                ''.format(input_file))
                     shared.give_user_feedback(message,
@@ -362,7 +358,7 @@ def summarise_bins(input_file, output_file, force, quiet):
 
                 break
         else:
-            message = 'ERROR: input file does not have a recognisable header.'
+            message = 'input file does not have a recognisable header.'
             shared.give_user_feedback(message, log_file, quiet, error=True)
 
             sys.exit(1)
@@ -413,10 +409,9 @@ def summarise_bins(input_file, output_file, force, quiet):
                 number_of_bins[rank][classification] += 1
                 
     if len(doubles) != 0:
-        message = ('ERROR: some bins have multiple classifications. CAT '
-                   'summarise currently does not allow for this. Bins with '
-                   'multiple classifications: {0}.'
-                   ''.format(', '.join(list(doubles))))
+        message = ('some bins have multiple classifications. CAT summarise '
+                   'currently does not allow for this. Bins with multiple '
+                   'classifications: {0}.'.format(', '.join(list(doubles))))
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         sys.exit(1)

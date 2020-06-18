@@ -127,8 +127,8 @@ def add_names(args):
                 try:
                     lineage_index = line.index('lineage')
                 except:
-                    message = ('ERROR: {0} is not a supported classification '
-                               'file.'.format(input_file))
+                    message = ('{0} is not a supported classification file.'
+                               ''.format(input_file))
                     shared.give_user_feedback(message,
                                               log_file,
                                               quiet,
@@ -145,7 +145,7 @@ def add_names(args):
 
                 break
         else:
-            message = ('ERROR: {0} is not a supported classification file.'
+            message = ('{0} is not a supported classification file.'
                        ''.format(input_file))
             shared.give_user_feedback(message, log_file, quiet, error=True)
 
