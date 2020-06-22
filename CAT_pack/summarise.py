@@ -343,8 +343,9 @@ def summarise_bins(args):
                         message = (
                                 '{0} appears to be a CAT classification file. '
                                 'If you want to summarise contig '
-                                'classifications, please supply a contigs '
-                                'fasta.'.format(args.input_file))
+                                'classifications, supply a contigs fasta with '
+                                'argument [-c / --contigs_fasta].'.format(
+                                    args.input_file))
                         shared.give_user_feedback(
                                 message, args.log_file, args.quiet, error=True)
                         

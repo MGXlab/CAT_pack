@@ -122,8 +122,8 @@ def parse_arguments():
             type=str,
             action=shared.PathAction,
             default='diamond',
-            help=('Path to DIAMOND binaries. Please supply if BAT can not '
-                'find DIAMOND.'))
+            help=('Path to DIAMOND binaries. Supply if BAT can not find '
+                'DIAMOND.'))
     optional.add_argument(
             '--no_stars',
             dest='no_stars',
