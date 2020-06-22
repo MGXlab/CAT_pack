@@ -1,5 +1,8 @@
 # Changelog
 
+## 5.1
+The code has been rewritten to prepare for future extensions. We have also added the `--verbose` flag.
+
 ## 5.0.5.
 Skip hidden files in bin folder.
 

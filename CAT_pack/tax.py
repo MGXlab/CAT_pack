@@ -62,9 +62,8 @@ def import_fastaid2LCAtaxid(fastaid2LCAtaxid_file, all_hits, log_file, quiet):
     return fastaid2LCAtaxid
 
 
-def import_taxids_with_multiple_offspring(taxids_with_multiple_offspring_file,
-                                          log_file,
-                                          quiet):
+def import_taxids_with_multiple_offspring(
+        taxids_with_multiple_offspring_file, log_file, quiet):
     message = 'Importing file {0}.'.format(taxids_with_multiple_offspring_file)
     shared.give_user_feedback(message, log_file, quiet)
 
@@ -148,19 +147,17 @@ def star_lineage(lineage, taxids_with_multiple_offspring):
     questionable_taxids = find_questionable_taxids(lineage,
                                                    taxids_with_multiple_offspring)
 
-    starred_lineage = [taxid if taxid not in questionable_taxids
-                       else '{0}*'.format(taxid)
-                       for taxid in lineage]
+    starred_lineage = [taxid if
+            taxid not in questionable_taxids else
+            '{0}*'.format(taxid) for taxid in lineage]
 
     return starred_lineage
 
 
-def find_weighted_LCA(LCAs_ORFs,
-                      taxid2parent,
-                      f):
+def find_weighted_LCA(LCAs_ORFs, taxid2parent, f):
     list_of_lineages = []
     list_of_bitscores = []
-    based_on_number_of_ORFs = 0
+    based_on_n_ORFs = 0
 
     for (taxid, top_bitscore) in LCAs_ORFs:
         if taxid.startswith('no taxid found'):
@@ -173,10 +170,11 @@ def find_weighted_LCA(LCAs_ORFs,
         
         list_of_lineages.append(lineage)
         list_of_bitscores.append(top_bitscore)
-        based_on_number_of_ORFs += 1
+        based_on_n_ORFs += 1
 
     if len(list_of_lineages) == 0:
-        return ('no ORFs with taxids found.',
+        return (
+                'no ORFs with taxids found.',
                 'no ORFs with taxids found.',
                 'no ORFs with taxids found.')
 
@@ -196,13 +194,13 @@ def find_weighted_LCA(LCAs_ORFs,
             whitelisted_lineages.append(lineage)
 
     if len(whitelisted_lineages) == 0:
-        return ('no lineage whitelisted.',
+        return (
+                'no lineage whitelisted.',
                 'no lineage whitelisted.',
                 'no lineage whitelisted.')
 
     whitelisted_lineages = sorted(whitelisted_lineages,
-                                  key=lambda x: len(x),
-                                  reverse=True)
+            key=lambda x: len(x), reverse=True)
 
     longest_lineages = []
     longest_lineages_scores = []
@@ -213,18 +211,15 @@ def find_weighted_LCA(LCAs_ORFs,
             longest_lineages.append(whitelisted_lineage)
 
             scores = [taxid2bitscore[taxid] / sum(list_of_bitscores) for
-                      taxid in whitelisted_lineage]
+                    taxid in whitelisted_lineage]
             longest_lineages_scores.append(scores)
 
             taxid_trace |= set(whitelisted_lineage)
 
-    return (longest_lineages, longest_lineages_scores, based_on_number_of_ORFs)
+    return (longest_lineages, longest_lineages_scores, based_on_n_ORFs)
 
 
-def convert_to_names(lineage,
-                     taxid2rank,
-                     taxid2name,
-                     scores=None):
+def convert_to_names(lineage, taxid2rank, taxid2name, scores=None):
     names = []
     for (i, taxid) in enumerate(lineage):
         if '*' in taxid:
@@ -251,12 +246,9 @@ def convert_to_names(lineage,
     return names
 
 
-def convert_to_official_names(lineage,
-                              taxid2rank,
-                              taxid2name,
-                              scores=None):
+def convert_to_official_names(lineage, taxid2rank, taxid2name, scores=None):
     official_ranks = ['superkingdom', 'phylum', 'class', 'order', 'family',
-                      'genus', 'species']
+            'genus', 'species']
     lineage_ranks = [taxid2rank[taxid.rstrip('*')] for taxid in lineage]
 
     official_names = ['not classified'] * 7
@@ -301,4 +293,4 @@ def convert_to_official_names(lineage,
 
 
 if __name__ == '__main__':
-    sys.exit('Please run \'CAT\' to run CAT or BAT.')
+    sys.exit('Run \'CAT\' to run CAT or BAT.')

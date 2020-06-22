@@ -1,24 +1,170 @@
 #!/usr/bin/env python3
 
+import argparse
 import datetime
 import decimal
 import math
+import os
 import subprocess
 import sys
 
+import check
 
-def give_user_feedback(message,
-                       log_file=None,
-                       quiet=False,
-                       show_time=True,
-                       error=False):
+
+class PathAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        path = os.path.expanduser(values.rstrip('/'))
+
+        if not path.startswith('/') and not path.startswith('.'):
+            path = './{0}'.format(path)
+
+        if os.path.isdir(path):
+            path = '{0}/'.format(path)
+
+        setattr(namespace, self.dest, path)
+
+
+class DecimalAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, self.dest, decimal.Decimal(values))
+
+
+class SuffixAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        bin_suffix = '.{0}'.format(values.lstrip('.'))
+
+        setattr(namespace, self.dest, bin_suffix)
+
+
+def expand_arguments(args):
+    if 'r' in args:
+        setattr(args, 'one_minus_r', (100 - args.r) / 100)
+
+    if 'out_prefix' in args:
+        if not args.tmpdir:
+            tmpdir = '{0}/'.format(args.out_prefix.rsplit('/', 1)[0])
+
+            setattr(args, 'tmpdir', tmpdir)
+
+    if 'no_log' in args and not args.no_log:
+        if 'fresh' in args and args.fresh:
+            log_file = './{0}.CAT_prepare.fresh.log'.format(args.date)
+        elif 'fresh' in args and not args.fresh:
+            log_file = './{0}.CAT_prepare.existing.log'.format(args.date)
+        else:
+            # Check out_prefix as the log file needs to be written to a valid
+            # location.
+            error = check.check_out_prefix(args.out_prefix, None, args.quiet)
+            if error:
+                sys.exit(1)
+
+            log_file = '{0}.log'.format(args.out_prefix)
+
+        with open(log_file, 'w') as outf:
+            pass
+    else:
+        log_file = None
+
+    setattr(args, 'log_file', log_file)
+
+    if 'taxonomy_folder' in args:
+        setattr(args,
+                'taxonomy_folder',
+                '{0}/'.format(args.taxonomy_folder.rstrip('/')))
+
+        explore_taxonomy_folder(args)
+    if 'database_folder' in args:
+        setattr(args,
+                'database_folder',
+                '{0}/'.format(args.database_folder.rstrip('/')))
+
+        explore_database_folder(args)
+
+    return
+
+
+def explore_taxonomy_folder(args):
+    nodes_dmp = None
+    names_dmp = None
+    prot_accession2taxid_file = None
+
+    if os.path.isdir(args.taxonomy_folder):
+        for file_ in os.listdir(args.taxonomy_folder):
+            if file_ == 'nodes.dmp':
+                nodes_dmp = '{0}{1}'.format(args.taxonomy_folder, file_)
+            elif file_ == 'names.dmp':
+                names_dmp = '{0}{1}'.format(args.taxonomy_folder, file_)
+            elif file_.endswith('prot.accession2taxid.gz'):
+                prot_accession2taxid_file = '{0}{1}'.format(
+                        args.taxonomy_folder, file_)
+
+    setattr(args, 'nodes_dmp', nodes_dmp)
+    setattr(args, 'names_dmp', names_dmp)
+    setattr(args, 'prot_accession2taxid_file', prot_accession2taxid_file)
+
+    return
+
+
+def explore_database_folder(args):
+    nr_file = None
+    diamond_database = None
+    fastaid2LCAtaxid_file = None
+    taxids_with_multiple_offspring_file = None
+
+    if os.path.isdir(args.database_folder):
+        for file_ in os.listdir(args.database_folder):
+            if file_.endswith('nr.gz'):
+                nr_file = '{0}{1}'.format(args.database_folder, file_)
+            elif file_.endswith('.dmnd'):
+                diamond_database = '{0}{1}'.format(
+                        args.database_folder, file_)
+            elif file_.endswith('fastaid2LCAtaxid'):
+                fastaid2LCAtaxid_file = '{0}{1}'.format(
+                        args.database_folder, file_)
+            elif file_.endswith('taxids_with_multiple_offspring'):
+                taxids_with_multiple_offspring_file = ('{0}{1}'
+                        ''.format(args.database_folder, file_))
+
+    setattr(args, 'nr_file', nr_file)
+    setattr(args, 'diamond_database', diamond_database)
+    setattr(args, 'fastaid2LCAtaxid_file', fastaid2LCAtaxid_file)
+    setattr(args,
+            'taxids_with_multiple_offspring_file',
+            taxids_with_multiple_offspring_file)
+
+    return
+
+
+def print_variables(args, step_list=None):
+    if args.verbose:
+        arguments = ['{0}: {1}'.format(k, v) for
+                k, v in sorted(vars(args).items())]
+        message = (
+                '\n-----------------\n\n'
+                'Full list of arguments:\n'
+                '{0}'.format('\n'.join(arguments)))
+        give_user_feedback(message, args.log_file, args.quiet, show_time=False)
+
+        if step_list:
+            message = '\nStep list: {0}'.format(step_list)
+            give_user_feedback(message, args.log_file, args.quiet,
+                    show_time=False)
+
+        message = '\n-----------------\n'
+        give_user_feedback(message, args.log_file, args.quiet, show_time=False)
+
+    return
+
+
+def give_user_feedback(
+        message, log_file=None, quiet=False, show_time=True, error=False):
+    if error:
+        message = 'ERROR: {0}'.format(message)
+
     if show_time:
         time = datetime.datetime.now()
 
         message = '[{0}] {1}'.format(time, message)
-
-    if error:
-        message = 'ERROR: {0}'.format(message)
 
     message = '{0}\n'.format(message)
 
@@ -31,29 +177,33 @@ def give_user_feedback(message,
 
     if not quiet and error:
         sys.stderr.write(message)
+
+    return
         
         
-def run_prodigal(path_to_prodigal,
-                 contigs_fasta,
-                 predicted_proteins_fasta,
-                 predicted_proteins_gff,
-                 log_file,
-                 quiet):
-    message = ('Running Prodigal for ORF prediction. Files {0} and {1} will '
-               'be generated. Do not forget to cite Prodigal when using CAT '
-               'or BAT in your publication!'.format(predicted_proteins_fasta,
-                                                    predicted_proteins_gff))
+def run_prodigal(
+        path_to_prodigal,
+        contigs_fasta,
+        proteins_fasta,
+        proteins_gff,
+        log_file,
+        quiet):
+    message = (
+            'Running Prodigal for ORF prediction. Files {0} and {1} will be '
+            'generated. Do not forget to cite Prodigal when using CAT or BAT '
+            'in your publication!'.format(proteins_fasta, proteins_gff))
     give_user_feedback(message, log_file, quiet)
 
     try:
-        command = [path_to_prodigal,
-                   '-i', contigs_fasta,
-                   '-a', predicted_proteins_fasta,
-                   '-o', predicted_proteins_gff,
-                   '-p', 'meta',
-                   '-g', '11',
-                   '-q',
-                   '-f', 'gff']
+        command = [
+                path_to_prodigal,
+                '-i', contigs_fasta,
+                '-a', proteins_fasta,
+                '-o', proteins_gff,
+                '-p', 'meta',
+                '-g', '11',
+                '-q',
+                '-f', 'gff']
         subprocess.check_call(command)
     except:
         message = 'Prodigal finished abnormally.'
@@ -63,59 +213,68 @@ def run_prodigal(path_to_prodigal,
 
     message = 'ORF prediction done!'
     give_user_feedback(message, log_file, quiet)
+
+    return
     
     
-def run_diamond(path_to_diamond,
-                diamond_database,
-                predicted_proteins_fasta,
-                diamond_file,
-                nproc,
-                sensitive,
-                block_size,
-                index_chunks,
-                tmpdir,
-                top,
-                log_file,
-                quiet):
+def run_diamond(
+        path_to_diamond,
+        diamond_database,
+        proteins_fasta,
+        alignment_file,
+        nproc,
+        sensitive,
+        block_size,
+        index_chunks,
+        tmpdir,
+        top,
+        log_file,
+        quiet,
+        verbose):
     if not sensitive:
         mode = 'fast'
     else:
         mode = 'sensitive'
 
-    message = ('Homology search with DIAMOND is starting. Please be patient. '
-               'Do not forget to cite DIAMOND when using CAT or BAT in your '
-               'publication!\n'
-               '\t\t\t\tquery: {0}\n'
-               '\t\t\t\tdatabase: {1}\n'
-               '\t\t\t\tmode: {2}\n'
-               '\t\t\t\tnumber of cores: {3}\n'
-               '\t\t\t\tblock-size (billions of letters): {4}\n'
-               '\t\t\t\tindex-chunks: {5}\n'
-               '\t\t\t\ttmpdir: {6}\n'
-               '\t\t\t\ttop: {7}'.format(predicted_proteins_fasta,
-                                         diamond_database,
-                                         mode,
-                                         nproc,
-                                         block_size,
-                                         index_chunks,
-                                         tmpdir,
-                                         top))
+    message = (
+            'Homology search with DIAMOND is starting. Please be patient. Do '
+            'not forget to cite DIAMOND when using CAT or BAT in your '
+            'publication!\n'
+            '\t\t\t\tquery: {0}\n'
+            '\t\t\t\tdatabase: {1}\n'
+            '\t\t\t\tmode: {2}\n'
+            '\t\t\t\tnumber of cores: {3}\n'
+            '\t\t\t\tblock-size (billions of letters): {4}\n'
+            '\t\t\t\tindex-chunks: {5}\n'
+            '\t\t\t\ttmpdir: {6}\n'
+            '\t\t\t\ttop: {7}'.format(
+                proteins_fasta,
+                diamond_database,
+                mode,
+                nproc,
+                block_size,
+                index_chunks,
+                tmpdir,
+                top))
     give_user_feedback(message, log_file, quiet)
 
     try:
-        command = [path_to_diamond,
-                   'blastp',
-                   '-d', diamond_database,
-                   '-q', predicted_proteins_fasta,
-                   '--top', str(top),
-                   '--matrix', 'BLOSUM62',
-                   '--evalue', '0.001',
-                   '-o', diamond_file,
-                   '-p', str(nproc),
-                   '--block-size', str(block_size),
-                   '--index-chunks', str(index_chunks),
-                   '--tmpdir', tmpdir,
-                   '--quiet']
+        command = [
+                path_to_diamond,
+                'blastp',
+                '-d', diamond_database,
+                '-q', proteins_fasta,
+                '--top', str(top),
+                '--matrix', 'BLOSUM62',
+                '--evalue', '0.001',
+                '-o', alignment_file,
+                '-p', str(nproc),
+                '--block-size', str(block_size),
+                '--index-chunks', str(index_chunks),
+                '--tmpdir', tmpdir]
+
+        if not verbose:
+            command += ['--quiet']
 
         if sensitive:
             command += ['--sensitive']
@@ -127,8 +286,10 @@ def run_diamond(path_to_diamond,
 
         sys.exit(1)
 
-    message = 'Homology search done! File {0} created.'.format(diamond_file)
+    message = 'Homology search done! File {0} created.'.format(alignment_file)
     give_user_feedback(message, log_file, quiet)
+
+    return
 
 
 def import_contig_names(fasta_file, log_file, quiet):
@@ -143,10 +304,10 @@ def import_contig_names(fasta_file, log_file, quiet):
                 contig = line.split(' ')[0].lstrip('>').rstrip()
                 
                 if contig in contig_names:
-                    message = ('it looks like your fasta file contains '
-                               'duplicate headers! The first duplicate '
-                               'encountered is {0}, but there might be more...'
-                               ''.format(contig))
+                    message = (
+                            'it looks like your fasta file contains duplicate '
+                            'headers! The first duplicate encountered is {0}, '
+                            'but there might be more...'.format(contig))
                     give_user_feedback(message, log_file, quiet, error=True)
                     
                     sys.exit(1)
@@ -156,13 +317,13 @@ def import_contig_names(fasta_file, log_file, quiet):
     return contig_names
 
 
-def import_ORFs(predicted_proteins_fasta, log_file, quiet):
-    message = 'Parsing ORF file {0}'.format(predicted_proteins_fasta)
+def import_ORFs(proteins_fasta, log_file, quiet):
+    message = 'Parsing ORF file {0}'.format(proteins_fasta)
     give_user_feedback(message, log_file, quiet)
 
     contig2ORFs = {}
     
-    with open(predicted_proteins_fasta, 'r') as f1:
+    with open(proteins_fasta, 'r') as f1:
         for line in f1:
             line = line.rstrip()
 
@@ -178,11 +339,9 @@ def import_ORFs(predicted_proteins_fasta, log_file, quiet):
     return contig2ORFs
 
 
-def parse_diamond_file(diamond_file,
-                       one_minus_r,
-                       log_file,
-                       quiet):
-    message = 'Parsing DIAMOND file {0}.'.format(diamond_file)
+def parse_tabular_alignment(
+        alignment_file, one_minus_r, log_file, quiet):
+    message = 'Parsing alignment file {0}.'.format(alignment_file)
     give_user_feedback(message, log_file, quiet)
 
     ORF2hits = {}
@@ -190,7 +349,7 @@ def parse_diamond_file(diamond_file,
 
     ORF = 'first ORF'
     ORF_done = False
-    with open(diamond_file, 'r') as f1:
+    with open(alignment_file, 'r') as f1:
         for line in f1:
             if line.startswith(ORF) and ORF_done == True:
                 # The ORF has already surpassed its minimum allowed bit-score.
@@ -222,4 +381,4 @@ def parse_diamond_file(diamond_file,
 
 
 if __name__ == '__main__':
-    sys.exit('Please run \'CAT\' to run CAT or BAT.')
+    sys.exit('Run \'CAT\' to run CAT or BAT.')
