@@ -4,10 +4,10 @@ import sys
 
 import about
 import add_names
-import single_bin
 import bins
 import contigs
 import prepare
+import single_bin
 import summarise
 
 

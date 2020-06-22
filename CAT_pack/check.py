@@ -8,6 +8,7 @@ import shared
 
 
 def check_memory(Gb):
+    total_memory = None
     error = False
     
     if sys.platform == 'linux' or sys.platform == 'linux2':
