@@ -1,5 +1,8 @@
 # Changelog
 
+## 5.1.1
+CAT and BAT can now compress the DIAMOND alignment file, and import gzip compressed alignment files.
+
 ## 5.1
 The code has been rewritten to prepare for future extensions. We have also added the `--verbose` flag.
 

@@ -3,6 +3,7 @@
 import argparse
 import datetime
 import decimal
+import gzip
 import os
 import subprocess
 import sys
@@ -216,24 +217,16 @@ def run_prodigal(
     return
     
     
-def run_diamond(
-        path_to_diamond,
-        diamond_database,
-        proteins_fasta,
-        alignment_file,
-        nproc,
-        sensitive,
-        block_size,
-        index_chunks,
-        tmpdir,
-        top,
-        log_file,
-        quiet,
-        verbose):
-    if not sensitive:
-        mode = 'fast'
-    else:
+def run_diamond(args):
+    if args.sensitive:
         mode = 'sensitive'
+    else:
+        mode = 'fast'
+
+    if args.compress:
+        compression = '1'
+    else:
+        compression = '0'
 
     message = (
             'Homology search with DIAMOND is starting. Please be patient. Do '
@@ -246,47 +239,54 @@ def run_diamond(
             '\t\t\t\tblock-size (billions of letters): {4}\n'
             '\t\t\t\tindex-chunks: {5}\n'
             '\t\t\t\ttmpdir: {6}\n'
-            '\t\t\t\ttop: {7}'.format(
-                proteins_fasta,
-                diamond_database,
+            '\t\t\t\tcompress: {7}\n'
+            '\t\t\t\ttop: {8}'.format(
+                args.proteins_fasta,
+                args.diamond_database,
                 mode,
-                nproc,
-                block_size,
-                index_chunks,
-                tmpdir,
-                top))
-    give_user_feedback(message, log_file, quiet)
+                args.nproc,
+                args.block_size,
+                args.index_chunks,
+                args.tmpdir,
+                compression,
+                args.top))
+    give_user_feedback(message, args.log_file, args.quiet)
 
     try:
         command = [
-                path_to_diamond,
+                args.path_to_diamond,
                 'blastp',
-                '-d', diamond_database,
-                '-q', proteins_fasta,
-                '--top', str(top),
+                '-d', args.diamond_database,
+                '-q', args.proteins_fasta,
+                '--top', str(args.top),
                 '--matrix', 'BLOSUM62',
                 '--evalue', '0.001',
-                '-o', alignment_file,
-                '-p', str(nproc),
-                '--block-size', str(block_size),
-                '--index-chunks', str(index_chunks),
-                '--tmpdir', tmpdir]
+                '-o', args.alignment_file,
+                '-p', str(args.nproc),
+                '--block-size', str(args.block_size),
+                '--index-chunks', str(args.index_chunks),
+                '--tmpdir', args.tmpdir,
+                '--compress', compression]
 
-        if not verbose:
+        if not args.verbose:
             command += ['--quiet']
 
-        if sensitive:
+        if args.sensitive:
             command += ['--sensitive']
 
         subprocess.check_call(command)
     except:
         message = 'DIAMOND finished abnormally.'
-        give_user_feedback(message, log_file, quiet, error=True)
+        give_user_feedback(message, args.log_file, args.quiet, error=True)
 
         sys.exit(1)
 
-    message = 'Homology search done! File {0} created.'.format(alignment_file)
-    give_user_feedback(message, log_file, quiet)
+    if args.compress:
+        setattr(args, 'alignment_file', '{0}.gz'.format(args.alignment_file))
+
+    message = 'Homology search done! File {0} created.'.format(
+            args.alignment_file)
+    give_user_feedback(message, args.log_file, args.quiet)
 
     return
 
@@ -343,38 +343,50 @@ def parse_tabular_alignment(
     message = 'Parsing alignment file {0}.'.format(alignment_file)
     give_user_feedback(message, log_file, quiet)
 
+    compressed = False
+    if alignment_file.endswith('.gz'):
+        compressed = True
+
+        f1 = gzip.open(alignment_file, 'rb')
+    else:
+        f1 = open(alignment_file, 'r')
+
     ORF2hits = {}
     all_hits = set()
 
     ORF = 'first ORF'
     ORF_done = False
-    with open(alignment_file, 'r') as f1:
-        for line in f1:
-            if line.startswith(ORF) and ORF_done == True:
-                # The ORF has already surpassed its minimum allowed bit-score.
-                continue
+    for line in f1:
+        if compressed:
+            line = line.decode('utf-8')
 
-            line = line.rstrip().split('\t')
+        if line.startswith(ORF) and ORF_done == True:
+            # The ORF has already surpassed its minimum allowed bit-score.
+            continue
 
-            if not line[0] == ORF:
-                # A new ORF is reached.
-                ORF = line[0]
-                best_bitscore = decimal.Decimal(line[11])
-                ORF2hits[ORF] = []
+        line = line.rstrip().split('\t')
 
-                ORF_done = False
+        if not line[0] == ORF:
+            # A new ORF is reached.
+            ORF = line[0]
+            best_bitscore = decimal.Decimal(line[11])
+            ORF2hits[ORF] = []
 
-            bitscore = decimal.Decimal(line[11])
-            
-            if bitscore >= one_minus_r * best_bitscore:
-                # The hit has a high enough bit-score to be included.
-                hit = line[1]
+            ORF_done = False
 
-                ORF2hits[ORF].append((hit, bitscore),)
-                all_hits.add(hit)
-            else:
-                # The hit is not included because its bit-score is too low.
-                ORF_done = True
+        bitscore = decimal.Decimal(line[11])
+        
+        if bitscore >= one_minus_r * best_bitscore:
+            # The hit has a high enough bit-score to be included.
+            hit = line[1]
+
+            ORF2hits[ORF].append((hit, bitscore),)
+            all_hits.add(hit)
+        else:
+            # The hit is not included because its bit-score is too low.
+            ORF_done = True
+
+    f1.close()
                 
     return (ORF2hits, all_hits)
 

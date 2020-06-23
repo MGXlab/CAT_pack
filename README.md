@@ -31,7 +31,7 @@ CAT and BAT have been thoroughly tested on Linux systems, and should run on macO
 No installation is required. You can run CAT and BAT by supplying the absolute path:
 
 ```
-$ CAT_pack/CAT --help
+$ ./CAT_pack/CAT --help
 ```
 
 Alternatively, if you add the files in the CAT\_pack directory to your `$PATH` variable, you can run CAT and BAT from anywhere:
@@ -85,6 +85,17 @@ CAT prepare will try to assess which files need to be downloaded and created and
 The taxonomy folder and database folder created by CAT prepare are needed in subsequent CAT and BAT runs. They only need to be generated/downloaded once or whenever you want to update the nr database.
 
 To run CAT on a contig set, each header in the contig fasta file (the part after `>` and before the first space) needs to be unique. To run BAT on set of MAGs, each header in a MAG needs to be unique within that MAG. If you are unsure if this is the case, you can just run CAT or BAT, as the appropriate error messages are generated if formatting is incorrect.
+
+### Getting help.
+If you are unsure what options a program has, you can always add `--help` to a command. This is a great way to get you started with CAT and BAT.
+
+```
+$ CAT --help
+
+$ CAT contigs --help
+
+$ CAT summarise --help
+```
 
 ## Usage
 After you have got the database files on your system, you can run CAT to annotate your contig set:

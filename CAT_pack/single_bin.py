@@ -213,6 +213,12 @@ def parse_arguments():
             help=('Directory for temporary DIAMOND files (default: directory '
                 'to which output files are written).'))
     specific.add_argument(
+            '--compress',
+            dest='compress',
+            required=False,
+            action='store_true',
+            help='Compress DIAMOND alignment file.')
+    specific.add_argument(
             '--top',
             dest='top',
             metavar='',
@@ -310,7 +316,7 @@ def run():
                 args.bin_fasta,
                 args.taxonomy_folder,
                 args.database_folder,
-                float(args.r),
+                int(args.r),
                 float(args.f),
                 args.log_file))
     shared.give_user_feedback(message, args.log_file, args.quiet,
@@ -399,6 +405,10 @@ def run():
                 check.check_fasta(
                     args.proteins_fasta, args.log_file, args.quiet))
 
+    if 'align' in step_list:
+        errors.append(
+                check.check_top(args.top, args.r, args.log_file, args.quiet))
+
     # Print all variables.
     shared.print_variables(args, step_list)
 
@@ -429,20 +439,7 @@ def run():
             contig_names, contig2ORFs, args.log_file, args.quiet)
     
     if 'align' in step_list:
-        shared.run_diamond(
-                args.path_to_diamond,
-                args.diamond_database,
-                args.proteins_fasta,
-                args.alignment_file,
-                args.nproc,
-                args.sensitive,
-                args.block_size,
-                args.index_chunks,
-                args.tmpdir,
-                args.top,
-                args.log_file,
-                args.quiet,
-                args.verbose)
+        shared.run_diamond(args)
 
     (ORF2hits,
             all_hits) = shared.parse_tabular_alignment(
