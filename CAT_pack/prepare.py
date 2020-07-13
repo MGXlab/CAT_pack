@@ -506,7 +506,7 @@ def run_fresh(args):
         shared.give_user_feedback(message, args.log_file, args.quiet)
         
     # Check memory.
-    min_mem = 100
+    min_mem = 150
     (total_memory, error) = check.check_memory(min_mem)
     if error:
         message = (
