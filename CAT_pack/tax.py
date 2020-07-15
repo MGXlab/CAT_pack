@@ -79,7 +79,7 @@ def import_taxids_with_multiple_offspring(
 
 
 def find_lineage(taxid, taxid2parent, lineage=None):
-    if lineage == None:
+    if lineage is None:
         lineage = []
 
     lineage.append(taxid)
@@ -232,7 +232,7 @@ def convert_to_names(lineage, taxid2rank, taxid2name, scores=None):
         name = taxid2name[taxid]
         rank = taxid2rank[taxid]
 
-        if scores:
+        if scores is not None:
             if starred:
                 names.append('{0}* ({1}): {2}'.format(name, rank, scores[i]))
             else:
@@ -268,7 +268,7 @@ def convert_to_official_names(lineage, taxid2rank, taxid2name, scores=None):
                 
             name = taxid2name[taxid]
 
-            if scores:
+            if scores is not None:
                 if starred:
                     official_names[i] = '{0}*: {1}'.format(name, scores[index])
                 else:

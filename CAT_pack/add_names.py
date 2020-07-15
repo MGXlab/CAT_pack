@@ -185,7 +185,7 @@ def run():
             
             lineage = line[lineage_index].split(';')
 
-            if scores_index and not args.exclude_scores:
+            if scores_index is not None and not args.exclude_scores:
                 scores = line[scores_index].split(';')
             else:
                 scores = None

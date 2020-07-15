@@ -145,7 +145,7 @@ def print_variables(args, step_list=None):
                 '{0}'.format('\n'.join(arguments)))
         give_user_feedback(message, args.log_file, args.quiet, show_time=False)
 
-        if step_list:
+        if step_list is not None:
             message = '\nStep list: {0}'.format(step_list)
             give_user_feedback(message, args.log_file, args.quiet,
                     show_time=False)
