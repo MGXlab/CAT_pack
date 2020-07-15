@@ -125,6 +125,7 @@ def parse_arguments():
 
     # Add extra arguments.
     setattr(args, 'date', date)
+    setattr(args, 'min_mem', 150)
     shared.expand_arguments(args)
 
     return (args)
@@ -181,7 +182,7 @@ def download_prot_accession2taxid_file(
     message = 'Download complete!'
     shared.give_user_feedback(message, log_file, quiet)
     
-    return prot_accession2taxid_file
+    return
 
 
 def download_nr(nr_file, log_file, quiet):
@@ -210,7 +211,8 @@ def make_diamond_database(
         diamond_database_prefix,
         nproc,
         log_file,
-        quiet):
+        quiet,
+        verbose):
     message = (
             'Constructing DIAMOND database {0}.dmnd from {1} using {2} cores. '
             'Please be patient...'.format(
@@ -221,8 +223,11 @@ def make_diamond_database(
             path_to_diamond, 'makedb',
             '--in', nr_file,
             '-d', diamond_database_prefix,
-            '-p', str(nproc),
-            '--quiet']
+            '-p', str(nproc)]
+
+    if not verbose:
+        command += ['--quiet']
+
     try:
         subprocess.check_call(command)
     except:
@@ -255,7 +260,7 @@ def import_prot_accession2taxid(prot_accession2taxid_file, log_file, quiet):
 
 
 def make_fastaid2LCAtaxid_file(
-        taxonomy_folder,
+        nodes_dmp,
         fastaid2LCAtaxid_file,
         nr_file,
         prot_accession2taxid_file,
@@ -263,7 +268,6 @@ def make_fastaid2LCAtaxid_file(
         quiet):
     prot_accession2taxid = import_prot_accession2taxid(
             prot_accession2taxid_file, log_file, quiet)
-    nodes_dmp = '{0}/nodes.dmp'.format(taxonomy_folder)
     (taxid2parent, taxid2rank) = tax.import_nodes(nodes_dmp, log_file, quiet)
 
     message = ('Finding LCA of all protein accession numbers in fasta headers '
@@ -316,10 +320,8 @@ def make_fastaid2LCAtaxid_file(
                 # numbers, it is counted as a correction as well.
                 corrected += 1
 
-    message = (
-            'Done! File {0} is created. '
-            '{1} of {2} headers ({3:.1f}%) corrected. Please wait patiently '
-            'for Python to collect garbage.'.format(
+    message = ('Done! File {0} is created. '
+            '{1} of {2} headers ({3:.1f}%) corrected.'.format(
                 fastaid2LCAtaxid_file,
                 corrected,
                 total,
@@ -329,8 +331,7 @@ def make_fastaid2LCAtaxid_file(
     return
     
     
-def find_offspring(taxonomy_folder, fastaid2LCAtaxid_file, log_file, quiet):
-    nodes_dmp = '{0}/nodes.dmp'.format(taxonomy_folder)
+def find_offspring(nodes_dmp, fastaid2LCAtaxid_file, log_file, quiet):
     (taxid2parent, taxid2rank) = tax.import_nodes(nodes_dmp, log_file, quiet)
 
     message = 'Searching nr database for taxids with multiple offspring.'
@@ -376,32 +377,65 @@ def write_taxids_with_multiple_offspring_file(
 def prepare(step_list, args):
     shared.print_variables(args, step_list)
 
+    if not os.path.isdir(args.taxonomy_folder):
+        os.mkdir(args.taxonomy_folder)
+        message = 'Taxonomy folder {0} is created.'.format(
+                args.taxonomy_folder)
+        shared.give_user_feedback(message, args.log_file, args.quiet)
+
+    if not os.path.isdir(args.database_folder):
+        os.mkdir(args.database_folder)
+        message = 'Database folder {0} is created.'.format(
+                args.database_folder)
+        shared.give_user_feedback(message, args.log_file, args.quiet)
+
     if 'download_taxonomy_files' in step_list:
         download_taxonomy_files(
                 args.taxonomy_folder, args.date, args.log_file, args.quiet)
 
+        setattr(args, 'nodes_dmp', '{0}nodes.dmp'.format(args.taxonomy_folder))
+
     if 'download_prot_accession2taxid_file' in step_list:
+        setattr(args,
+                'prot_accession2taxid_file',
+                '{0}{1}.prot.accession2taxid.gz'.format(
+                    args.taxonomy_folder, args.date))
+
         download_prot_accession2taxid_file(
                 args.prot_accession2taxid_file,
                 args.date,
                 args.log_file,
                 args.quiet)
-        
+
     if 'download_nr' in step_list:
+        setattr(args,
+                'nr_file',
+                '{0}{1}.nr.gz'.format(args.database_folder, args.date))
+
         download_nr(args.nr_file, args.log_file, args.quiet)
 
     if 'make_diamond_database' in step_list:
+        setattr(args,
+                'diamond_database_prefix',
+                '{0}{1}.nr'.format(args.database_folder, args.date))
+
         make_diamond_database(
                 args.path_to_diamond,
                 args.nr_file,
                 args.diamond_database_prefix,
                 args.nproc,
                 args.log_file,
-                args.quiet)
+                args.quiet,
+                args.verbose)
 
     if 'make_fastaid2LCAtaxid_file' in step_list:
+        setattr(args,
+                'fastaid2LCAtaxid_file',
+                '{0}{1}.nr.fastaid2LCAtaxid'.format(
+                    args.database_folder, args.date))
+
         make_fastaid2LCAtaxid_file(
-                args.taxonomy_folder,
+                args.nodes_dmp,
                 args.fastaid2LCAtaxid_file,
                 args.nr_file,
                 args.prot_accession2taxid_file,
@@ -409,8 +443,13 @@ def prepare(step_list, args):
                 args.quiet)
 
     if 'make_taxids_with_multiple_offspring_file' in step_list:
+        setattr(args,
+                'taxids_with_multiple_offspring_file',
+                '{0}{1}.nr.taxids_with_multiple_offspring'.format(
+                    args.database_folder, args.date))
+
         taxid2offspring = find_offspring(
-                args.taxonomy_folder,
+                args.nodes_dmp,
                 args.fastaid2LCAtaxid_file,
                 args.log_file,
                 args.quiet)
@@ -506,52 +545,20 @@ def run_fresh(args):
         shared.give_user_feedback(message, args.log_file, args.quiet)
         
     # Check memory.
-    min_mem = 150
-    (total_memory, error) = check.check_memory(min_mem)
+    (total_memory, error) = check.check_memory(args.min_mem)
     if error:
         message = (
                 'at least {0}GB of memory is needed for a fresh database '
-                'construction. {1}GB is found on your system. You can either '
-                'try to find a machine with more memory, or download '
-                'preconstructed database files from '
+                'construction. {1}GB is found on your system. You can try to '
+                'find a machine with more memory, or download preconstructed '
+                'database files from '
                 'tbb.bio.uu.nl/bastiaan/CAT_prepare/.'.format(
-                    min_mem, total_memory))
+                    args.min_mem, total_memory))
         shared.give_user_feedback(message, args.log_file, args.quiet,
                 error=True)
 
         sys.exit(1)
 
-    if not os.path.isdir(args.taxonomy_folder):
-        os.mkdir(args.taxonomy_folder)
-
-        message = '{0} is created.'.format(args.taxonomy_folder)
-        shared.give_user_feedback(message, args.log_file, args.quiet)
-
-    if not os.path.isdir(args.database_folder):
-        os.mkdir(args.database_folder)
-
-        message = '{0} is created.'.format(args.database_folder)
-        shared.give_user_feedback(message, args.log_file, args.quiet)
-        
-    setattr(args,
-            'prot_accession2taxid_file',
-            '{0}{1}.prot.accession2taxid.gz'.format(
-                args.taxonomy_folder, args.date))
-    setattr(args,
-            'nr_file',
-            '{0}{1}.nr.gz'.format(args.database_folder, args.date))
-    setattr(args,
-            'diamond_database_prefix',
-            '{0}{1}.nr'.format(args.database_folder, args.date))
-    setattr(args,
-            'fastaid2LCAtaxid_file',
-            '{0}{1}.nr.fastaid2LCAtaxid'.format(
-                args.database_folder, args.date))
-    setattr(args,
-            'taxids_with_multiple_offspring_file',
-            '{0}{1}.nr.taxids_with_multiple_offspring'.format(
-                args.database_folder, args.date))
-    
     step_list = ['download_taxonomy_files',
                  'download_prot_accession2taxid_file',
                  'download_nr',
@@ -671,7 +678,8 @@ def run_existing(args):
                 'not all of the downstream files that depend on it are '
                 'present. In order to prevent strange bugs from arising, '
                 'remove all files from the database folder and try again.')
-        shared.give_user_feedback(message, args.log_file, args.quiet, error=True)
+        shared.give_user_feedback(message, args.log_file, args.quiet,
+                error=True)
         
         sys.exit(1)
 
@@ -700,9 +708,6 @@ def run_existing(args):
             message = 'Nr file will be downloaded to database folder.'
             shared.give_user_feedback(message, args.log_file, args.quiet)
 
-            setattr(args,
-                    'nr_file',
-                    '{0}{1}.nr.gz'.format(args.database_folder, args.date))
             step_list.append('download_nr')
         else:
             pass
@@ -711,21 +716,13 @@ def run_existing(args):
         shared.give_user_feedback(message, args.log_file, args.quiet)
 
     if not args.diamond_database:
-        message = ('DIAMOND database will be constructed from the nr file.'
-                ''.format(args.nr_file))
+        message = 'DIAMOND database will be constructed from the nr file.'
         shared.give_user_feedback(message, args.log_file, args.quiet)
 
-        setattr(args,
-                'diamond_database_prefix',
-                '{0}{1}.nr'.format(args.database_folder, args.date))
         step_list.append('make_diamond_database')
     else:
         message = 'DIAMOND database found: {0}.'.format(args.diamond_database)
         shared.give_user_feedback(message, args.log_file, args.quiet)
-
-        setattr(args,
-                'diamond_database_prefix',
-                args.diamond_database.rsplit('.dmnd', 1)[0])
 
     if not args.fastaid2LCAtaxid_file:
         if not args.prot_accession2taxid_file:
@@ -733,19 +730,11 @@ def run_existing(args):
                     'taxonomy folder.')
             shared.give_user_feedback(message, args.log_file, args.quiet)
 
-            setattr(args,
-                    'prot_accession2taxid_file',
-                    '{0}{1}.prot.accession2taxid.gz'.format(
-                        args.taxonomy_folder, args.date))
             step_list.append('download_prot_accession2taxid_file')
 
         message = 'File fastaid2LCAtaxid will be created.'
         shared.give_user_feedback(message, args.log_file, args.quiet)
 
-        setattr(args,
-                'fastaid2LCAtaxid_file',
-                '{0}{1}.nr.fastaid2LCAtaxid'.format(
-                    args.database_folder, args.date))
         step_list.append('make_fastaid2LCAtaxid_file')
     else:
         message = ('Fastaid2LCAtaxid found: {0}.'.format(
@@ -760,10 +749,6 @@ def run_existing(args):
         message = 'File taxids_with_multiple_offspring will be created.'
         shared.give_user_feedback(message, args.log_file, args.quiet)
 
-        setattr(args,
-                'taxids_with_multiple_offspring_file',
-                '{0}{1}.nr.taxids_with_multiple_offspring'.format(
-                    args.database_folder, args.date))
         step_list.append('make_taxids_with_multiple_offspring_file')
     else:
         message = 'Taxids_with_multiple_offspring found: {0}'.format(
@@ -787,20 +772,18 @@ def run_existing(args):
                 'to existing folders?')
         shared.give_user_feedback(message, args.log_file, args.quiet,
                 show_time=False)
-        
-    if ('make_fastaid2LCAtaxid_file' in step_list or
-        'make_taxids_with_multiple_offspring_file' in step_list):
+
+    if 'make_fastaid2LCAtaxid_file' in step_list:
         # Check memory.
-        min_mem = 100
-        (total_memory, error) = check.check_memory(min_mem)
+        (total_memory, error) = check.check_memory(args.min_mem)
         if error:
             message = (
                     'at least {0}GB of memory is needed for the database '
-                    'construction. {1}GB is found on your system. You can '
-                    'either try to find a machine with more memory, or '
-                    'download preconstructed database files '
+                    'construction. {1}GB is found on your system. You can try '
+                    'to find a machine with more memory, or download '
+                    'preconstructed database files '
                     'from tbb.bio.uu.nl/bastiaan/CAT_prepare/.'.format(
-                        min_mem, total_memory))
+                        args.min_mem, total_memory))
             shared.give_user_feedback(message, args.log_file, args.quiet,
                     error=True)
             
@@ -818,18 +801,6 @@ def run_existing(args):
         shared.give_user_feedback(message, args.log_file, args.quiet,
                 show_time=False)
 
-    if not os.path.isdir(args.taxonomy_folder):
-        os.mkdir(args.taxonomy_folder)
-        message = 'Taxonomy folder {0} is created.'.format(
-                args.taxonomy_folder)
-        shared.give_user_feedback(message, args.log_file, args.quiet)
-
-    if not os.path.isdir(args.database_folder):
-        os.mkdir(args.database_folder)
-        message = 'Database folder {0} is created.'.format(
-                args.database_folder)
-        shared.give_user_feedback(message, args.log_file, args.quiet)
-        
     prepare(step_list, args)
 
     return
