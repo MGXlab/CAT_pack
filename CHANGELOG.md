@@ -1,5 +1,8 @@
 # Changelog
 
+## 5.2
+`CAT prepare` now uses the latest taxonomy mapping files from NCBI, significantly expanding taxonomic coverage of proteins in nr. File integrity of downloads is assessed based on md5 checksums. The ORF2LCA output file contains a new column for the number of hits the classification is based on. We have made textual changes to the output files to better reflect the meaning of 'classified' and 'not classified' in different contexts.
+
 ## 5.1.2
 Code streamlining.
 

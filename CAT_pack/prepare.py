@@ -17,7 +17,7 @@ import tax
 
 
 def parse_arguments():
-    date = str(datetime.datetime.now().date())
+    date = datetime.datetime.now().strftime('%Y-%m-%d')
     
     parser = argparse.ArgumentParser(
             prog='CAT prepare',
@@ -125,28 +125,61 @@ def parse_arguments():
 
     # Add extra arguments.
     setattr(args, 'date', date)
-    setattr(args, 'min_mem', 150)
+    setattr(args, 'min_mem', 200)
     shared.expand_arguments(args)
 
     return (args)
 
 
+def memory_bottleneck(args):
+    (total_memory, error) = check.check_memory(args.min_mem)
+    if error:
+        message = (
+                'at least {0:,d}GB of memory is needed for the database '
+                'construction. {1:,d}GB is found on your system. You can try '
+                'to find a machine with more memory, or download '
+                'preconstructed database files from '
+                'tbb.bio.uu.nl/bastiaan/CAT_prepare/.'.format(
+                    args.min_mem, total_memory))
+        shared.give_user_feedback(message, args.log_file, args.quiet,
+                error=True)
+
+        sys.exit(1)
+
+    return
+
+
 def download_taxonomy_files(taxonomy_folder, date, log_file, quiet):
+    url = 'ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/'
+    message = ('Downloading and extracting taxonomy files from {0} to '
+            'taxonomy folder.'.format(url))
+    shared.give_user_feedback(message, log_file, quiet)
+
     url = 'ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz'
     tmp_taxonomy_file = '{0}{1}.taxdump.tar.gz'.format(taxonomy_folder, date)
-
-    message = ('Downloading and extracting taxonomy files from {0} to {1}.'
-            ''.format(url, taxonomy_folder))
-    shared.give_user_feedback(message, log_file, quiet)
-    
     try:
         urllib.request.urlretrieve(url, tmp_taxonomy_file)
     except:
-        message = 'download of taxonomy files failed.'
+        message = 'download of {0} failed.'.format(url)
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         sys.exit(1)
-    
+
+    url = '{0}.md5'.format(url)
+    md5_file = '{0}{1}.taxdump.tar.gz.md5'.format(taxonomy_folder, date)
+    try:
+        urllib.request.urlretrieve(url, md5_file)
+    except:
+        message = 'download of {0} failed.'.format(url)
+        shared.give_user_feedback(message, log_file, quiet, error=True)
+
+        sys.exit(1)
+
+    message = 'Download complete.'
+    shared.give_user_feedback(message, log_file, quiet)
+
+    check.check_md5_gz(tmp_taxonomy_file, md5_file, log_file, quiet)
+
     try:
         with tarfile.open(tmp_taxonomy_file) as tar:
             tar.extractall(taxonomy_folder)
@@ -155,8 +188,8 @@ def download_taxonomy_files(taxonomy_folder, date, log_file, quiet):
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         sys.exit(1)
-        
-    message = 'Download complete!'
+
+    message = 'Extracting complete.'
     shared.give_user_feedback(message, log_file, quiet)
 
     return
@@ -164,43 +197,68 @@ def download_taxonomy_files(taxonomy_folder, date, log_file, quiet):
     
 def download_prot_accession2taxid_file(
         prot_accession2taxid_file, date, log_file, quiet):
-    url = ('ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/'
-            'prot.accession2taxid.gz')
-
-    message = ('Downloading mapping file from {0} to {1}.'.format(
-        url, prot_accession2taxid_file))
+    url = 'ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/'
+    message = 'Downloading mapping file from {0} to taxonomy folder.'.format(
+            url)
     shared.give_user_feedback(message, log_file, quiet)
-    
+
+    url = ('ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/'
+            'prot.accession2taxid.FULL.gz')
     try:
         urllib.request.urlretrieve(url, prot_accession2taxid_file)
     except:
-        message = 'download of prot.accession2taxid.gz failed.'
+        message = 'download of {0} failed.'.format(url)
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         sys.exit(1)
 
-    message = 'Download complete!'
+    url = '{0}.md5'.format(url)
+    md5_file = '{0}.md5'.format(prot_accession2taxid_file)
+    try:
+        urllib.request.urlretrieve(url, md5_file)
+    except:
+        message = 'download of {0} failed.'.format(url)
+        shared.give_user_feedback(message, log_file, quiet, error=True)
+
+        sys.exit(1)
+
+    message = 'Download complete.'
     shared.give_user_feedback(message, log_file, quiet)
-    
+
+    check.check_md5_gz(prot_accession2taxid_file, md5_file, log_file, quiet)
+
     return
 
 
 def download_nr(nr_file, log_file, quiet):
-    url = 'ftp://ftp.ncbi.nlm.nih.gov/blast/db/FASTA/nr.gz'
-    
-    message = 'Downloading nr database from {0} to {1}.'.format(url, nr_file)
+    url = 'ftp://ftp.ncbi.nlm.nih.gov/blast/db/FASTA/'
+    message = 'Downloading nr database from {0} to database folder.'.format(
+            url)
     shared.give_user_feedback(message, log_file, quiet)
-    
+
+    url = 'ftp://ftp.ncbi.nlm.nih.gov/blast/db/FASTA/nr.gz'
     try:
         urllib.request.urlretrieve(url, nr_file)
     except:
-        message = 'download of nr database failed.'
+        message = 'download of {0} failed.'.format(url)
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         sys.exit(1)
 
-    message = 'Download complete!'
+    url = '{0}.md5'.format(url)
+    md5_file = '{0}.md5'.format(nr_file)
+    try:
+        urllib.request.urlretrieve(url, md5_file)
+    except:
+        message = 'download of {0} failed.'.format(url)
+        shared.give_user_feedback(message, log_file, quiet, error=True)
+
+        sys.exit(1)
+
+    message = 'Download complete.'
     shared.give_user_feedback(message, log_file, quiet)
+
+    check.check_md5_gz(nr_file, md5_file, log_file, quiet)
 
     return
 
@@ -213,10 +271,8 @@ def make_diamond_database(
         log_file,
         quiet,
         verbose):
-    message = (
-            'Constructing DIAMOND database {0}.dmnd from {1} using {2} cores. '
-            'Please be patient...'.format(
-                diamond_database_prefix, nr_file, nproc))
+    message = ('Constructing DIAMOND database {0}.dmnd from {1} using {2} '
+            'cores.'.format(diamond_database_prefix, nr_file, nproc))
     shared.give_user_feedback(message, log_file, quiet)
 
     command = [
@@ -236,25 +292,60 @@ def make_diamond_database(
 
         sys.exit(1)
         
-    message = 'DIAMOND database constructed!'
+    message = 'DIAMOND database constructed.'
     shared.give_user_feedback(message, log_file, quiet)
 
     return
-    
-    
-def import_prot_accession2taxid(prot_accession2taxid_file, log_file, quiet):
-    message = 'Loading {0} into memory. Please be patient...'.format(
-            prot_accession2taxid_file)
+
+
+def import_headers_nr(nr_file, log_file, quiet):
+    message = 'Loading file {0}.'.format(nr_file)
+    shared.give_user_feedback(message, log_file, quiet)
+
+    fastaid2prot_accessions = {}
+    prot_accessions_whitelist = set()
+
+    with gzip.open(nr_file, 'rb') as f1:
+        for line in f1:
+            line = line.decode('utf-8')
+
+            if not line.startswith('>'):
+                continue
+
+            line = line.lstrip('>').split('\x01')
+
+            prot_accessions = [i.split(' ')[0] for i in line]
+            fastaid = prot_accessions[0]
+
+            fastaid2prot_accessions[fastaid] = prot_accessions
+            prot_accessions_whitelist.update(prot_accessions)
+
+    return (fastaid2prot_accessions, prot_accessions_whitelist)
+
+
+def import_prot_accession2taxid(
+        prot_accession2taxid_file, prot_accessions_whitelist, log_file, quiet):
+    message = 'Loading file {0}.'.format(prot_accession2taxid_file)
     shared.give_user_feedback(message, log_file, quiet)
     
     prot_accession2taxid = {}
 
     with gzip.open(prot_accession2taxid_file, 'rb') as f1:
-        for line in f1:
+        for n, line in enumerate(f1):
             line = line.decode('utf-8')
-            line = line.split('\t')
 
-            prot_accession2taxid[line[1]] = line[2]
+            line = line.rstrip().split('\t')
+
+            if n == 0:
+                index_1 = line.index('accession.version')
+                index_2 = line.index('taxid')
+
+                continue
+
+            prot_accession = line[index_1]
+
+            if prot_accession in prot_accessions_whitelist:
+                prot_accession2taxid[prot_accession] = line[index_2]
 
     return prot_accession2taxid
 
@@ -264,33 +355,28 @@ def make_fastaid2LCAtaxid_file(
         fastaid2LCAtaxid_file,
         nr_file,
         prot_accession2taxid_file,
+        taxid2parent,
         log_file,
         quiet):
+    (fastaid2prot_accessions,
+            prot_accessions_whitelist) = import_headers_nr(
+                    nr_file, log_file, quiet)
     prot_accession2taxid = import_prot_accession2taxid(
-            prot_accession2taxid_file, log_file, quiet)
-    (taxid2parent, taxid2rank) = tax.import_nodes(nodes_dmp, log_file, quiet)
+            prot_accession2taxid_file, prot_accessions_whitelist,
+            log_file, quiet)
 
-    message = ('Finding LCA of all protein accession numbers in fasta headers '
-            'of {0}. Please be patient...'.format(nr_file))
+    message = 'Finding LCA of all protein accession numbers in fasta headers.'
     shared.give_user_feedback(message, log_file, quiet)
     
+    no_taxid = 0
     corrected = 0
     total = 0
-    with gzip.open(nr_file, 'rb') as f1, open(fastaid2LCAtaxid_file, 'w') as outf1:
-        for line in f1:
-            line = line.decode('utf-8')
-            if not line.startswith('>'):
-                continue
-
-            line = line.lstrip('>').split('\x01')
-
-            accession_numbers = [i.split(' ')[0] for i in line]
-            fastaid = accession_numbers[0]
-            
+    with open(fastaid2LCAtaxid_file, 'w') as outf1:
+        for fastaid, prot_accessions in fastaid2prot_accessions.items():
             list_of_lineages = []
-            for accession_number in accession_numbers:
+            for prot_accession in prot_accessions:
                 try:
-                    taxid = prot_accession2taxid[accession_number]
+                    taxid = prot_accession2taxid[prot_accession]
                     lineage = tax.find_lineage(taxid, taxid2parent)
                     list_of_lineages.append(lineage)
                 except:
@@ -305,35 +391,38 @@ def make_fastaid2LCAtaxid_file(
                 # that are missing in prot.accession2taxid or whose taxid is
                 # missing in nodes.dmp. NOTE that these entries are thus not
                 # present in the output file.
+                no_taxid += 1
+
                 continue
 
             LCAtaxid = tax.find_LCA(list_of_lineages)
 
             outf1.write('{0}\t{1}\n'.format(fastaid, LCAtaxid))
 
-            try:
-                if LCAtaxid != prot_accession2taxid[fastaid]:
-                    corrected += 1
-            except:
+            if (fastaid not in prot_accession2taxid or
+                    LCAtaxid != prot_accession2taxid[fastaid]):
                 # If the fastaid cannot be found in prot.accession2taxid, but
                 # a taxid is given to the fastaid based on secondary accession
-                # numbers, it is counted as a correction as well.
+                # numbers, or if the taxid of the header is different from the
+                # LCA taxid, it is counted as corrected.
                 corrected += 1
 
     message = ('Done! File {0} is created. '
-            '{1} of {2} headers ({3:.1f}%) corrected.'.format(
+            '{1:,d} of {2:,d} headers ({3:.1f}%) corrected. '
+            '{4:,d} headers ({5:.1f}%) do not have a taxid assigned.'.format(
                 fastaid2LCAtaxid_file,
                 corrected,
                 total,
-                corrected / total * 100))
+                corrected / total * 100,
+                no_taxid,
+                no_taxid / total * 100))
     shared.give_user_feedback(message, log_file, quiet)
 
     return
-    
-    
-def find_offspring(nodes_dmp, fastaid2LCAtaxid_file, log_file, quiet):
-    (taxid2parent, taxid2rank) = tax.import_nodes(nodes_dmp, log_file, quiet)
 
+
+def find_offspring(
+        nodes_dmp, fastaid2LCAtaxid_file, taxid2parent, log_file, quiet):
     message = 'Searching nr database for taxids with multiple offspring.'
     shared.give_user_feedback(message, log_file, quiet)
 
@@ -398,7 +487,7 @@ def prepare(step_list, args):
     if 'download_prot_accession2taxid_file' in step_list:
         setattr(args,
                 'prot_accession2taxid_file',
-                '{0}{1}.prot.accession2taxid.gz'.format(
+                '{0}{1}.prot.accession2taxid.FULL.gz'.format(
                     args.taxonomy_folder, args.date))
 
         download_prot_accession2taxid_file(
@@ -428,6 +517,11 @@ def prepare(step_list, args):
                 args.quiet,
                 args.verbose)
 
+    if ('make_fastaid2LCAtaxid_file' in step_list
+            or 'make_taxids_with_multiple_offspring_file' in step_list):
+        taxid2parent, taxid2rank = tax.import_nodes(
+                args.nodes_dmp, args.log_file, args.quiet)
+
     if 'make_fastaid2LCAtaxid_file' in step_list:
         setattr(args,
                 'fastaid2LCAtaxid_file',
@@ -439,6 +533,7 @@ def prepare(step_list, args):
                 args.fastaid2LCAtaxid_file,
                 args.nr_file,
                 args.prot_accession2taxid_file,
+                taxid2parent,
                 args.log_file,
                 args.quiet)
 
@@ -451,6 +546,7 @@ def prepare(step_list, args):
         taxid2offspring = find_offspring(
                 args.nodes_dmp,
                 args.fastaid2LCAtaxid_file,
+                taxid2parent,
                 args.log_file,
                 args.quiet)
         write_taxids_with_multiple_offspring_file(
@@ -460,7 +556,7 @@ def prepare(step_list, args):
                 args.quiet)
 
     message = ('\n-----------------\n\n'
-            '[{0}] CAT prepare is done!'.format(datetime.datetime.now()))
+            '{0} CAT prepare is done!'.format(shared.timestamp()))
     shared.give_user_feedback(message, args.log_file, args.quiet,
             show_time=False)
 
@@ -471,7 +567,7 @@ def prepare(step_list, args):
 
     message = (
             '\nSupply the following arguments to CAT or BAT if you want to '
-            'use the constructed database:\n'
+            'use this database:\n'
             '-d / --database_folder {0}\n'
             '-t / --taxonomy_folder {1}'.format(
                 args.database_folder, args.taxonomy_folder))
@@ -545,19 +641,7 @@ def run_fresh(args):
         shared.give_user_feedback(message, args.log_file, args.quiet)
         
     # Check memory.
-    (total_memory, error) = check.check_memory(args.min_mem)
-    if error:
-        message = (
-                'at least {0}GB of memory is needed for a fresh database '
-                'construction. {1}GB is found on your system. You can try to '
-                'find a machine with more memory, or download preconstructed '
-                'database files from '
-                'tbb.bio.uu.nl/bastiaan/CAT_prepare/.'.format(
-                    args.min_mem, total_memory))
-        shared.give_user_feedback(message, args.log_file, args.quiet,
-                error=True)
-
-        sys.exit(1)
+    memory_bottleneck(args)
 
     step_list = ['download_taxonomy_files',
                  'download_prot_accession2taxid_file',
@@ -775,20 +859,8 @@ def run_existing(args):
 
     if 'make_fastaid2LCAtaxid_file' in step_list:
         # Check memory.
-        (total_memory, error) = check.check_memory(args.min_mem)
-        if error:
-            message = (
-                    'at least {0}GB of memory is needed for the database '
-                    'construction. {1}GB is found on your system. You can try '
-                    'to find a machine with more memory, or download '
-                    'preconstructed database files '
-                    'from tbb.bio.uu.nl/bastiaan/CAT_prepare/.'.format(
-                        args.min_mem, total_memory))
-            shared.give_user_feedback(message, args.log_file, args.quiet,
-                    error=True)
-            
-            sys.exit(1)
-            
+        memory_bottleneck(args)
+
     if len(step_list) == 0:
         message = ('All necessary files are found. Existing database does not '
                 'need any more work...')

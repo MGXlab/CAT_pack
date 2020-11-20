@@ -6,7 +6,7 @@ import shared
 
 
 def import_nodes(nodes_dmp, log_file, quiet):
-    message = 'Importing file {0}.'.format(nodes_dmp)
+    message = 'Loading file {0}.'.format(nodes_dmp)
     shared.give_user_feedback(message, log_file, quiet)
     
     taxid2parent = {}
@@ -27,7 +27,7 @@ def import_nodes(nodes_dmp, log_file, quiet):
 
 
 def import_names(names_dmp, log_file, quiet):
-    message = 'Importing file {0}.'.format(names_dmp)
+    message = 'Loading file {0}.'.format(names_dmp)
     shared.give_user_feedback(message, log_file, quiet)
 
     taxid2name = {}
@@ -46,7 +46,7 @@ def import_names(names_dmp, log_file, quiet):
 
 
 def import_fastaid2LCAtaxid(fastaid2LCAtaxid_file, all_hits, log_file, quiet):
-    message = 'Importing file {0}.'.format(fastaid2LCAtaxid_file)
+    message = 'Loading file {0}.'.format(fastaid2LCAtaxid_file)
     shared.give_user_feedback(message, log_file, quiet)
 
     fastaid2LCAtaxid = {}
@@ -64,7 +64,7 @@ def import_fastaid2LCAtaxid(fastaid2LCAtaxid_file, all_hits, log_file, quiet):
 
 def import_taxids_with_multiple_offspring(
         taxids_with_multiple_offspring_file, log_file, quiet):
-    message = 'Importing file {0}.'.format(taxids_with_multiple_offspring_file)
+    message = 'Loading file {0}.'.format(taxids_with_multiple_offspring_file)
     shared.give_user_feedback(message, log_file, quiet)
 
     taxids_with_multiple_offspring = set()
@@ -251,7 +251,7 @@ def convert_to_official_names(lineage, taxid2rank, taxid2name, scores=None):
             'genus', 'species']
     lineage_ranks = [taxid2rank[taxid.rstrip('*')] for taxid in lineage]
 
-    official_names = ['not classified'] * 7
+    official_names = ['no support'] * 7
 
     for (i, rank) in enumerate(official_ranks):
         if rank in lineage_ranks:
@@ -282,11 +282,11 @@ def convert_to_official_names(lineage, taxid2rank, taxid2name, scores=None):
     # Fill the official lineage with NAs if a lower classification is present.
     index_lowest_classification = 0
     for (i, name) in enumerate(official_names):
-        if name != 'not classified':
+        if name != 'no support':
             index_lowest_classification = i
             
     for i in range(index_lowest_classification):
-        if official_names[i] == 'not classified':
+        if official_names[i] == 'no support':
             official_names[i] = 'NA'
 
     return official_names

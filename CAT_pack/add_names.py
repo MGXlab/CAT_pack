@@ -129,9 +129,9 @@ def run():
             if line.startswith('#'):
                 line = line.rstrip().split('\t')
 
-                try:
+                if 'lineage' in line:
                     lineage_index = line.index('lineage')
-                except:
+                else:
                     message = ('{0} is not a supported classification file.'
                             ''.format(input_file))
                     shared.give_user_feedback(

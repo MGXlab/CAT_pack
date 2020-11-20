@@ -6,7 +6,7 @@
 - [Getting started](#getting-started)
 - [Usage](#usage)
 - [Interpreting the output files](#interpreting-the-output-files)
-- [Marking suggestive classifications with an asterisk](#marking-suggestive-classifications-with-an-asterisk)
+- [Marking suggestive taxonomic assignments with an asterisk](#marking-suggestive-taxonomic-assignments-with-an-asterisk)
 - [Optimising running time, RAM, and disk usage](#optimising-running-time-ram-and-disk-usage)
 - [Examples](#examples)
 
@@ -60,7 +60,7 @@ $ wget tbb.bio.uu.nl/bastiaan/CAT_prepare/CAT_prepare_20200618.tar.gz
 $ tar -xvzf CAT_prepare_20200618.tar.gz
 ```
 
-Make sure that your version of DIAMOND is the same as with which the database is constructed. You can find the DIAMOND version within the database log file:
+Your version of DIAMOND should be the same as with which the database is constructed. For this reason the DIAMOND executable is supplied within the CAT prepare folder. Alternatively, you can find the DIAMOND version used for database construction within the database log file:
 
 ```
 $ grep version 2020-06-18.CAT_prepare.fresh.log
@@ -72,14 +72,14 @@ $ grep version 2020-06-18.CAT_prepare.fresh.log
 $ CAT prepare --fresh
 ```
 
-This will download the taxonomy files from NCBI taxonomy to a taxonomy folder, and the nr database to a database folder. A DIAMOND database is constructed from the nr file. CAT prepare also generates a fastaid2LCAtaxid file, as the first accession numbers in the headers of nr are not necessarily the Last Common Ancestor (LCA) of all accession numbers in it. Moreover, the file taxids\_with\_multiple\_offspring is generated. CAT prepare will typically take a few hours to create a fresh database, and will use up to 100GB of memory.
+This will download the taxonomy files from NCBI taxonomy to a taxonomy folder, and the nr database to a database folder. A DIAMOND database is constructed from the nr file. CAT prepare also generates a fastaid2LCAtaxid file, as the first accession numbers in the headers of nr are not necessarily the Last Common Ancestor (LCA) of all accession numbers in it. Moreover, the file taxids\_with\_multiple\_offspring is generated. CAT prepare will typically take a few hours to create a fresh database, and will use up to 150 of memory.
 
 If some of the files are already on your system (say the taxonomy files and the nr database) you can run:
 ```
 $ CAT prepare --existing -d {folder containing nr} -t {folder containing taxonomy files}
 ```
 
-CAT prepare will try to assess which files need to be downloaded and created and start from that point. CAT prepare only checks if the necessary files are there, not if they are correctly formatted.
+CAT prepare will assess which files need to be downloaded and created and start from that point. CAT prepare only checks if the necessary files are there, not if they are correctly formatted.
 
 ### Running CAT and BAT.
 The taxonomy folder and database folder created by CAT prepare are needed in subsequent CAT and BAT runs. They only need to be generated/downloaded once or whenever you want to update the nr database.
@@ -157,12 +157,12 @@ The contig2classification and bin2classification output looks like this:
 
 contig or bin | classification | reason | lineage | lineage scores
 --- | --- | --- | --- | ---
-contig\_1 | classified | based on 14/15 ORFs | 1;131567;2;1783272 | 1.00; 1.00; 1.00; 0.78
-contig\_2 | classified (1/2) | based on 10/10 ORFs | 1;131567;2;1783272;1798711;1117;307596;307595;1890422;33071;1416614;1183438\* | 1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;0.23;0.23
-contig\_2 | classified (2/2) | based on 10/10 ORFs | 1;131567;2;1783272;1798711;1117;307596;307595;1890422;33071;33072 | 1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;0.77
-contig\_3 | unclassified | no ORFs found
+contig\_1 | taxid assigned | based on 14/15 ORFs | 1;131567;2;1783272 | 1.00; 1.00; 1.00; 0.78
+contig\_2 | taxid assigned (1/2) | based on 10/10 ORFs | 1;131567;2;1783272;1798711;1117;307596;307595;1890422;33071;1416614;1183438\* | 1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;0.23;0.23
+contig\_2 | taxid assigned (2/2) | based on 10/10 ORFs | 1;131567;2;1783272;1798711;1117;307596;307595;1890422;33071;33072 | 1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;1.00;0.77
+contig\_3 | no taxid assigned | no ORFs found
 
-Where the lineage scores represent the fraction of bit-score support for each classification. **Contig\_2 has two classifications.** This can happen if the *f* parameter is chosen below 0.5. For an explanation of the **starred classification**, see [Marking suggestive classifications with an asterisk](#marking-suggestive-classifications-with-an-asterisk).
+Where the lineage scores represent the fraction of bit-score support for each classification. **Contig\_2 has two classifications.** This can happen if the *f* parameter is chosen below 0.5. For an explanation of the **starred classification**, see [Marking suggestive taxonomic assignments with an asterisk](#marking-suggestive-taxonomic-assignments-with-an-asterisk).
 
 To add names to the taxonomy id's in either output file, run:
 
@@ -192,8 +192,8 @@ $ CAT summarise -i {named BAT classification file} -o {output file}
 
 CAT summarise currently does not support classification files wherein some contigs / MAGs have multiple classifications (as contig\_2 above).
 
-## Marking suggestive classifications with an asterisk
-When we want to confidently go down to the lowest taxonomic level possible for an classification, an important assumption is that on that level conflict between classifications could have arisen. Namely, if there were conflicting classifications, the algorithm would have made the classification more conservative by moving up a level. Since it did not, we can trust the low-level classification. However, it is not always possible for conflict to arise, because in some cases no other sequences from the clade are present in the database. This is true for example for the family Dehalococcoidaceae, which in our databases is the sole representative of the order Dehalococcoidales. Thus, here we cannot confidently state that an classification on the family level is more correct than an classification on the order level. For these cases, CAT and BAT mark the lineage with asterisks, starting from the lowest level classification up to the level where conflict could have arisen because the clade contains multiple taxa with database entries. The user is advised to examine starred taxa more carefully, for example by analysing sequence identity between predicted ORFs and hits, or move up the lineage to a confident classification (i.e. the first classification without an asterisk).
+## Marking suggestive taxonomic assignments with an asterisk
+When we want to confidently go down to the lowest taxonomic level possible for a classification, an important assumption is that on that level conflict between classifications could have arisen. Namely, if there were conflicting classifications, the algorithm would have made the classification more conservative by moving up a level. Since it did not, we can trust the low-level classification. However, it is not always possible for conflict to arise, because in some cases no other sequences from the clade are present in the database. This is true for example for the family Dehalococcoidaceae, which in our databases is the sole representative of the order Dehalococcoidales. Thus, here we cannot confidently state that an classification on the family level is more correct than an classification on the order level. For these cases, CAT and BAT mark the lineage with asterisks, starting from the lowest level classification up to the level where conflict could have arisen because the clade contains multiple taxa with database entries. The user is advised to examine starred taxa more carefully, for example by analysing sequence identity between predicted ORFs and hits, or move up the lineage to a confident classification (i.e. the first classification without an asterisk).
 
 If you do not want the asterisks in your output files, you can add the `--no_stars` flag to CAT or BAT.
 

@@ -153,7 +153,7 @@ def summarise_contigs(args):
                                 '{0} appears to be a BAT classification file. '
                                 'If you want to summarise bin '
                                 'classifications, simply don\'t supply a '
-                                'contigs fasta and everything should be fine!'
+                                'contigs fasta and everything should be fine.'
                                 ''.format(args.input_file))
                         shared.give_user_feedback(
                                 message, args.log_file, args.quiet, error=True)
@@ -182,7 +182,7 @@ def summarise_contigs(args):
             sys.exit(1)
             
     length = {}
-    length['unclassified'] = []
+    length['no taxid assigned'] = []
 
     ORFs = {}
 
@@ -225,8 +225,8 @@ def summarise_contigs(args):
 
                 sys.exit(1)
 
-            if line[1] == 'unclassified':
-                length['unclassified'].append(contig2length[contig])
+            if line[1] == 'no taxid assigned':
+                length['no taxid assigned'].append(contig2length[contig])
 
                 continue
 
@@ -270,14 +270,15 @@ def summarise_contigs(args):
     with open(args.output_file, 'w') as outf1:
         n_contigs = len(contig2length)
         total_length = sum(contig2length.values())
-        n_classified_contigs = n_contigs - len(length['unclassified'])
-        total_classified_length = total_length - sum(length['unclassified'])
+        n_classified_contigs = n_contigs - len(length['no taxid assigned'])
+        total_classified_length = total_length - sum(
+                length['no taxid assigned'])
 
-        outf1.write('# total number of contigs in {0} is {1} representing {2} '
-                'positions.\n'.format(
+        outf1.write('# total number of contigs in {0} is {1:,d} representing '
+                '{2:,d} positions.\n'.format(
                     args.contigs_fasta, n_contigs, total_length))
-        outf1.write('# {0} contigs are classified ({1:.2f}%) representing {2} '
-                'positions ({3:.2f}%) in {4}.\n'.format(
+        outf1.write('# {0:,d} contigs have taxonomy assigned ({1:.2f}%) '
+                'representing {2:,d} positions ({3:.2f}%) in {4}.\n'.format(
                     n_classified_contigs,
                     n_classified_contigs / n_contigs * 100,
                     total_classified_length,
@@ -373,7 +374,7 @@ def summarise_bins(args):
             sys.exit(1)
             
     n_bins = {}
-    n_bins['unclassified'] = 0
+    n_bins['no taxid assigned'] = 0
     
     official_ranks = ['superkingdom', 'phylum', 'class', 'order', 'family',
                       'genus', 'species']
@@ -402,8 +403,8 @@ def summarise_bins(args):
 
             bin_trace.add(bin_)
             
-            if line[1] == 'unclassified':
-                n_bins['unclassified'] += 1
+            if line[1] == 'no taxid assigned':
+                n_bins['no taxid assigned'] += 1
                 
                 continue
 
@@ -427,11 +428,11 @@ def summarise_bins(args):
 
         sys.exit(1)
         
-    n_classified_bins = n - n_bins['unclassified']
+    n_classified_bins = n - n_bins['no taxid assigned']
 
     with open(args.output_file, 'w') as outf1:
-        outf1.write('# total number of bins is {0}, of which {1} ({2:.2f}%) '
-                'are classified.\n'.format(
+        outf1.write('# total number of bins is {0:,d}, of which {1:,d} '
+                '({2:.2f}%) have taxonomy assigned.\n'.format(
                     n, n_classified_bins, n_classified_bins / n * 100))
         outf1.write('#\n')
         outf1.write('# rank\tclade\tnumber of bins\n')

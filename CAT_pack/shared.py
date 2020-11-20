@@ -36,6 +36,13 @@ class SuffixAction(argparse.Action):
         setattr(namespace, self.dest, bin_suffix)
 
 
+def timestamp():
+    now = datetime.datetime.now()
+    str_ = '[{0}]'.format(now.strftime('%Y-%m-%d %H:%M:%S'))
+
+    return str_
+
+
 def expand_arguments(args):
     if 'r' in args:
         setattr(args, 'one_minus_r', (100 - args.r) / 100)
@@ -94,7 +101,12 @@ def explore_taxonomy_folder(args):
                 nodes_dmp = '{0}{1}'.format(args.taxonomy_folder, file_)
             elif file_ == 'names.dmp':
                 names_dmp = '{0}{1}'.format(args.taxonomy_folder, file_)
-            elif file_.endswith('prot.accession2taxid.gz'):
+            elif file_.endswith('prot.accession2taxid.FULL.gz'):
+                prot_accession2taxid_file = '{0}{1}'.format(
+                        args.taxonomy_folder, file_)
+            elif (file_.endswith('prot.accession2taxid.gz') and
+                    prot_accession2taxid_file is None):
+                # Legacy prot_accession2taxid_file.
                 prot_accession2taxid_file = '{0}{1}'.format(
                         args.taxonomy_folder, file_)
 
@@ -156,15 +168,13 @@ def print_variables(args, step_list=None):
     return
 
 
-def give_user_feedback(
-        message, log_file=None, quiet=False, show_time=True, error=False):
+def give_user_feedback(message,
+        log_file=None, quiet=False, show_time=True, error=False):
     if error:
         message = 'ERROR: {0}'.format(message)
 
     if show_time:
-        time = datetime.datetime.now()
-
-        message = '[{0}] {1}'.format(time, message)
+        message = '{0} {1}'.format(timestamp(), message)
 
     message = '{0}\n'.format(message)
 
@@ -191,7 +201,7 @@ def run_prodigal(
     message = (
             'Running Prodigal for ORF prediction. Files {0} and {1} will be '
             'generated. Do not forget to cite Prodigal when using CAT or BAT '
-            'in your publication!'.format(proteins_fasta, proteins_gff))
+            'in your publication.'.format(proteins_fasta, proteins_gff))
     give_user_feedback(message, log_file, quiet)
 
     try:
@@ -231,16 +241,16 @@ def run_diamond(args):
     message = (
             'Homology search with DIAMOND is starting. Please be patient. Do '
             'not forget to cite DIAMOND when using CAT or BAT in your '
-            'publication!\n'
-            '\t\t\t\tquery: {0}\n'
-            '\t\t\t\tdatabase: {1}\n'
-            '\t\t\t\tmode: {2}\n'
-            '\t\t\t\tnumber of cores: {3}\n'
-            '\t\t\t\tblock-size (billions of letters): {4}\n'
-            '\t\t\t\tindex-chunks: {5}\n'
-            '\t\t\t\ttmpdir: {6}\n'
-            '\t\t\t\tcompress: {7}\n'
-            '\t\t\t\ttop: {8}'.format(
+            'publication.\n'
+            '\t\t\tquery: {0}\n'
+            '\t\t\tdatabase: {1}\n'
+            '\t\t\tmode: {2}\n'
+            '\t\t\tnumber of cores: {3}\n'
+            '\t\t\tblock-size (billions of letters): {4}\n'
+            '\t\t\tindex-chunks: {5}\n'
+            '\t\t\ttmpdir: {6}\n'
+            '\t\t\tcompress: {7}\n'
+            '\t\t\ttop: {8}'.format(
                 args.proteins_fasta,
                 args.diamond_database,
                 mode,
@@ -304,9 +314,9 @@ def import_contig_names(fasta_file, log_file, quiet):
                 
                 if contig in contig_names:
                     message = (
-                            'it looks like your fasta file contains duplicate '
-                            'headers! The first duplicate encountered is {0}, '
-                            'but there might be more...'.format(contig))
+                            'your fasta file contains duplicate headers. The '
+                            'first duplicate encountered is {0}, but there '
+                            'might be more...'.format(contig))
                     give_user_feedback(message, log_file, quiet, error=True)
                     
                     sys.exit(1)
@@ -369,14 +379,14 @@ def parse_tabular_alignment(
         if not line[0] == ORF:
             # A new ORF is reached.
             ORF = line[0]
-            best_bitscore = decimal.Decimal(line[11])
+            top_bitscore = decimal.Decimal(line[11])
             ORF2hits[ORF] = []
 
             ORF_done = False
 
         bitscore = decimal.Decimal(line[11])
         
-        if bitscore >= one_minus_r * best_bitscore:
+        if bitscore >= one_minus_r * top_bitscore:
             # The hit has a high enough bit-score to be included.
             hit = line[1]
 

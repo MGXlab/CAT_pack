@@ -1,10 +1,43 @@
 #!/usr/bin/env/ python3
 
+import hashlib
 import os
 import subprocess
 import sys
 
 import shared
+
+
+def check_md5_gz(gz_file, md5_file, log_file, quiet):
+    message = 'Checking file integrity via MD5 checksum.'
+    shared.give_user_feedback(message, log_file, quiet)
+
+    with open(md5_file, 'r') as f:
+        md5_exp = f.read().split(' ')[0]
+
+    if md5_exp == '':
+        message = ('WARNING: no MD5 found in {0}. Integrity of {1} can not be '
+                'established.'.format(md5_file, gz_file))
+        shared.give_user_feedback(message, log_file, quiet)
+    else:
+        md5 = hashlib.md5()
+
+        block_size = 4096
+        with open(gz_file, 'rb') as f:
+            for chunk in iter(lambda: f.read(block_size), b''):
+                md5.update(chunk)
+        md5 = md5.hexdigest()
+
+        if md5 != md5_exp:
+            message = 'MD5 of {0} does not check out.'.format(gz_file)
+            shared.give_user_feedback(message, log_file, quiet, error=True)
+
+            sys.exit(1)
+        else:
+            message = 'MD5 of {0} checks out.'.format(gz_file)
+            shared.give_user_feedback(message, log_file, quiet)
+
+    return
 
 
 def check_memory(Gb):
@@ -138,7 +171,7 @@ def check_bin_folder(bin_folder, bin_suffix, log_file, quiet):
                 'WARNING: a single bin is found. You can run BAT in single '
                 'bin mode, with \'CAT bin\' as opposed to \'CAT bins\' for a '
                 'set of bins. Both modes will give the same results, but you '
-                'might find single mode more convenient for your workflow!')
+                'might find single mode more convenient for your workflow.')
         shared.give_user_feedback(message, log_file, quiet)
 
     return error
