@@ -72,7 +72,7 @@ $ grep version 2020-06-18.CAT_prepare.fresh.log
 $ CAT prepare --fresh
 ```
 
-This will download the taxonomy files from NCBI taxonomy to a taxonomy folder, and the nr database to a database folder. A DIAMOND database is constructed from the nr file. CAT prepare also generates a fastaid2LCAtaxid file, as the first accession numbers in the headers of nr are not necessarily the Last Common Ancestor (LCA) of all accession numbers in it. Moreover, the file taxids\_with\_multiple\_offspring is generated. CAT prepare will typically take a few hours to create a fresh database, and will use up to 150 of memory.
+This will download the taxonomy files from NCBI taxonomy to a taxonomy folder, and the nr database to a database folder. A DIAMOND database is constructed from the nr file. CAT prepare also generates a fastaid2LCAtaxid file, as the first accession numbers in the headers of nr are not necessarily the Last Common Ancestor (LCA) of all accession numbers in it. Moreover, the file taxids\_with\_multiple\_offspring is generated. CAT prepare will typically take a few hours to create a fresh database, and will use up to 200GB of memory.
 
 If some of the files are already on your system (say the taxonomy files and the nr database) you can run:
 ```
