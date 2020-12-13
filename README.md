@@ -19,11 +19,11 @@ A paper describing the algorithm together with extensive benchmarks can be found
 
 
 ## Dependencies and where to get them
-Python 3, https://www.python.org/ (tested on version 3.5.2)
+Python 3, https://www.python.org/.
 
-DIAMOND, https://github.com/bbuchfink/diamond (tested on version 0.9.14)
+DIAMOND, https://github.com/bbuchfink/diamond.
 
-Prodigal, https://github.com/hyattpd/Prodigal (tested on version 2.6.3)
+Prodigal, https://github.com/hyattpd/Prodigal.
 
 CAT and BAT have been thoroughly tested on Linux systems, and should run on macOS as well.
 
