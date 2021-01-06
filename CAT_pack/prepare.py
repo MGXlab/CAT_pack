@@ -135,8 +135,8 @@ def memory_bottleneck(args):
     (total_memory, error) = check.check_memory(args.min_mem)
     if error:
         message = (
-                'at least {0:,d}GB of memory is needed for the database '
-                'construction. {1:,d}GB is found on your system. You can try '
+                'at least {0}GB of memory is needed for the database '
+                'construction. {1}GB is found on your system. You can try '
                 'to find a machine with more memory, or download '
                 'preconstructed database files from '
                 'tbb.bio.uu.nl/bastiaan/CAT_prepare/.'.format(
