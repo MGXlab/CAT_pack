@@ -128,6 +128,10 @@ def summarise_contigs(args):
                 check.check_output_file(
                     args.output_file, args.log_file, args.quiet))
 
+    errors.append(
+            check.check_in_and_output_file(
+                args.input_file, args.output_file, args.log_file, args.quiet))
+
     if True in errors:
         sys.exit(1)
         
@@ -322,6 +326,10 @@ def summarise_bins(args):
         errors.append(
                 check.check_output_file(
                     args.output_file, args.log_file, args.quiet))
+
+    errors.append(
+            check.check_in_and_output_file(
+                args.input_file, args.output_file, args.log_file, args.quiet))
 
     if True in errors:
         sys.exit(1)

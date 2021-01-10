@@ -276,6 +276,18 @@ def check_input_file(input_file, log_file, quiet):
     return error
 
 
+def check_in_and_output_file(input_file, output_file, log_file, quiet):
+    error = False
+
+    if input_file == output_file:
+        message = 'input file and output file can not be the same.'
+        shared.give_user_feedback(message, log_file, quiet, error=True)
+
+        error = True
+
+    return error
+
+
 def check_top(top, r, log_file, quiet):
     error = False
 
