@@ -42,10 +42,20 @@ def parse_arguments():
                 'files that do not exist yet.'))
     
     optional = parser.add_argument_group('Optional arguments')
-    shared.add_argument(optional, 'database_folder', False,
-            default='./CAT_database.{0}'.format(date))
-    shared.add_argument(optional, 'taxonomy_folder', False,
-            default='./CAT_taxonomy.{0}'.format(date))
+    shared.add_argument(
+            optional,
+            'database_folder',
+            False,
+            default='./CAT_database.{0}'.format(date),
+            help_=('Name of folder to which database files will be written '
+                '(default: CAT_database.{date})'))
+    shared.add_argument(
+            optional,
+            'taxonomy_folder',
+            False,
+            default='./CAT_taxonomy.{0}'.format(date),
+            help_=('Name of folder to which taxonomy files will be downloaded '
+                '(default: CAT_taxonomy.{date})'))
     shared.add_argument(optional, 'path_to_diamond', False, default='diamond')
     shared.add_argument(optional, 'quiet', False)
     shared.add_argument(optional, 'verbose', False)
