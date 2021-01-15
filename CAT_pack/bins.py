@@ -196,6 +196,13 @@ def parse_arguments():
             action='store_true',
             help='Run DIAMOND in sensitive mode (default: not enabled).')
     specific.add_argument(
+            '--no_self_hits',
+            dest='no_self_hits',
+            required=False,
+            action='store_true',
+            help=('Do not report identical self hits by DIAMOND (default: not '
+                'enabled).'))
+    specific.add_argument(
             '--block_size',
             dest='block_size',
             metavar='',

@@ -245,21 +245,23 @@ def run_diamond(args):
             '\t\t\tquery: {0}\n'
             '\t\t\tdatabase: {1}\n'
             '\t\t\tmode: {2}\n'
-            '\t\t\tnumber of cores: {3}\n'
-            '\t\t\tblock-size (billions of letters): {4}\n'
-            '\t\t\tindex-chunks: {5}\n'
-            '\t\t\ttmpdir: {6}\n'
-            '\t\t\tcompress: {7}\n'
-            '\t\t\ttop: {8}'.format(
+            '\t\t\ttop: {3}\n'
+            '\t\t\tno-self-hits: {4}\n'
+            '\t\t\tnumber of cores: {5}\n'
+            '\t\t\tblock-size (billions of letters): {6}\n'
+            '\t\t\tindex-chunks: {7}\n'
+            '\t\t\ttmpdir: {8}\n'
+            '\t\t\tcompress: {9}'.format(
                 args.proteins_fasta,
                 args.diamond_database,
                 mode,
+                args.top,
+                args.no_self_hits,
                 args.nproc,
                 args.block_size,
                 args.index_chunks,
                 args.tmpdir,
-                compression,
-                args.top))
+                compression))
     give_user_feedback(message, args.log_file, args.quiet)
 
     try:
@@ -283,6 +285,9 @@ def run_diamond(args):
 
         if args.sensitive:
             command += ['--sensitive']
+
+        if args.no_self_hits:
+            command += ['--no-self-hits']
 
         subprocess.check_call(command)
     except:
