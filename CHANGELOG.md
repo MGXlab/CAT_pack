@@ -1,5 +1,8 @@
 # Changelog
 
+## 5.2.2
+We have added the DIAMOND specific `--no_self_hits` flag. We have also added some extra checks and removed redundancy from the parser code.
+
 ## 5.2.1
 Minor bug fix for `CAT prepare`.
 

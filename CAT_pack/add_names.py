@@ -17,70 +17,18 @@ def parse_arguments():
             add_help=False)
     
     required = parser.add_argument_group('Required arguments')
-    
-    required.add_argument(
-            '-i',
-            '--input_file',
-            dest='input_file',
-            metavar='',
-            required=True,
-            type=str,
-            action=shared.PathAction,
-            help=('Path to input file. Can be either classification output '
-                'file or ORF2LCA output file.'))
-    required.add_argument(
-            '-o',
-            '--output_file',
-            dest='output_file',
-            metavar='',
-            required=True,
-            type=str,
-            action=shared.PathAction,
-            help='Path to output file.')
-    required.add_argument(
-            '-t',
-            '--taxonomy_folder',
-            dest='taxonomy_folder',
-            metavar='',
-            required=True,
-            type=str,
-            action=shared.PathAction,
-            help='Path to folder that contains taxonomy files.')
-    
+    shared.add_argument(required, 'input_file', True,
+            help_=('Path to input file. Can be classification or ORF2LCA '
+                'output file from CAT or BAT.'))
+    shared.add_argument(required, 'output_file', True)
+    shared.add_argument(required, 'taxonomy_folder', True)
+
     optional = parser.add_argument_group('Optional arguments')
-    
-    optional.add_argument(
-            '--only_official',
-            dest='only_official',
-            required=False,
-            action='store_true',
-            help=('Only output official rank names (i.e., superkingdom, '
-                'phylum, class, order, family, genus, species).'))
-    optional.add_argument(
-            '--exclude_scores',
-            dest='exclude_scores',
-            required=False,
-            action='store_true',
-            help=('Do not include bit-score support scores in the lineage of '
-                'a classification output file.'))
-    optional.add_argument(
-            '--force',
-            dest='force',
-            required=False,
-            action='store_true',
-            help='Force overwrite existing files.')
-    optional.add_argument(
-            '-q',
-            '--quiet',
-            dest='quiet',
-            required=False,
-            action='store_true',
-            help='Suppress verbosity.')
-    optional.add_argument(
-            '-h',
-            '--help',
-            action='help',
-            help='Show this help message and exit.')
+    shared.add_argument(optional, 'only_official', False)
+    shared.add_argument(optional, 'exclude_scores', False)
+    shared.add_argument(optional, 'force', False)
+    shared.add_argument(optional, 'quiet', False)
+    shared.add_argument(optional, 'help', False)
 
     (args, extra_args) = parser.parse_known_args()
 

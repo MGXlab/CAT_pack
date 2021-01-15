@@ -2,7 +2,6 @@
 
 import argparse
 import decimal
-import multiprocessing
 import sys
 
 import about
@@ -19,225 +18,30 @@ def parse_arguments():
             add_help=False)
     
     required = parser.add_argument_group('Required arguments')
-    
-    required.add_argument(
-            '-c',
-            '--contigs_fasta',
-            dest='contigs_fasta',
-            metavar='',
-            required=True,
-            type=str,
-            action=shared.PathAction,
-            help='Path to contigs fasta file.')
-    required.add_argument(
-            '-d',
-            '--database_folder',
-            dest='database_folder',
-            metavar='',
-            required=True,
-            type=str,
-            action=shared.PathAction,
-            help='Path to folder that contains database files.')
-    required.add_argument(
-            '-t',
-            '--taxonomy_folder',
-            dest='taxonomy_folder',
-            metavar='',
-            required=True,
-            type=str,
-            action=shared.PathAction,
-            help='Path to folder that contains taxonomy files.')
-    
+    shared.add_argument(required, 'contigs_fasta', True)
+    shared.add_argument(required, 'database_folder', True)
+    shared.add_argument(required, 'taxonomy_folder', True)
+
     optional = parser.add_argument_group('Optional arguments')
-    
-    optional.add_argument(
-            '-r',
-            '--range',
-            dest='r',
-            metavar='',
-            required=False,
-            type=float,
-            choices = [i for i in range(50)],
-            action=shared.DecimalAction,
-            default=decimal.Decimal(10),
-            help='r parameter [0-49] (default: 10).')
-    optional.add_argument(
-            '-f',
-            '--fraction',
-            dest='f',
-            metavar='',
-            required=False,
-            type=float,
-            choices = [i / 100 for i in range(0, 100)],
-            action=shared.DecimalAction,
-            default=decimal.Decimal(0.5),
-            help='f parameter [0-0.99] (default: 0.5).')
-    optional.add_argument(
-            '-o',
-            '--out_prefix',
-            dest='out_prefix',
-            metavar='',
-            required=False,
-            type=str,
-            action=shared.PathAction,
-            default='./out.CAT',
-            help='Prefix for output files (default: out.CAT).')
-    optional.add_argument(
-            '-p',
-            '--proteins_fasta',
-            dest='proteins_fasta',
-            metavar='',
-            required=False,
-            type=str,
-            action=shared.PathAction,
-            help=('Path to predicted proteins fasta file. If supplied, CAT '
-                'will skip the protein prediction step.'))
-    optional.add_argument(
-            '-a',
-            '--diamond_alignment',
-            dest='alignment_file',
-            metavar='',
-            required=False,
-            type=str,
-            action=shared.PathAction,
-            help=('Path to alignment table. If supplied, CAT will skip the '
-                'alignment step and directly classify the contigs. A '
-                'predicted proteins fasta file should also be supplied with '
-                'argument [-p / --proteins].'))
-    optional.add_argument(
-            '--path_to_prodigal',
-            dest='path_to_prodigal',
-            metavar='',
-            required=False,
-            type=str,
-            action=shared.PathAction,
-            default='prodigal',
-            help=('Path to Prodigal binaries. Supply if CAT can not find '
-                'Prodigal.'))
-    optional.add_argument(
-            '--path_to_diamond',
-            dest='path_to_diamond',
-            metavar='',
-            required=False,
-            type=str,
-            action=shared.PathAction,
-            default='diamond',
-            help=('Path to DIAMOND binaries. Supply if CAT can not find '
-                'DIAMOND.'))
-    optional.add_argument(
-            '--no_stars',
-            dest='no_stars',
-            required=False,
-            action='store_true',
-            help='Suppress marking of suggestive taxonomic assignments.')
-    optional.add_argument(
-            '--force',
-            dest='force',
-            required=False,
-            action='store_true',
-            help='Force overwrite existing files.')
-    optional.add_argument(
-            '-q',
-            '--quiet',
-            dest='quiet',
-            required=False,
-            action='store_true',
-            help='Suppress verbosity.')
-    optional.add_argument(
-            '--verbose',
-            dest='verbose',
-            required=False,
-            action='store_true',
-            help='Increase verbosity.')
-    optional.add_argument(
-            '--no_log',
-            dest='no_log',
-            required=False,
-            action='store_true',
-            help='Suppress log file.')
-    optional.add_argument(
-            '-h',
-            '--help',
-            action='help',
-            help='Show this help message and exit.')
-    optional.add_argument(
-            '--I_know_what_Im_doing',
-            dest='IkwId',
-            required=False,
-            action='store_true',
-            help='Flag for experimental features.')
+    shared.add_argument(optional, 'r', False, default=decimal.Decimal(10))
+    shared.add_argument(optional, 'f', False, default=decimal.Decimal(0.5))
+    shared.add_argument(optional, 'out_prefix', False, default='./out.CAT')
+    shared.add_argument(optional, 'proteins_fasta', False)
+    shared.add_argument(optional, 'alignment_file', False)
+    shared.add_argument(optional, 'path_to_prodigal', False,
+            default='prodigal')
+    shared.add_argument(optional, 'path_to_diamond', False, default='diamond')
+    shared.add_argument(optional, 'no_stars', False)
+    shared.add_argument(optional, 'force', False)
+    shared.add_argument(optional, 'quiet', False)
+    shared.add_argument(optional, 'verbose', False)
+    shared.add_argument(optional, 'no_log', False)
+    shared.add_argument(optional, 'help', False)
+    shared.add_argument(optional, 'IkwId', False)
 
     specific = parser.add_argument_group('DIAMOND specific optional arguments')
+    shared.add_all_diamond_arguments(specific)
 
-    specific.add_argument(
-            '-n',
-            '--nproc',
-            dest='nproc',
-            metavar='',
-            required=False,
-            type=int,
-            default=multiprocessing.cpu_count(),
-            help='Number of cores to deploy by DIAMOND (default: maximum).')
-    specific.add_argument(
-            '--sensitive',
-            dest='sensitive',
-            required=False,
-            action='store_true',
-            help='Run DIAMOND in sensitive mode (default: not enabled).')
-    specific.add_argument(
-            '--no_self_hits',
-            dest='no_self_hits',
-            required=False,
-            action='store_true',
-            help=('Do not report identical self hits by DIAMOND (default: not '
-                'enabled).'))
-    specific.add_argument(
-            '--block_size',
-            dest='block_size',
-            metavar='',
-            required=False,
-            type=float,
-            default=2.0,
-            help=('DIAMOND block-size parameter (default: 2.0). Lower numbers '
-                'will decrease memory and temporary disk space usage.'))
-    specific.add_argument(
-            '--index_chunks',
-            dest='index_chunks',
-            metavar='',
-            required=False,
-            type=int,
-            default=4,
-            help=('DIAMOND index-chunks parameter (default: 4). Set to 1 on '
-                'high memory machines. The parameter has no effect on '
-                'temporary disk space usage.'))
-    specific.add_argument(
-            '--tmpdir',
-            dest='tmpdir',
-            metavar='',
-            required=False,
-            type=str,
-            action=shared.PathAction,
-            help=('Directory for temporary DIAMOND files (default: directory '
-                'to which output files are written).'))
-    specific.add_argument(
-            '--compress',
-            dest='compress',
-            required=False,
-            action='store_true',
-            help='Compress DIAMOND alignment file.')
-    specific.add_argument(
-            '--top',
-            dest='top',
-            metavar='',
-            required=False,
-            type=float,
-            choices = [i for i in range(51)],
-            default=50,
-            help=('DIAMOND top parameter [0-50] (default: 50). Governs hits '
-                'within range of best hit that are written to the alignment '
-                'file. This is not the [-r / --range] parameter! Can only be '
-                'set with the [--I_know_what_Im_doing] flag, see README.md.'))
-                          
     (args, extra_args) = parser.parse_known_args()
     
     extra_args = [arg for (i, arg) in enumerate(extra_args) if

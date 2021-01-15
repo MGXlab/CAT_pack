@@ -27,9 +27,7 @@ def parse_arguments():
             add_help=False)
     
     required_choice = parser.add_argument_group('Required choice')
-
     group = required_choice.add_mutually_exclusive_group(required=True)
-
     group.add_argument(
             '--fresh',
             dest='fresh',
@@ -44,77 +42,20 @@ def parse_arguments():
                 'files that do not exist yet.'))
     
     optional = parser.add_argument_group('Optional arguments')
+    shared.add_argument(optional, 'database_folder', False,
+            default='./CAT_database.{0}'.format(date))
+    shared.add_argument(optional, 'taxonomy_folder', False,
+            default='./CAT_taxonomy.{0}'.format(date))
+    shared.add_argument(optional, 'path_to_diamond', False, default='diamond')
+    shared.add_argument(optional, 'quiet', False)
+    shared.add_argument(optional, 'verbose', False)
+    shared.add_argument(optional, 'no_log', False)
+    shared.add_argument(optional, 'help', False)
 
-    optional.add_argument(
-            '-d',
-            '--database_folder',
-            dest='database_folder',
-            metavar='',
-            required=False,
-            type=str,
-            action=shared.PathAction,
-            default='./{0}_CAT_database'.format(date),
-            help=('Name of folder to which database files will be written '
-                '(default: {date}_CAT_database).'))
-    optional.add_argument(
-            '-t',
-            '--taxonomy_folder',
-            dest='taxonomy_folder',
-            metavar='',
-            required=False,
-            type=str,
-            action=shared.PathAction,
-            default='./{0}_taxonomy'.format(date),
-            help=('Name of folder to which taxonomy files will be downloaded '
-                '(default: {date}_taxonomy).'))
-    optional.add_argument(
-            '--path_to_diamond',
-            dest='path_to_diamond',
-            metavar='',
-            required=False,
-            type=str,
-            action=shared.PathAction,
-            default='diamond',
-            help=('Path to DIAMOND binaries. Supply if CAT prepare can not '
-                'find DIAMOND.'))
-    optional.add_argument(
-            '-q',
-            '--quiet',
-            dest='quiet',
-            required=False,
-            action='store_true',
-            help='Suppress verbosity.')
-    optional.add_argument(
-            '--verbose',
-            dest='verbose',
-            required=False,
-            action='store_true',
-            help='Increase verbostity.')
-    optional.add_argument(
-            '--no_log',
-            dest='no_log',
-            required=False,
-            action='store_true',
-            help='Suppress log file.')
-    optional.add_argument(
-            '-h',
-            '--help',
-            action='help',
-            help='Show this help message and exit.')
-    
     specific = parser.add_argument_group('DIAMOND specific optional arguments')
+    shared.add_argument(specific, 'nproc', False,
+            default=multiprocessing.cpu_count())
 
-    specific.add_argument(
-            '-n',
-            '--nproc',
-            dest='nproc',
-            metavar='',
-            required=False,
-            type=int,
-            default=multiprocessing.cpu_count(),
-            help=('Number of cores to deploy by DIAMOND makedb '
-                '(default: maximum).'))
-    
     (args, extra_args) = parser.parse_known_args()
 
     extra_args = [arg for (i, arg) in enumerate(extra_args) if

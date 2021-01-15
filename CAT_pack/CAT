@@ -39,7 +39,7 @@ def help():
             'Run Contig Annotation Tool (CAT) or '
             'Bin Annotation Tool (BAT).\n\n'
             'Required choice:\n'
-            '  prepare\t\tDownload database files and construct databases.\n'
+            '  prepare\t\tConstruct database files.\n'
             '  contigs\t\tRun CAT.\n'
             '  bin\t\t\tRun BAT on a single bin.\n'
             '  bins\t\t\tRun BAT on a set of bins.\n'

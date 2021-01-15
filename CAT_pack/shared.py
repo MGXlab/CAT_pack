@@ -4,6 +4,7 @@ import argparse
 import datetime
 import decimal
 import gzip
+import multiprocessing
 import os
 import subprocess
 import sys
@@ -43,6 +44,404 @@ def timestamp():
     return str_
 
 
+def add_argument(argument_group, dest, required, default=None, help_=None):
+    if dest == 'contigs_fasta':
+        if help_ is None:
+            help_ = 'Path to contigs fasta file.'
+        argument_group.add_argument(
+                '-c',
+                '--contigs_fasta',
+                dest='contigs_fasta',
+                metavar='',
+                required=required,
+                type=str,
+                action=PathAction,
+                help=help_)
+    elif dest == 'bin_fasta':
+        if help is None:
+            help_ = 'Path to bin fasta file.'
+        argument_group.add_argument(
+                '-b',
+                '--bin_fasta',
+                dest='bin_fasta',
+                metavar='',
+                required=required,
+                type=str,
+                action=PathAction,
+                help=help_)
+    elif dest == 'bin_folder':
+        if help_ is None:
+            help_ = 'Path to directory containing bins.'
+        argument_group.add_argument(
+                '-b',
+                '--bin_folder',
+                dest='bin_folder',
+                metavar='',
+                required=required,
+                type=str,
+                action=PathAction,
+                help=help_)
+    elif dest == 'database_folder':
+        if help_ is None:
+            help_ = 'Path to folder that contains database files.'
+        argument_group.add_argument(
+                '-d',
+                '--database_folder',
+                dest='database_folder',
+                metavar='',
+                required=required,
+                type=str,
+                action=PathAction,
+                default=default,
+                help=help_)
+    elif dest == 'taxonomy_folder':
+        if help_ is None:
+            help_ = 'Path to folder that contains taxonomy files.'
+        argument_group.add_argument(
+                '-t',
+                '--taxonomy_folder',
+                dest='taxonomy_folder',
+                metavar='',
+                required=required,
+                type=str,
+                action=PathAction,
+                default=default,
+                help=help_)
+    elif dest == 'bin_suffix':
+        if help_ is None:
+            help_ = ('Suffix of bins in bin folder (default: {0}).'
+                    ''.format(default))
+        argument_group.add_argument(
+                '-s',
+                '--bin_suffix',
+                dest='bin_suffix',
+                metavar='',
+                required=required,
+                type=str,
+                default=default,
+                help=help_)
+    elif dest == 'r':
+        if help_ is None:
+            help_ = 'r parameter [0-49] (default: {0:.0f}).'.format(default)
+        argument_group.add_argument(
+                '-r',
+                '--range',
+                dest='r',
+                metavar='',
+                required=required,
+                type=float,
+                choices = [i for i in range(50)],
+                action=DecimalAction,
+                default=default,
+                help=help_)
+    elif dest == 'f':
+        if help_ is None:
+            help_ = ('f parameter [0-0.99] (default: {0:.2f}).'
+                    ''.format(default))
+        argument_group.add_argument(
+                '-f',
+                '--fraction',
+                dest='f',
+                metavar='',
+                required=required,
+                type=float,
+                choices = [i / 100 for i in range(0, 100)],
+                action=DecimalAction,
+                default=default,
+                help=help_)
+    elif dest == 'out_prefix':
+        if help_ is None:
+            help_ = 'Prefix for output files (default: {0}).'.format(default)
+        argument_group.add_argument(
+                '-o',
+                '--out_prefix',
+                dest='out_prefix',
+                metavar='',
+                required=required,
+                type=str,
+                action=PathAction,
+                default=default,
+                help=help_)
+    elif dest == 'proteins_fasta':
+        if help_ is None:
+            help_ = ('Path to predicted proteins fasta file. If supplied, the '
+                    'protein prediction step is skipped.')
+        argument_group.add_argument(
+                '-p',
+                '--proteins_fasta',
+                dest='proteins_fasta',
+                metavar='',
+                required=required,
+                type=str,
+                action=PathAction,
+                help=help_)
+    elif dest == 'alignment_file':
+        if help_ is None:
+            help_ = (
+                    'Path to alignment table. If supplied, the alignment '
+                    'step is skipped and classification is carried out '
+                    'directly. A predicted proteins fasta file should also be '
+                    'supplied with argument [-p / --proteins].')
+        argument_group.add_argument(
+                '-a',
+                '--diamond_alignment',
+                dest='alignment_file',
+                metavar='',
+                required=required,
+                type=str,
+                action=PathAction,
+                help=help_)
+    elif dest == 'path_to_prodigal':
+        if help_ is None:
+            help_ = ('Path to Prodigal binaries. Supply if CAT/BAT cannot '
+                    'find Prodigal')
+        argument_group.add_argument(
+                '--path_to_prodigal',
+                dest='path_to_prodigal',
+                metavar='',
+                required=required,
+                type=str,
+                action=PathAction,
+                default=default,
+                help=help_)
+    elif dest == 'path_to_diamond':
+        if help_ is None:
+            help_ = ('Path to DIAMOND binaries. Supply if CAT/BAT cannot find '
+                    'DIAMOND.')
+        argument_group.add_argument(
+                '--path_to_diamond',
+                dest='path_to_diamond',
+                metavar='',
+                required=required,
+                type=str,
+                action=PathAction,
+                default=default,
+                help=help_)
+    elif dest == 'no_stars':
+        if help_ is None:
+            help_ = 'Suppress marking of suggestive taxonomic assignments.'
+        argument_group.add_argument(
+                '--no_stars',
+                dest='no_stars',
+                required=required,
+                action='store_true',
+                help=help_)
+    elif dest == 'force':
+        if help_ is None:
+            help_ = 'Force overwrite existing files.'
+        argument_group.add_argument(
+                '--force',
+                dest='force',
+                required=required,
+                action='store_true',
+                help=help_)
+    elif dest == 'quiet':
+        if help_ is None:
+            help_ = 'Suppress verbosity.'
+        argument_group.add_argument(
+                '-q',
+                '--quiet',
+                dest='quiet',
+                required=required,
+                action='store_true',
+                help=help_)
+    elif dest == 'verbose':
+        if help_ is None:
+            help_ = 'Increase verbosity.'
+        argument_group.add_argument(
+                '--verbose',
+                dest='verbose',
+                required=required,
+                action='store_true',
+                help=help_)
+    elif dest == 'no_log':
+        if help_ is None:
+            help_ = 'Suppress log file.'
+        argument_group.add_argument(
+                '--no_log',
+                dest='no_log',
+                required=required,
+                action='store_true',
+                help=help_)
+    elif dest == 'help':
+        if help_ is None:
+            help_ = 'Show this help message and exit.'
+        argument_group.add_argument(
+                '-h',
+                '--help',
+                action='help',
+                help=help_)
+    elif dest == 'IkwId':
+        if help_ is None:
+            help_ = 'Flag for experimental features.'
+        argument_group.add_argument(
+                '--I_know_what_Im_doing',
+                dest='IkwId',
+                required=required,
+                action='store_true',
+                help=help_)
+    elif dest == 'input_file':
+        if help_ is None:
+            help_ = 'Path to input file.'
+        argument_group.add_argument(
+                '-i',
+                '--input_file',
+                dest='input_file',
+                metavar='',
+                required=required,
+                type=str,
+                action=PathAction,
+                help=help_)
+    elif dest == 'output_file':
+        if help_ is None:
+            help_ = 'Path to output file.'
+        argument_group.add_argument(
+                '-o',
+                '--output_file',
+                dest='output_file',
+                metavar='',
+                required=required,
+                type=str,
+                action=PathAction,
+                help=help_)
+    elif dest == 'only_official':
+        if help_ is None:
+            help_ = ('Only output official raxonomic ranks (superkingdom, '
+                    'phylum, class, order, family, genus, species).')
+        argument_group.add_argument(
+                '--only_official',
+                dest='only_official',
+                required=required,
+                action='store_true',
+                help=help_)
+    elif dest == 'exclude_scores':
+        if help_ is None:
+            help_ = ('Do not include bit-score support scores in the lineage '
+                    'of a classification output file.')
+        argument_group.add_argument(
+                '--exclude_scores',
+                dest='exclude_scores',
+                required=required,
+                action='store_true',
+                help=help_)
+    elif dest == 'nproc':
+        if help_ is None:
+            help_ = 'Number of cores to deploy by DIAMOND (default: maximum).'
+        argument_group.add_argument(
+                '-n',
+                '--nproc',
+                dest='nproc',
+                metavar='',
+                required=required,
+                type=int,
+                default=default,
+                help=help_)
+    elif dest == 'sensitive':
+        if help_ is None:
+            help_ = 'Run DIAMOND in sensitive mode (default: not enabled).'
+        argument_group.add_argument(
+                '--sensitive',
+                dest='sensitive',
+                required=required,
+                action='store_true',
+                help=help_)
+    elif dest == 'no_self_hits':
+        if help_ is None:
+            help_ = ('Do not report identical self hits by DIAMOND (default: '
+                    'not enabled).')
+        argument_group.add_argument(
+                '--no_self_hits',
+                dest='no_self_hits',
+                required=required,
+                action='store_true',
+                help=help_)
+    elif dest == 'block_size':
+        if help_ is None:
+            help_ = (
+                    'DIAMOND block-size parameter (default: {0}). Lower '
+                    'numbers will decrease memory and temporary disk space '
+                    'usage.'.format(default))
+        argument_group.add_argument(
+                '--block_size',
+                dest='block_size',
+                metavar='',
+                required=required,
+                type=float,
+                default=default,
+                help=help_)
+    elif dest == 'index_chunks':
+        if help_ is None:
+            help_ = (
+                    'DIAMOND index-chunks parameter (default: {0}). Set to '
+                    '1 on high memory machines. The parameter has no effect '
+                    'on temporary disk space usage.'.format(default))
+        argument_group.add_argument(
+                '--index_chunks',
+                dest='index_chunks',
+                metavar='',
+                required=required,
+                type=int,
+                default=default,
+                help=help_)
+    elif dest == 'tmpdir':
+        if help_ is None:
+            help_ = ('Directory for temporary DIAMOND files (default: '
+                    'directory to which output files are written).')
+        argument_group.add_argument(
+                '--tmpdir',
+                dest='tmpdir',
+                metavar='',
+                required=required,
+                type=str,
+                action=PathAction,
+                help=help_)
+    elif dest == 'compress':
+        if help_ is None:
+            help_ = 'Compress DIAMOND alignment file (default: not enabled).'
+        argument_group.add_argument(
+                '--compress',
+                dest='compress',
+                required=required,
+                action='store_true',
+                help=help_)
+    elif dest == 'top':
+        if help_ is None:
+            help_ = (
+                    'DIAMOND top parameter [0-50] (default: {0}). Governs '
+                    'hits within range of best hit that are written to the '
+                    'alignment file. This is not the [-r / --range] '
+                    'parameter! Can only be set with the '
+                    '[--I_know_what_Im_doing] flag, see README.md.'
+                    ''.format(default))
+        argument_group.add_argument(
+                '--top',
+                dest='top',
+                metavar='',
+                required=required,
+                type=float,
+                choices = [i for i in range(51)],
+                default=default,
+                help=help_)
+    else:
+        sys.exit('Unknown parser dest {0}.'.format(dest))
+
+    return
+
+
+def add_all_diamond_arguments(argument_group):
+    add_argument(argument_group, 'nproc', False,
+            default=multiprocessing.cpu_count())
+    add_argument(argument_group, 'sensitive', False)
+    add_argument(argument_group, 'no_self_hits', False)
+    add_argument(argument_group, 'block_size', False, default=2.0)
+    add_argument(argument_group, 'index_chunks', False, default=4)
+    add_argument(argument_group, 'tmpdir', False)
+    add_argument(argument_group, 'compress', False)
+    add_argument(argument_group, 'top', False, default=50)
+
+    return
+
+
 def expand_arguments(args):
     if 'r' in args:
         setattr(args, 'one_minus_r', (100 - args.r) / 100)
@@ -55,9 +454,9 @@ def expand_arguments(args):
 
     if 'no_log' in args and not args.no_log:
         if 'fresh' in args and args.fresh:
-            log_file = './{0}.CAT_prepare.fresh.log'.format(args.date)
+            log_file = './CAT_prepare.{0}.fresh.log'.format(args.date)
         elif 'fresh' in args and not args.fresh:
-            log_file = './{0}.CAT_prepare.existing.log'.format(args.date)
+            log_file = './CAT_prepare.{0}.existing.log'.format(args.date)
         else:
             # Check out_prefix as the log file needs to be written to a valid
             # location.

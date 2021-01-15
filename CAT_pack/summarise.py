@@ -16,60 +16,23 @@ def parse_arguments():
             add_help=False)
     
     required = parser.add_argument_group('Required arguments')
-    
-    required.add_argument(
-            '-i',
-            '--input_file',
-            dest='input_file',
-            metavar='',
-            required=True,
-            type=str,
-            action=shared.PathAction,
-            help=(
+    shared.add_argument(required, 'input_file', True,
+            help_=(
                 'Path to named CAT contig classification file or BAT bin '
                 'classification file. Currently only official ranks are '
                 'supported, and only classification files containing a single '
-                'classification per contig / bin.'))
-    required.add_argument(
-            '-o',
-            '--output_file',
-            dest='output_file',
-            metavar='',
-            required=True,
-            type=str,
-            action=shared.PathAction,
-            help='Path to output file.')
+                'classification per contig / bin. If you want to summarise a '
+                'contig classification file, you have to supply the contigs '
+                'fasta file with argument [-c / --contigs_fasta].'))
+    shared.add_argument(required, 'output_file', True)
     
     optional = parser.add_argument_group('Optional arguments')
-    
-    optional.add_argument(
-            '-c',
-            '--contigs_fasta',
-            dest='contigs_fasta',
-            metavar='',
-            required=False,
-            type=str,
-            action=shared.PathAction,
-            help=('Path to contigs fasta file. This is required if you want '
-                'to summarise a contig classification file.'))
-    optional.add_argument(
-            '--force',
-            dest='force',
-            required=False,
-            action='store_true',
-            help='Force overwrite existing files.')
-    optional.add_argument(
-            '-q',
-            '--quiet',
-            dest='quiet',
-            required=False,
-            action='store_true',
-            help='Suppress verbosity.')
-    optional.add_argument(
-            '-h',
-            '--help',
-            action='help',
-            help='Show this help message and exit.')
+    shared.add_argument(optional, 'contigs_fasta', False,
+            help_=('Path to contigs fasta file. Required if you want to '
+                'summarise a contig classification file.'))
+    shared.add_argument(optional, 'force', False)
+    shared.add_argument(optional, 'quiet', False)
+    shared.add_argument(optional, 'help', False)
 
     (args, extra_args) = parser.parse_known_args()
 
