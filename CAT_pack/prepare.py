@@ -106,7 +106,7 @@ def download_taxonomy_files(taxonomy_folder, date, log_file, quiet):
             'taxonomy folder.'.format(url))
     shared.give_user_feedback(message, log_file, quiet)
 
-    url = 'ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz'
+    url = '{0}taxdump.tar.gz'.format(url)
     tmp_taxonomy_file = '{0}{1}.taxdump.tar.gz'.format(taxonomy_folder, date)
     try:
         urllib.request.urlretrieve(url, tmp_taxonomy_file)
@@ -153,8 +153,7 @@ def download_prot_accession2taxid_file(
             url)
     shared.give_user_feedback(message, log_file, quiet)
 
-    url = ('ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/'
-            'prot.accession2taxid.FULL.gz')
+    url = '{0}prot.accession2taxid.FULL.gz'.format(url)
     try:
         urllib.request.urlretrieve(url, prot_accession2taxid_file)
     except:
@@ -187,7 +186,7 @@ def download_nr(nr_file, log_file, quiet):
             url)
     shared.give_user_feedback(message, log_file, quiet)
 
-    url = 'ftp://ftp.ncbi.nlm.nih.gov/blast/db/FASTA/nr.gz'
+    url = '{0}nr.gz'.format(url)
     try:
         urllib.request.urlretrieve(url, nr_file)
     except:
