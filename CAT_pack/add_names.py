@@ -127,8 +127,7 @@ def run():
 
                 continue
 
-            if (line[1].startswith('no taxid found') or
-                    line[2].startswith('no taxid found')):
+            if any([c.startswith('no taxid found') for c in line[1:4]]):
                 # ORF has database hits but the accession number is not found
                 # in the taxonomy files.
                 outf1.write('{0}\n'.format('\t'.join(line)))
