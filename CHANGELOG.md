@@ -1,5 +1,8 @@
 # Changelog
 
+## 5.2.3
+Minor bug fix for `CAT add_names`.
+
 ## 5.2.2
 We have added the DIAMOND specific `--no_self_hits` flag. We have also added some extra checks and removed redundancy from the parser code. Databases constructed by `CAT prepare` now have a slightly different naming scheme.
 
