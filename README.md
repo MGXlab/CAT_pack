@@ -1,4 +1,4 @@
-# CAT and BAT
+# CAT, BAT, and RAT
 
 - [Introduction](#introduction)
 - [Dependencies and where to get them](#dependencies-and-where-to-get-them)
