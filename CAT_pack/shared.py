@@ -714,7 +714,7 @@ def import_contig_names(fasta_file, log_file, quiet):
     with open(fasta_file, 'r') as f1:
         for line in f1:
             if line.startswith('>'):
-                contig = line.split(' ')[0].lstrip('>').rstrip()
+                contig = line.split()[0].lstrip('>').rstrip()
                 
                 if contig in contig_names:
                     message = (
@@ -741,7 +741,7 @@ def import_ORFs(proteins_fasta, log_file, quiet):
             line = line.rstrip()
 
             if line.startswith('>'):
-                ORF = line.split(' ')[0].lstrip('>')
+                ORF = line.split()[0].lstrip('>')
                 contig = ORF.rsplit('_', 1)[0]
 
                 if contig not in contig2ORFs:

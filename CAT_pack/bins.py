@@ -104,7 +104,7 @@ def import_bins(bin_folder, bin_suffix, log_file, quiet):
         with open('{0}{1}'.format(bin_folder, file_), 'r') as f1:
             for line in f1:
                 if line.startswith('>'):
-                    contig = line.split(' ')[0].rstrip().lstrip('>')
+                    contig = line.split()[0].rstrip().lstrip('>')
 
                     # Add bin name in front of the contig name.
                     new_contig_name = '{0}_{1}'.format(bin_, contig)
@@ -142,7 +142,7 @@ def make_concatenated_fasta(
             with open('{0}{1}'.format(bin_folder, bin_), 'r') as f1:
                 for line in f1:
                     if line.startswith('>'):
-                        contig = line.split(' ')[0].rstrip().lstrip('>')
+                        contig = line.split()[0].rstrip().lstrip('>')
                         
                         # add bin name in front of the contig name.
                         outf1.write('>{0}_{1}\n'.format(bin_, contig))

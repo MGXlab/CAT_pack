@@ -59,7 +59,7 @@ def import_contig_lengths(contigs_fasta, log_file, quiet):
             line = line.rstrip()
 
             if line.startswith('>'):
-                contig = line.split(' ')[0].lstrip('>')
+                contig = line.split()[0].lstrip('>')
 
                 contig2length[contig] = 0
             else:
@@ -209,7 +209,7 @@ def summarise_contigs(args):
 
                 length[rank][classification].append(contig2length[contig])
 
-                # NOTE that the total number of ORFs on a contig is reproted,
+                # NOTE that the total number of ORFs on a contig is reported,
                 # not only the number of ORFs a classification is based on.
                 ORFs_on_contig = int(line[2].split('/')[1].split(' ')[0])
                 ORFs[rank][classification].append(ORFs_on_contig)
