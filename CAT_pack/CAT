@@ -6,6 +6,7 @@ import about
 import add_names
 import bins
 import contigs
+import reads
 import prepare
 import single_bin
 import summarise
