@@ -859,6 +859,7 @@ def run_CAT(
                 '--path_to_prodigal', path_to_prodigal,
                 '--path_to_diamond', path_to_diamond,
                 '--force']
+        print(' '.join(command))
         subprocess.check_call(command)
     except:
         message = 'CAT finished abnormally.'
