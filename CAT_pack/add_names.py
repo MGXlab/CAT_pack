@@ -79,7 +79,7 @@ def run():
     with open(args.input_file, 'r') as f1:
         for line in f1:
             if line.startswith('#'):
-                line = line.rstrip().split('\t')
+                line = line[2:].rstrip().split('\t')
 
                 if 'lineage' in line:
                     lineage_index = line.index('lineage')

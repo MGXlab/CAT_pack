@@ -14,9 +14,9 @@ import summarise
 def usage():
     message = (
             'usage: CAT (prepare | contigs | bin | bins | add_names | '
-            'summarise) [-v / --version] [-h / --help]\n'
+            'reads | summarise) [-v / --version] [-h / --help]\n'
             'CAT: error: one of the arguments prepare contigs bin bins '
-            'add_names summarise is required')
+            'reads add_names summarise is required')
     
     sys.stdout.write('{0}\n'.format(message))
 
@@ -39,16 +39,18 @@ def help():
             'Run Contig Annotation Tool (CAT) or '
             'Bin Annotation Tool (BAT).\n\n'
             'Required choice:\n'
-            '  prepare\t\tConstruct database files.\n'
+            '  prepare\t\tDownload database files and construct databases.\n'
             '  contigs\t\tRun CAT.\n'
             '  bin\t\t\tRun BAT on a single bin.\n'
             '  bins\t\t\tRun BAT on a set of bins.\n'
+            '  reads\t\t\tRun RAT on a set of reads and contigs.\n'
             '  add_names\t\tAdd taxonomic names to CAT or BAT output files.\n'
             '  summarise\t\tSummarise a named CAT or BAT classification file.'
             '\n\n'
             'Optional arguments:\n'
             '  -v, --version\t\tPrint version information and exit.\n'
             '  -h, --help\t\tShow this help message and exit.')
+
 
     sys.stdout.write('{0}\n'.format(message))
 
@@ -70,6 +72,8 @@ def main():
         add_names.run()
     elif sys.argv[1] == 'summarise':
         summarise.run()
+    elif sys.argv[1] == 'reads':
+        reads.run()
     elif sys.argv[1] == '-v' or sys.argv[1] == '--version':
         version()
     elif sys.argv[1] == '-h' or sys.argv[1] == '--help':

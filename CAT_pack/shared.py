@@ -217,6 +217,32 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 action=PathAction,
                 default=default,
                 help=help_)
+    elif dest == 'path_to_bwa':
+        if help_ is None:
+            help_ = ('Path to bwa binaries. Supply if RAT cannot find '
+                    'bwa.')
+        argument_group.add_argument(
+                '--path_to_bwa',
+                dest='path_to_bwa',
+                metavar='',
+                required=required,
+                type=str,
+                action=PathAction,
+                default=default,
+                help=help_)
+    elif dest == 'path_to_samtools':
+        if help_ is None:
+            help_ = ('Path to samtools binaries. Supply if RAT cannot find '
+                    'samtools.')
+        argument_group.add_argument(
+                '--path_to_samtools',
+                dest='path_to_samtools',
+                metavar='',
+                required=required,
+                type=str,
+                action=PathAction,
+                default=default,
+                help=help_)
     elif dest == 'no_stars':
         if help_ is None:
             help_ = 'Suppress marking of suggestive taxonomic assignments.'
@@ -324,6 +350,106 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 required=required,
                 action='store_true',
                 help=help_)
+    elif dest == 'read_classification':
+        if help_ is None:
+            help_ = ('Create output table with taxonomic annotation for each '
+                     'read.')
+        argument_group.add_argument(
+                '--read_classification',
+                dest='read_classification',
+                required=required,
+                action='store_true',
+                help=help_)
+    elif dest == 'read_file1':
+        if help_ is None:
+            help_ = ('Path to (forward) read file. Please note that RAT does not '
+            'currently support interlaced read files. Please supply '
+            'a single read file or two files for paired-end reads.')
+        argument_group.add_argument(
+                '-1',
+                '--read_file1',
+                dest='read_file1',
+                metavar='',
+                required=required,
+                type=str,
+                action=PathAction,
+                help=help_)
+    elif dest == 'read_file2':
+        if help_ is None:
+            help_ = ('Path to reverse read file.')
+        argument_group.add_argument(
+                '-2',
+                '--read_file2',
+                dest='read_file2',
+                metavar='',
+                required=required,
+                type=str,
+                action=PathAction,
+                help=help_)
+    elif dest == 'bam_file1':
+        if help_ is None:
+            help_ = ('Path to sorted mapping file.')
+        argument_group.add_argument(
+                '--bam1',
+                dest='bam_file1',
+                metavar='',
+                required=required,
+                type=str,
+                action=PathAction,
+                help=help_)
+    elif dest == 'bam_file2':
+        if help_ is None:
+            help_ = ('Path to second sorted mapping file (not recommended).')
+        argument_group.add_argument(
+                '--bam2',
+                dest='bam_file2',
+                metavar='',
+                required=required,
+                type=str,
+                action=PathAction,
+                help=help_)
+    elif dest == 'mapping_quality':
+        if help_ is None:
+            help_ = ('Minimum mapping quality phred score (default: 2)')
+        argument_group.add_argument(
+                '--mapping_quality',
+                dest='mapping_quality',
+                metavar='',
+                required=required,
+                type=int,
+                default=default,
+                help=help_)
+    elif dest == 'contig2classification':
+        if help_ is None:
+            help_ = ('Path to contig2classification file.')
+        argument_group.add_argument(
+                '--c2c',
+                dest='contig2classification',
+                metavar='',
+                required=required,
+                type=str,
+                action=PathAction,
+                help=help_)
+    elif dest == 'bin2classification':
+        if help_ is None:
+            help_ = ('Path to bin2classification file.')
+        argument_group.add_argument(
+                '--b2c',
+                dest='bin2classification',
+                metavar='',
+                required=required,
+                type=str,
+                action=PathAction,
+                help=help_)
+    elif dest == 'read2classification':
+        if help_ is None:
+            help_ = ('Includes read classification step.')
+        argument_group.add_argument(
+                '--read2classification',
+                dest='read2classification',
+                required=required,
+                action='store_true',
+                help=help_)
     elif dest == 'nproc':
         if help_ is None:
             help_ = 'Number of cores to deploy by DIAMOND (default: maximum).'
@@ -428,9 +554,10 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     return
 
 
-def add_all_diamond_arguments(argument_group):
-    add_argument(argument_group, 'nproc', False,
-            default=multiprocessing.cpu_count())
+def add_all_diamond_arguments(argument_group, add_nproc=True):
+    if add_nproc:
+        add_argument(argument_group, 'nproc', False,
+                default=multiprocessing.cpu_count())
     add_argument(argument_group, 'sensitive', False)
     add_argument(argument_group, 'no_self_hits', False)
     add_argument(argument_group, 'block_size', False, default=2.0)
@@ -479,7 +606,7 @@ def expand_arguments(args):
                 '{0}/'.format(args.taxonomy_folder.rstrip('/')))
 
         explore_taxonomy_folder(args)
-    if 'database_folder' in args:
+    if 'database_folder' in args and args.database_folder != None:
         setattr(args,
                 'database_folder',
                 '{0}/'.format(args.database_folder.rstrip('/')))
@@ -703,6 +830,203 @@ def run_diamond(args):
     give_user_feedback(message, args.log_file, args.quiet)
 
     return
+
+def run_CAT(
+        contigs_fasta,
+        database_folder,
+        taxonomy_folder,
+        log_file,
+        quiet,
+        nproc,
+        fraction,
+        CAT_range,
+        path_to_prodigal='prodigal',
+        path_to_diamond='diamond',
+        path_to_output='out.CAT'):
+    message = (
+            'Running CAT.')
+    give_user_feedback(message, log_file, quiet, show_time=True)
+
+    try:
+        command = ['CAT', 'contigs',
+                '-c', contigs_fasta,
+                '-d', database_folder,
+                '-t', taxonomy_folder,
+                '-o', path_to_output+'.CAT',
+                '-n', str(nproc),
+                '-f', str(fraction),
+                '-r', str(CAT_range),
+                '--path_to_prodigal', path_to_prodigal,
+                '--path_to_diamond', path_to_diamond,
+                '--force']
+        subprocess.check_call(command)
+    except:
+        message = 'CAT finished abnormally.'
+        give_user_feedback(message, log_file, quiet, error=True)
+
+        sys.exit(1)
+
+    message = 'CAT done!\n'
+    give_user_feedback(message, log_file, quiet, show_time=True)
+
+    return
+
+def run_BAT(
+        bin_folder,
+        database_folder,
+        taxonomy_folder,
+        log_file,
+        quiet,
+        n_proc,
+        fraction,
+        CAT_range,
+        path_to_prodigal='prodigal',
+        path_to_diamond='diamond',
+        path_to_output='out.BAT',
+        bin_suffix='.fna'):
+    message = (
+            'Running BAT.')
+    give_user_feedback(message, log_file, quiet, show_time=True)
+
+    try:
+        command = ['CAT', 'bins',
+                '-b', bin_folder,
+                '-d', database_folder,
+                '-t', taxonomy_folder,
+                '-o', path_to_output+'.BAT',
+                '-n', str(n_proc),
+                '-f', str(fraction),
+                '-r', str(CAT_range),
+                '--path_to_prodigal', path_to_prodigal,
+                '--path_to_diamond', path_to_diamond,
+                '-s', bin_suffix, '--force']
+        subprocess.check_call(command)
+    except:
+        message = 'BAT finished abnormally.'
+        give_user_feedback(message, log_file, quiet, error=True)
+
+        sys.exit(1)
+
+    message = 'BAT done!\n'
+    give_user_feedback(message, log_file, quiet, show_time=True)
+
+    return
+
+
+
+def run_bwa_mem(
+        path_to_bwa,
+        path_to_samtools,
+        contigs_fasta,
+        read_file,
+        out_prefix,
+        nproc,
+        log_file):
+
+    # tested with bwa 0.7.17
+    # tested with samtools 1.11
+    output_file='{0}.{1}.bwamem'.format(out_prefix+
+                                        '.'+os.path.split(contigs_fasta)[-1], 
+                                        os.path.split(read_file[0])[-1])
+    message = (
+            'Running bwa mem for read mapping. File {0}.sorted will be generated.'
+            'Do not forget to cite bwa mem and samtools when using RAT in '
+            'your publication!'.format(output_file))
+    give_user_feedback(message, log_file, show_time=True)
+
+    try:
+        # Run bwa index
+        message = 'Indexing contigs fasta...'
+        give_user_feedback(message, log_file, error=False)
+
+        command =[
+                path_to_bwa, 'index',
+                contigs_fasta
+                ]
+        subprocess.check_call(command)
+
+        try:
+            # Run bwa mem
+            message = 'Running bwa mem...'
+            give_user_feedback(message, log_file, error=False)
+
+            if len(read_file)==2:
+                command =[
+                        path_to_bwa, 'mem',
+                        '-t', str(nproc),
+                        contigs_fasta,
+                        read_file[0], read_file[1]
+                        ]
+            elif len(read_file)==1:
+                command =[
+                        path_to_bwa, 'mem',
+                        '-t', nproc,
+                        contigs_fasta,
+                        read_file[0]
+                        ]
+            proc=subprocess.Popen(command, stdout=subprocess.PIPE)
+            with open(output_file, 'wb') as outf:
+                for line in proc.stdout:
+                    outf.write(line)
+
+            try:
+                # Run samtools view and remove bwamem file
+                command =[
+                        path_to_samtools, 'view',
+                        '-b','-@', str(nproc),
+                        output_file,
+                        '-o', output_file + '.bam'
+                        ]
+
+                subprocess.check_call(command)
+                os.remove(output_file)
+
+
+                try:
+                    # Run samtools sort and remove sam file
+                    message = 'Sorting bam file...'
+                    give_user_feedback(message, log_file, error=False)
+
+                    command =[
+                        path_to_samtools, 'sort',
+                        '-@', str(nproc),
+                        output_file + '.bam',
+                        '-o', output_file + '.sorted'
+                        ]
+
+                    subprocess.check_call(command)
+
+                except:
+                    message = 'samtools sort finished abnormally.'
+                    give_user_feedback(message, log_file, error=True)
+
+                    sys.exit(1)
+            except:
+                message = 'samtools view finished abnormally.'
+                give_user_feedback(message, log_file, error=True)
+
+                sys.exit(1)
+
+
+        except:
+            message = 'Bwa mem finished abnormally.'
+            give_user_feedback(message, log_file, error=True)
+
+            sys.exit(1)
+    except:
+        message = 'Bwa index finished abnormally.'
+        give_user_feedback(message, log_file, error=True)
+
+        sys.exit(1)
+
+    message = 'Read mapping done!\n'
+    give_user_feedback(message, log_file,show_time=True)
+
+    return
+
+
+
+
 
 
 def import_contig_names(fasta_file, log_file, quiet):
