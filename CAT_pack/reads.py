@@ -496,11 +496,11 @@ def make_tax_table(c2c_dict,
     Writes table with all classifications including subspecies
     """
     RAT_contig_header=('# contig\tnumber of reads\tfraction of reads\t'
-                       'contig_length\tcorrected fraction\tlineage\t'
+                       'contig_length\tAverage Coveraget\tlineage\t'
                        'lineage ranks\tlineage scores\n')
                        
     RAT_file_header=('# lineage\tnumber of reads\tfraction of reads\t'
-                     'taxon length\taverage genome size\tlineage ranks\n')
+                     'taxon length\tlineage ranks\n')
     
     taxon_dict={}
     unclassified={
