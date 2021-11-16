@@ -332,15 +332,24 @@ def prepare(step_list, args):
     db_dir = pathlib.Path(args.database_folder).resolve()
     db_dir.mkdir(exist_ok=True)
 
-    # It should contain a taxonomy folder with names and nodes
+    # It should contain 
+    # 1. a taxonomy folder with names and nodes
     tax_db = db_dir / pathlib.Path("tax")
     tax_db.mkdir(exist_ok=True)
-    names_dmp_fp = tax_db / pathlib.Path("names.dmp")
-    shutil.copyfile(args.names_dmp, names_dmp_fp)
-    nodes_dmp_fp = tax_db / pathlib.Path("nodes.dmp")
-    shutil.copyfile(args.nodes_dmp, nodes_dmp_fp)
 
-    # ... and a dir with the .dmnd and LCA files
+    # Check if names and nodes exist together
+    nodes_dmp_fp = tax_db / pathlib.Path("nodes.dmp")
+    names_dmp_fp = tax_db / pathlib.Path("names.dmp")
+    if not names_dmp_fp.exists() or not nodes_dmp_fp.exists():
+        message = ("Copying names.dmp and nodes.dmp in {}".format(tax_db))
+        shared.give_user_feedback(
+            message, args.log_file, args.quiet, show_time=True
+        )
+        shutil.copyfile(args.names_dmp, names_dmp_fp)
+        shutil.copyfile(args.nodes_dmp, nodes_dmp_fp)
+
+
+    # 2. a dir with the .dmnd and LCA files
     cat_db = db_dir / pathlib.Path("db")
 
     if cat_db.is_dir():
@@ -349,10 +358,12 @@ def prepare(step_list, args):
             shared.give_user_feedback(
                 message, args.log_file, args.quiet, show_time=False
             )
-            skip_steps = [step_list.pop(0)]
+            step_list.pop(0)
     else:
-        message = "Database folder is created at {}".format(db_dir)
-        shared.give_user_feedback(message, args.log_file, args.quiet, show_time=True)
+        message = "Database folder is created at {}".format(cat_db)
+        shared.give_user_feedback(
+            message, args.log_file, args.quiet, show_time=True
+        )
         cat_db.mkdir()
 
     setattr(
