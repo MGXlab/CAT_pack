@@ -90,19 +90,18 @@ def memory_bottleneck(args):
     (total_memory, error) = check.check_memory(args.min_mem)
     if error:
         message = (
-            "at least {0}GB of memory is needed for the database "
-            "construction. {1}GB is found on your system. You can try "
-            "to find a machine with more memory, or download "
-            "preconstructed database files from "
+            "WARNING: "
+            "At least {0}GB of memory is recommended for large database "
+            "construction (e.g. nr). {1}GB is found on your system. "
+            "You can try to find a machine with more memory if you run into "
+            "issues or download preconstructed database files from "
             "tbb.bio.uu.nl/bastiaan/CAT_prepare/.".format(
                 args.min_mem, total_memory
             )
         )
         shared.give_user_feedback(
-            message, args.log_file, args.quiet, error=True
+            message, args.log_file, args.quiet,
         )
-
-        sys.exit(1)
 
     return
 
@@ -163,7 +162,7 @@ def import_fasta_headers(fasta, log_file, quiet):
             if not line.startswith(">"):
                 continue
 
-            # \x01 = ^A, handles multiple fasta headers
+            # \x01 == ^A, handles multiple fasta headers
             # Some legacy format for headers
             line = line.lstrip(">").split("\x01")
 
@@ -330,6 +329,7 @@ def write_taxids_with_multiple_offspring_file(
 def prepare(step_list, args):
     shared.print_variables(args, step_list)
     skip_steps = []
+    memory_bottleneck(args)
 
     # This is the root dir
     db_dir = pathlib.Path(args.database_folder).resolve()
