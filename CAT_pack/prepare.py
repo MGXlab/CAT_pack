@@ -205,9 +205,8 @@ def import_prot_accession2taxid(
 
 
 def make_fastaid2LCAtaxid_file(
-    nodes_dmp,
     fastaid2LCAtaxid_file,
-    nr_file,
+    fasta_file,
     prot_accession2taxid_file,
     taxid2parent,
     log_file,
@@ -216,7 +215,7 @@ def make_fastaid2LCAtaxid_file(
     (
         fastaid2prot_accessions,
         prot_accessions_whitelist,
-    ) = import_fasta_headers(nr_file, log_file, quiet)
+    ) = import_fasta_headers(fasta_file, log_file, quiet)
     prot_accession2taxid = import_prot_accession2taxid(
         prot_accession2taxid_file, prot_accessions_whitelist, log_file, quiet
     )
@@ -282,10 +281,8 @@ def make_fastaid2LCAtaxid_file(
     return
 
 
-def find_offspring(
-    nodes_dmp, fastaid2LCAtaxid_file, taxid2parent, log_file, quiet
-):
-    message = "Searching nr database for taxids with multiple offspring."
+def find_offspring(fastaid2LCAtaxid_file, taxid2parent, log_file, quiet):
+    message = "Searching database for taxids with multiple offspring."
     shared.give_user_feedback(message, log_file, quiet)
 
     taxid2offspring = {}
@@ -348,7 +345,7 @@ def prepare(step_list, args):
 
     if cat_db.is_dir():
         if any(cat_db.glob("*.dmnd")):
-            message = "DIAMOND database exists. Skipping creation"
+            message = "A DIAMOND database exists. Skipping creation"
             shared.give_user_feedback(
                 message, args.log_file, args.quiet, show_time=False
             )
