@@ -149,6 +149,7 @@ Notes:
 This is to ensure that the `-t` flag of the rest of CAT modules works.
 - The default prefix is `<YYYY-MM-DD>_CAT`. You can customize it with the `--common_prefix` option.
 
+For all command line options available see
 
 ```
 $ CAT prepare -h
