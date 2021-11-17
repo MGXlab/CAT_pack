@@ -6,6 +6,7 @@ import decimal
 import gzip
 import multiprocessing
 import os
+import pathlib
 import subprocess
 import sys
 
@@ -91,6 +92,18 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
             "-b",
             "--bin_folder",
             dest="bin_folder",
+            metavar="",
+            required=required,
+            type=str,
+            action=PathAction,
+            help=help_,
+        )
+    elif dest == "db_dir":
+        if help_ is None:
+            help_ = "Path to directory where CAT will create its files"
+        argument_group.add_argument(
+            "--db_dir",
+            dest="db_dir",
             metavar="",
             required=required,
             type=str,
@@ -259,21 +272,18 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
             action=PathAction,
             help=help_,
         )
-    elif dest == "diamond_database_prefix":
+    elif dest == "common_prefix":
         if help_ is None:
-            help_ = (
-                "Name of constructed diamond file. This is the " "[name].dmnd"
-            )
+            help_ = "Prefix for all files that will be created"
         argument_group.add_argument(
-            "--diamond_database_prefix",
-            dest="diamond_database_prefix",
+            "--common_prefix",
+            dest="common_prefix",
             metavar="",
             required=required,
             type=str,
             default=default,
             help=help_,
         )
-
     elif dest == "path_to_prodigal":
         if help_ is None:
             help_ = (
@@ -582,17 +592,63 @@ def expand_arguments(args):
 
     setattr(args, "log_file", log_file)
 
-    if 'taxonomy_folder' in args:
-        setattr(args,
-                'taxonomy_folder',
-                '{0}/'.format(args.taxonomy_folder.rstrip('/')))
-    
+    if "db_dir" in args:
+
+        database_folder_path = str(
+            pathlib.Path(args.db_dir) / pathlib.Path("db")
+        )
+        diamond_database_name = "{}.dmnd".format(args.common_prefix)
+        diamond_database_path = str(
+            database_folder_path / pathlib.Path(diamond_database_name)
+        )
+
+        taxonomy_folder_path = str(
+            pathlib.Path(args.db_dir) / pathlib.Path("tax")
+        )
+        fastaid2LCAtaxid_fname = "{}.fastaid2LCAtaxid".format(
+            args.common_prefix
+        )
+        fastaid2LCAtaxid_path = database_folder_path / pathlib.Path(
+            fastaid2LCAtaxid_fname
+        )
+        fastaid2LCAtaxid_file = str(fastaid2LCAtaxid_path)
+
+        taxids_with_multiple_offspring_fname = (
+            "{}.taxids_with_multiple_offspring".format(args.common_prefix)
+        )
+        taxids_with_multiple_offspring_path = (
+            database_folder_path
+            / pathlib.Path(taxids_with_multiple_offspring_fname)
+        )
+        taxids_with_multiple_offspring_file = str(
+            taxids_with_multiple_offspring_path
+        )
+
+        setattr(args, "database_folder", database_folder_path)
+        setattr(args, "taxonomy_folder", taxonomy_folder_path)
+        setattr(args, "diamond_database", diamond_database_path)
+        setattr(args, "fastaid2LCAtaxid_file", fastaid2LCAtaxid_file)
+        setattr(
+            args,
+            "taxids_with_multiple_offspring_file",
+            taxids_with_multiple_offspring_file,
+        )
+
+    if "taxonomy_folder" in args and not "db_dir" in args:
+        setattr(
+            args,
+            "taxonomy_folder",
+            "{0}/".format(args.taxonomy_folder.rstrip("/")),
+        )
+
         explore_taxonomy_folder(args)
-    if 'database_folder' in args:
-        setattr(args,
-                'database_folder',
-                '{0}/'.format(args.database_folder.rstrip('/')))
-    
+    if "database_folder" in args and not "db_dir" in args:
+        setattr(
+            args,
+            "database_folder",
+            "{0}/".format(args.database_folder.rstrip("/")),
+        )
+
         explore_database_folder(args)
 
     return
@@ -604,11 +660,13 @@ def explore_taxonomy_folder(args):
     prot_accession2taxid_file = None
 
     if os.path.isdir(args.taxonomy_folder):
+        print(args.taxonomy_folder)
         for file_ in os.listdir(args.taxonomy_folder):
             if file_ == "nodes.dmp":
                 nodes_dmp = "{0}{1}".format(args.taxonomy_folder, file_)
             elif file_ == "names.dmp":
                 names_dmp = "{0}{1}".format(args.taxonomy_folder, file_)
+            # No need to check for this
             elif file_.endswith("prot.accession2taxid.FULL.gz"):
                 prot_accession2taxid_file = "{0}{1}".format(
                     args.taxonomy_folder, file_
@@ -630,15 +688,17 @@ def explore_taxonomy_folder(args):
 
 
 def explore_database_folder(args):
-    nr_file = None
+    fasta_file = None
     diamond_database = None
     fastaid2LCAtaxid_file = None
     taxids_with_multiple_offspring_file = None
 
     if os.path.isdir(args.database_folder):
         for file_ in os.listdir(args.database_folder):
-            if file_.endswith("nr.gz"):
-                nr_file = "{0}{1}".format(args.database_folder, file_)
+            if file_.endswith(
+                (".fa", ".fasta", ".fna", "fa.gz", "fasta.gz", "fna.gz")
+            ):
+                fasta_file = "{0}{1}".format(args.database_folder, file_)
             elif file_.endswith(".dmnd"):
                 diamond_database = "{0}{1}".format(args.database_folder, file_)
             elif file_.endswith("fastaid2LCAtaxid"):
@@ -650,7 +710,7 @@ def explore_database_folder(args):
                     args.database_folder, file_
                 )
 
-    setattr(args, "nr_file", nr_file)
+    setattr(args, "db_fasta", fasta_file)
     setattr(args, "diamond_database", diamond_database)
     setattr(args, "fastaid2LCAtaxid_file", fastaid2LCAtaxid_file)
     setattr(
