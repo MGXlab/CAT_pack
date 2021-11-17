@@ -29,6 +29,7 @@ def parse_arguments():
             "--prot2acc path/to/accession2taxid.txt "
             "--names path/to/names.dmp "
             "--nodes path/to/nodes.dmp "
+            "--db_dir path/to/db_dir "
             "[options] [-h / --help]"
         ),
         add_help=False,
@@ -39,23 +40,17 @@ def parse_arguments():
     shared.add_argument(required, "names_dmp", True)
     shared.add_argument(required, "nodes_dmp", True)
     shared.add_argument(required, "prot2acc", True)
+    shared.add_argument(required, "db_dir", True)
 
     optional = parser.add_argument_group("Optional arguments")
+    shared.add_argument(optional, "path_to_diamond", False, default="diamond")
     shared.add_argument(
         optional,
-        "database_folder",
+        "common_prefix",
         False,
-        default="./CAT_database.{0}".format(date),
-        help_=(
-            "Name of folder to which database files will be written "
-            "(default: CAT_database.{date})"
-        ),
+        default="{}_CAT".format(date),
+        help_=("Prefix for all files to be created "),
     )
-    shared.add_argument(optional, "path_to_diamond", False, default="diamond")
-    shared.add_argument(optional, 'diamond_database_prefix', False,
-                        default="CAT",
-                        help_=("Prefix for the .dmnd file to be created "),
-                        )
     shared.add_argument(optional, "quiet", False)
     shared.add_argument(optional, "verbose", False)
     shared.add_argument(optional, "no_log", False)
@@ -100,7 +95,9 @@ def memory_bottleneck(args):
             )
         )
         shared.give_user_feedback(
-            message, args.log_file, args.quiet,
+            message,
+            args.log_file,
+            args.quiet,
         )
 
     return
@@ -109,7 +106,8 @@ def memory_bottleneck(args):
 def make_diamond_database(
     path_to_diamond,
     fasta_file,
-    diamond_database_prefix,
+    db_dir,
+    common_prefix,
     nproc,
     log_file,
     quiet,
@@ -117,9 +115,11 @@ def make_diamond_database(
 ):
     message = (
         "Constructing DIAMOND database {0}.dmnd from {1} using {2} "
-        "cores.".format(diamond_database_prefix, fasta_file, nproc)
+        "cores.".format(common_prefix, fasta_file, nproc)
     )
     shared.give_user_feedback(message, log_file, quiet)
+
+    diamond_database_prefix = db_dir / pathlib.Path(common_prefix)
 
     command = [
         path_to_diamond,
@@ -149,14 +149,14 @@ def make_diamond_database(
     return
 
 
-def import_fasta_headers(fasta, log_file, quiet):
-    message = "Loading file {0}.".format(fasta)
+def import_fasta_headers(fasta_file, log_file, quiet):
+    message = "Loading file {0}.".format(fasta_file)
     shared.give_user_feedback(message, log_file, quiet)
 
     fastaid2prot_accessions = {}
     prot_accessions_whitelist = set()
 
-    with shared.optionally_compressed_handle(fasta, "r") as f1:
+    with shared.optionally_compressed_handle(fasta_file, "r") as f1:
         for line in f1:
 
             if not line.startswith(">"):
@@ -325,29 +325,37 @@ def write_taxids_with_multiple_offspring_file(
 
 def prepare(step_list, args):
     shared.print_variables(args, step_list)
-    skip_steps = []
     memory_bottleneck(args)
 
     # This is the root dir
-    db_dir = pathlib.Path(args.database_folder).resolve()
+    db_dir = pathlib.Path(args.db_dir).resolve()
     db_dir.mkdir(exist_ok=True)
+    if not args.no_log:
+        log_fname = "{}.log".format(args.common_prefix)
+        log_path = db_dir / pathlib.Path(log_fname)
+        setattr(args, "log_file", log_path)
 
-    # It should contain 
+    # It should contain
     # 1. a taxonomy folder with names and nodes
     tax_db = db_dir / pathlib.Path("tax")
     tax_db.mkdir(exist_ok=True)
 
     # Check if names and nodes exist together
     nodes_dmp_fp = tax_db / pathlib.Path("nodes.dmp")
+    if not nodes_dmp_fp.exists():
+        message = "Copying nodes.dmp in {}".format(tax_db)
+        shared.give_user_feedback(
+            message, args.log_file, args.quiet, show_time=True
+        )
+        shutil.copyfile(args.nodes_dmp, nodes_dmp_fp)
+
     names_dmp_fp = tax_db / pathlib.Path("names.dmp")
-    if not names_dmp_fp.exists() or not nodes_dmp_fp.exists():
-        message = ("Copying names.dmp and nodes.dmp in {}".format(tax_db))
+    if not names_dmp_fp.exists():
+        message = "Copying names.dmp in {}".format(tax_db)
         shared.give_user_feedback(
             message, args.log_file, args.quiet, show_time=True
         )
         shutil.copyfile(args.names_dmp, names_dmp_fp)
-        shutil.copyfile(args.nodes_dmp, nodes_dmp_fp)
-
 
     # 2. a dir with the .dmnd and LCA files
     cat_db = db_dir / pathlib.Path("db")
@@ -356,9 +364,8 @@ def prepare(step_list, args):
         if any(cat_db.glob("*.dmnd")):
             message = "A DIAMOND database exists. Skipping creation"
             shared.give_user_feedback(
-                message, args.log_file, args.quiet, show_time=False
+                message, args.log_file, args.quiet, show_time=True
             )
-            step_list.pop(0)
     else:
         message = "Database folder is created at {}".format(cat_db)
         shared.give_user_feedback(
@@ -366,43 +373,31 @@ def prepare(step_list, args):
         )
         cat_db.mkdir()
 
-    setattr(
-        args,
-        "diamond_database_prefix",
-        cat_db / pathlib.Path(args.diamond_database_prefix)
-    )
-
-
     if "make_diamond_database" in step_list:
         make_diamond_database(
             args.path_to_diamond,
             args.db_fasta,
-            args.diamond_database_prefix,
+            args.database_folder,
+            args.common_prefix,
             args.nproc,
             args.log_file,
             args.quiet,
             args.verbose,
         )
 
-    if (
-        "make_fastaid2LCAtaxid_file" in step_list
-        or "make_taxids_with_multiple_offspring_file" in step_list
+    if ("make_fastaid2LCAtaxid_file" in step_list) or (
+        "make_taxids_with_multiple_offspring_file" in step_list
     ):
         taxid2parent, taxid2rank = tax.import_nodes(
             args.nodes_dmp, args.log_file, args.quiet
         )
 
     if "make_fastaid2LCAtaxid_file" in step_list:
-        fname = "{}.fastaid2LCAtaxid".format(args.date)
+        fname = "{}.fastaid2LCAtaxid".format(args.common_prefix)
         fpath = cat_db / pathlib.Path(fname)
-        setattr(
-            args,
-            "fastaid2LCAtaxid_file",
-            fpath
-        )
+        setattr(args, "fastaid2LCAtaxid_file", fpath)
 
         make_fastaid2LCAtaxid_file(
-            args.nodes_dmp,
             args.fastaid2LCAtaxid_file,
             args.db_fasta,
             args.prot2acc,
@@ -412,16 +407,11 @@ def prepare(step_list, args):
         )
 
     if "make_taxids_with_multiple_offspring_file" in step_list:
-        fname = "{}.taxids_with_multiple_offspring".format(args.date)
+        fname = "{}.taxids_with_multiple_offspring".format(args.common_prefix)
         fpath = cat_db / pathlib.Path(fname)
-        setattr(
-            args,
-            "taxids_with_multiple_offspring_file",
-            fpath
-            )
+        setattr(args, "taxids_with_multiple_offspring_file", fpath)
 
         taxid2offspring = find_offspring(
-            args.nodes_dmp,
             args.fastaid2LCAtaxid_file,
             taxid2parent,
             args.log_file,
@@ -445,9 +435,7 @@ def prepare(step_list, args):
         "\nSupply the following arguments to CAT or BAT if you want to "
         "use this database:\n"
         "-d / --database_folder {0}\n"
-        "-t / --taxonomy_folder {1}".format(
-            cat_db, tax_db
-        )
+        "-t / --taxonomy_folder {1}".format(cat_db, tax_db)
     )
     shared.give_user_feedback(
         message, args.log_file, args.quiet, show_time=False
@@ -458,12 +446,29 @@ def prepare(step_list, args):
 
 def run():
     args = parse_arguments()
-    step_list = [
-        "make_diamond_database",
-        "make_fastaid2LCAtaxid_file",
-        "make_taxids_with_multiple_offspring_file",
-    ]
-    prepare(step_list, args)
+
+    step_list = []
+    if not os.path.exists(args.diamond_database):
+        step_list.append("make_diamond_database")
+
+    if not os.path.exists(args.fastaid2LCAtaxid_file):
+        step_list.append("make_fastaid2LCAtaxid_file")
+
+    if not os.path.exists(args.taxids_with_multiple_offspring_file):
+        step_list.append("make_taxids_with_multiple_offspring_file")
+
+    if len(step_list) == 0:
+        message = (
+            "Nothing to do here! All files exist."
+            "Please provide a new location or remove one of the files "
+            "created by CAT to launch a build"
+        )
+        shared.give_user_feedback(
+            message, args.log_file, args.quiet, show_time=True
+        )
+    else:
+        prepare(step_list, args)
+
     return
 
 
