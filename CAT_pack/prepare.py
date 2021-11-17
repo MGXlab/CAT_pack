@@ -2,17 +2,13 @@
 
 import argparse
 import datetime
-import gzip
 import multiprocessing
 import os
 import pathlib
 import shutil
 import subprocess
 import sys
-import tarfile
-import urllib.request
 
-import about
 import check
 import shared
 import tax
