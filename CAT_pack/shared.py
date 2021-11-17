@@ -660,7 +660,6 @@ def explore_taxonomy_folder(args):
     prot_accession2taxid_file = None
 
     if os.path.isdir(args.taxonomy_folder):
-        print(args.taxonomy_folder)
         for file_ in os.listdir(args.taxonomy_folder):
             if file_ == "nodes.dmp":
                 nodes_dmp = "{0}{1}".format(args.taxonomy_folder, file_)
