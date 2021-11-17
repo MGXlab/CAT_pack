@@ -164,12 +164,12 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
             default=default,
             help=help_,
         )
-    elif dest == "prot2acc":
+    elif dest == "acc2tax":
         if help_ is None:
-            help_ = "Path to prot.accession2taxid.txt file"
+            help_ = "Path to accession2taxid.txt file. Can be gzipped."
         argument_group.add_argument(
-            "--prot2acc",
-            dest="prot2acc",
+            "--acc2tax",
+            dest="acc2tax",
             metavar="",
             required=required,
             type=str,

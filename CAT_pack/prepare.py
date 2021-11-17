@@ -26,7 +26,7 @@ def parse_arguments():
         description="Construct CAT/BAT database files.",
         usage=(
             "CAT prepare --db_fasta path/to/seqs.fa.gz "
-            "--prot2acc path/to/accession2taxid.txt "
+            "--acc2tax path/to/accession2taxid.txt "
             "--names path/to/names.dmp "
             "--nodes path/to/nodes.dmp "
             "--db_dir path/to/db_dir "
@@ -39,7 +39,7 @@ def parse_arguments():
     shared.add_argument(required, "db_fasta", True)
     shared.add_argument(required, "names_dmp", True)
     shared.add_argument(required, "nodes_dmp", True)
-    shared.add_argument(required, "prot2acc", True)
+    shared.add_argument(required, "acc2tax", True)
     shared.add_argument(required, "db_dir", True)
 
     optional = parser.add_argument_group("Optional arguments")
@@ -400,7 +400,7 @@ def prepare(step_list, args):
         make_fastaid2LCAtaxid_file(
             args.fastaid2LCAtaxid_file,
             args.db_fasta,
-            args.prot2acc,
+            args.acc2tax,
             taxid2parent,
             args.log_file,
             args.quiet,
