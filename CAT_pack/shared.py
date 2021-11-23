@@ -238,6 +238,31 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
             default=default,
             help=help_,
         )
+    elif dest == "db":
+        if help_ is None:
+            help_ = "One of 'nr' or 'gtdb'"
+        argument_group.add_argument(
+            "-db",
+            dest="db",
+            metavar="",
+            required=required,
+            type=str,
+            choices=["nr", "gtdb"],
+            default=None,
+            help=help_
+        )
+    elif dest == "output_dir":
+        if help_ is None:
+            help_ = "Directory where to store data"
+        argument_group.add_argument(
+            "-o",
+            "--output_dir",
+            dest="output_dir",
+            metavar="",
+            required=required,
+            type=lambda p: pathlib.Path(p).resolve(),
+            help=help_
+        )
     elif dest == "proteins_fasta":
         if help_ is None:
             help_ = (
