@@ -123,7 +123,7 @@ def check_nr_md5s(data_dir, log_file, quiet):
 def process_nr(output_dir, date_prefix, log_file, quiet):
 
     nr_download(output_dir, date_prefix, log_file, quiet)
-    #check_nr_md5s(output_dir, log_file, quiet)
+    check_nr_md5s(output_dir, log_file, quiet)
 
     tax_tar = "{}.{}".format(date_prefix, "taxdump.tar.gz")
     tax_tar_path = output_dir / pathlib.Path(tax_tar)
