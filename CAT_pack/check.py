@@ -13,7 +13,7 @@ def check_md5_gz(gz_file, md5_file, log_file, quiet):
     shared.give_user_feedback(message, log_file, quiet)
 
     with open(md5_file, 'r') as f:
-        md5_exp = f.read().split(' ')[0]
+        md5_exp = f.read().strip().split(' ')[0]
 
     if md5_exp == '':
         message = ('WARNING: no MD5 found in {0}. Integrity of {1} can not be '
