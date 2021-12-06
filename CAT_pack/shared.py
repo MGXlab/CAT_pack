@@ -360,6 +360,22 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 required=required,
                 action='store_true',
                 help=help_)
+    elif dest == 'mode':
+        if help_ is None:
+            help_ = ('classification mode. "direct_mapping": complete annotation,'
+                     '"robust": annotate only based on CAT/BAT'
+                     ' annotation')
+        argument_group.add_argument(
+                '-m',
+                '--mode',
+                dest='mode',
+                metavar='',
+                required=required,
+                type=str,
+                choices = ['direct_mapping','robust'],
+                action='store',
+                default=default,
+                help=help_)
     elif dest == 'read_file1':
         if help_ is None:
             help_ = ('Path to (forward) read file. Please note that RAT does not '
@@ -441,6 +457,17 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 type=str,
                 action=PathAction,
                 help=help_)
+    elif dest == 'unmapped2classification':
+        if help_ is None:
+            help_ = ('Path to bin2classification file.')
+        argument_group.add_argument(
+                '--u2c',
+                dest='unmapped2classification',
+                metavar='',
+                required=required,
+                type=str,
+                action=PathAction,
+                help=help_)
     elif dest == 'read2classification':
         if help_ is None:
             help_ = ('Includes read classification step.')
@@ -449,6 +476,18 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 dest='read2classification',
                 required=required,
                 action='store_true',
+                help=help_)
+    elif dest == 'alignment_unmapped':
+        if help_ is None:
+            help_ = ('Path to alignment file of reads and contigs that could'
+                     'not be classified by CAT/BAT.')
+        argument_group.add_argument(
+                '--alignment_unmapped',
+                dest='alignment_unmapped',
+                metavar='',
+                required=required,
+                type=str,
+                action=PathAction,
                 help=help_)
     elif dest == 'nproc':
         if help_ is None:
@@ -753,7 +792,7 @@ def run_prodigal(
     return
     
     
-def run_diamond(args):
+def run_diamond(args, blast='blastp', prot_fasta='', top=0):
     if args.sensitive:
         mode = 'sensitive'
     else:
@@ -763,7 +802,12 @@ def run_diamond(args):
         compression = '1'
     else:
         compression = '0'
-
+    
+    if not prot_fasta:
+        prot_fasta=args.proteins_fasta
+    if not top:
+        top=args.top
+        
     message = (
             'Homology search with DIAMOND is starting. Please be patient. Do '
             'not forget to cite DIAMOND when using CAT or BAT in your '
@@ -777,26 +821,29 @@ def run_diamond(args):
             '\t\t\tblock-size (billions of letters): {6}\n'
             '\t\t\tindex-chunks: {7}\n'
             '\t\t\ttmpdir: {8}\n'
-            '\t\t\tcompress: {9}'.format(
-                args.proteins_fasta,
+            '\t\t\tcompress: {9}\n'
+            '\t\t\tblast flavour: {10}'.format(
+                prot_fasta,
                 args.diamond_database,
                 mode,
-                args.top,
+                top,
                 args.no_self_hits,
                 args.nproc,
                 args.block_size,
                 args.index_chunks,
                 args.tmpdir,
-                compression))
+                compression,
+                blast))
     give_user_feedback(message, args.log_file, args.quiet)
 
     try:
+        
         command = [
                 args.path_to_diamond,
-                'blastp',
+                blast,
                 '-d', args.diamond_database,
-                '-q', args.proteins_fasta,
-                '--top', str(args.top),
+                '-q', prot_fasta,
+                '--top', str(top),
                 '--matrix', 'BLOSUM62',
                 '--evalue', '0.001',
                 '-o', args.alignment_file,
@@ -805,7 +852,8 @@ def run_diamond(args):
                 '--index-chunks', str(args.index_chunks),
                 '--tmpdir', args.tmpdir,
                 '--compress', compression]
-
+        print(' '.join([str(i) for i in command]))
+        
         if not args.verbose:
             command += ['--quiet']
 
@@ -814,7 +862,8 @@ def run_diamond(args):
 
         if args.no_self_hits:
             command += ['--no-self-hits']
-
+        
+        
         subprocess.check_call(command)
     except:
         message = 'DIAMOND finished abnormally.'
@@ -937,14 +986,20 @@ def run_bwa_mem(
 
     try:
         # Run bwa index
-        message = 'Indexing contigs fasta...'
-        give_user_feedback(message, log_file, error=False)
-
-        command =[
-                path_to_bwa, 'index',
-                contigs_fasta
-                ]
-        subprocess.check_call(command)
+        
+        if check_index(contigs_fasta):
+            message = 'Contigs fasta is already indexed.'
+            give_user_feedback(message, log_file, error=False)
+        
+        else:
+            message = 'Indexing contigs fasta...'
+            give_user_feedback(message, log_file, error=False)
+    
+            command =[
+                    path_to_bwa, 'index',
+                    contigs_fasta
+                    ]
+            subprocess.check_call(command)
 
         try:
             # Run bwa mem
@@ -1026,7 +1081,12 @@ def run_bwa_mem(
     return
 
 
-
+def check_index(path_to_fasta):
+    indexed=True
+    for suffix in ['.amb', '.ann', '.bwt', '.pac', '.sa']:
+        if not os.path.exists('{0}{1}'.format(path_to_fasta, suffix)):
+            indexed=False
+    return indexed
 
 
 
