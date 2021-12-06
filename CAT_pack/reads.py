@@ -446,7 +446,8 @@ def run():
                                   args.nodes_dmp, 
                                   args.log_file, 
                                   args.quiet)
-            
+    else:
+        u2c=None
             
     message = 'Writing output tables.'
     shared.give_user_feedback(message, args.log_file, args.quiet,
