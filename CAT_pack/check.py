@@ -13,20 +13,14 @@ def check_md5_gz(gz_file, md5_file, log_file, quiet):
     shared.give_user_feedback(message, log_file, quiet)
 
     with open(md5_file, 'r') as f:
-        md5_exp = f.read().split(' ')[0]
+        md5_exp = f.read().strip().split(' ')[0]
 
     if md5_exp == '':
         message = ('WARNING: no MD5 found in {0}. Integrity of {1} can not be '
                 'established.'.format(md5_file, gz_file))
         shared.give_user_feedback(message, log_file, quiet)
     else:
-        md5 = hashlib.md5()
-
-        block_size = 4096
-        with open(gz_file, 'rb') as f:
-            for chunk in iter(lambda: f.read(block_size), b''):
-                md5.update(chunk)
-        md5 = md5.hexdigest()
+        md5 = gz_md5(gz_file)
 
         if md5 != md5_exp:
             message = 'MD5 of {0} does not check out.'.format(gz_file)
@@ -38,6 +32,16 @@ def check_md5_gz(gz_file, md5_file, log_file, quiet):
             shared.give_user_feedback(message, log_file, quiet)
 
     return
+
+def gz_md5(input_gz, block_size=4096):
+    message = "Calculating md5sum for file {}".format(input_gz)
+    shared.give_user_feedback(message)
+    md5 = hashlib.md5()
+    with open(input_gz, 'rb') as f:
+        for chunk in iter(lambda: f.read(block_size), b''):
+            md5.update(chunk)
+
+    return md5.hexdigest()
 
 
 def check_memory(Gb):

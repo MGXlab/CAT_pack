@@ -6,6 +6,7 @@ import about
 import add_names
 import bins
 import contigs
+import download
 import prepare
 import single_bin
 import summarise
@@ -14,7 +15,7 @@ import summarise
 def usage():
     message = (
             'usage: CAT (prepare | contigs | bin | bins | add_names | '
-            'summarise) [-v / --version] [-h / --help]\n'
+            'summarise | download) [-v / --version] [-h / --help]\n'
             'CAT: error: one of the arguments prepare contigs bin bins '
             'add_names summarise is required')
     
@@ -34,21 +35,22 @@ def version():
     
 def help():
     message = (
-            'usage: CAT (prepare | contigs | bin | bins | add_names | '
-            'summarise) [-v / --version] [-h / --help]\n\n'
-            'Run Contig Annotation Tool (CAT) or '
-            'Bin Annotation Tool (BAT).\n\n'
-            'Required choice:\n'
-            '  prepare\t\tConstruct database files.\n'
-            '  contigs\t\tRun CAT.\n'
-            '  bin\t\t\tRun BAT on a single bin.\n'
-            '  bins\t\t\tRun BAT on a set of bins.\n'
-            '  add_names\t\tAdd taxonomic names to CAT or BAT output files.\n'
-            '  summarise\t\tSummarise a named CAT or BAT classification file.'
-            '\n\n'
-            'Optional arguments:\n'
-            '  -v, --version\t\tPrint version information and exit.\n'
-            '  -h, --help\t\tShow this help message and exit.')
+        'usage: CAT (prepare | contigs | bin | bins | add_names | '
+        'summarise) [-v / --version] [-h / --help]\n\n'
+        'Run Contig Annotation Tool (CAT) or '
+        'Bin Annotation Tool (BAT).\n\n'
+        'Required choice:\n'
+        '  prepare\t\tConstruct database files.\n'
+        '  contigs\t\tRun CAT.\n'
+        '  bin\t\t\tRun BAT on a single bin.\n'
+        '  bins\t\t\tRun BAT on a set of bins.\n'
+        '  add_names\t\tAdd taxonomic names to CAT or BAT output files.\n'
+        '  summarise\t\tSummarise a named CAT or BAT classification file.\n'
+        '  download\t\tDownload and preprocess data from nr or GTDB'
+        '\n\n'
+        'Optional arguments:\n'
+        '  -v, --version\t\tPrint version information and exit.\n'
+        '  -h, --help\t\tShow this help message and exit.')
 
     sys.stdout.write('{0}\n'.format(message))
 
@@ -58,6 +60,8 @@ def help():
 def main():
     if len(sys.argv) == 1:
         usage()
+    elif sys.argv[1] == 'download':
+        download.run()
     elif sys.argv[1] == 'prepare':
         prepare.run()
     elif sys.argv[1] == 'contigs':

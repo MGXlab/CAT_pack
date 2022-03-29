@@ -155,6 +155,58 @@ For all command line options available see
 $ CAT prepare -h
 ```
 
+### Downloading raw data for nr and GTDB
+
+The `download` module can be used to download and process raw data, in preparation for building a new CAT database.
+This will ensure that all input dependencies are met and correctly formatted for `CAT prepare`.
+
+Currently, two databases are supported, NCBI's nr and GTDB proteins.
+
+* NCBI non-redundant protein database ( aka `nr`)
+
+Command:
+
+```
+$ CAT download -db nr -o path/to/nr_data_dir
+```
+
+Download the fasta file with the protein sequences, their mapping to a taxid and the taxonomy information from the NCBI's ftp site.
+
+* [Genome Taxonomy Database](https://gtdb.ecogenomic.org/) proteins
+
+Command:
+
+```
+$ CAT download -db gtdb -o path/to/gtdb_data_dir
+```
+
+The files required to build a CAT database are provided by the [GTDB downloads page](https://gtdb.ecogenomic.org/downloads).
+
+`CAT download` fetches the necessary files and does some additional processing to get them ready for `CAT prepare`:
+
+  - The taxonomy information, provided for each genome from GTDB, is transformed into the NCBI style `nodes.dmp` and `names.dmp`.
+The species level annotation from GTDB is used as the unique taxid identifier.
+For example, all proteins coming from a representative genome for species `Escherichia coli` are assigned a taxid of `s__Escherichia coli`.
+All proteins from that genome get its taxid.
+  - Fasta files containing protein sequences are extracted from the provided `gtdb_proteins_aa_reps.tar.gz` and are subjected to a round of deduplication.
+This is to reduce the redundancy in the DIAMOND database to be created, thus simplifying the alignment process.
+Exact duplicate sequences are identified based on a combination of the MD5 sum of the protein sequences and their length.
+Only one representative sequence is kept, with information on the rest of the accessions identified as duplicates encoded in the fasta header.
+This information is later used by `CAT prepare` to assign the LCA of the protein sequence appropriately in the `.fastaid2LCAtaxid` file.
+  - The mapping of **all** protein sequences (duplicates or not) to their respective taxonomy is created.
+This is also used by `CAT prepare` for proper LCA identification.
+  - In addition, the newick formatted trees for Bacteria and Archaea are downloaded and - artificially - concatenated under a single `root` node, to produce an `all.tree` file.
+This can come in handy for downstream analyses tools that require a phylogeny to be present to calculate diversity indices based on some metric that takes that information into account.
+This is **not** required for `CAT`.
+
+When the download and processing of the files is finished successfully you can build a CAT database with `CAT prepare`.
+
+For all command line options available see
+
+```
+$ CAT download -h
+```
+
 ### Running CAT and BAT.
 The taxonomy folder and database folder created by CAT prepare are needed in subsequent CAT and BAT runs. They only need to be generated/downloaded once or whenever you want to update the database.
 

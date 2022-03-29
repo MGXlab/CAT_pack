@@ -177,6 +177,16 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
             default=default,
             help=help_,
         )
+    elif dest == "cleanup":
+        if help_ is None:
+            help_ = "Remove unnecessary files after all data have been processed."
+        argument_group.add_argument(
+            "--cleanup",
+            dest="cleanup",
+            required=required,
+            action="store_true",
+            help=help_
+        )
     elif dest == "bin_suffix":
         if help_ is None:
             help_ = "Suffix of bins in bin folder (default: {0})." "".format(
@@ -237,6 +247,31 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
             action=PathAction,
             default=default,
             help=help_,
+        )
+    elif dest == "db":
+        if help_ is None:
+            help_ = "One of 'nr' or 'gtdb'"
+        argument_group.add_argument(
+            "-db",
+            dest="db",
+            metavar="",
+            required=required,
+            type=str,
+            choices=["nr", "gtdb"],
+            default=None,
+            help=help_
+        )
+    elif dest == "output_dir":
+        if help_ is None:
+            help_ = "Directory where to store data"
+        argument_group.add_argument(
+            "-o",
+            "--output_dir",
+            dest="output_dir",
+            metavar="",
+            required=required,
+            type=lambda p: pathlib.Path(p).resolve(),
+            help=help_
         )
     elif dest == "proteins_fasta":
         if help_ is None:
@@ -1012,6 +1047,8 @@ def parse_tabular_alignment(alignment_file, one_minus_r, log_file, quiet):
 
 def is_gz(file_path):
     """Check if given file_paht is gzipped based on suffix"""
+    if isinstance(file_path, pathlib.Path):
+        file_path = file_path.name
     return file_path.endswith(".gz") or file_path.endswith(".z")
 
 
