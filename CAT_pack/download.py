@@ -516,11 +516,11 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
     # Using `latest` as an entry point
     # This needs to be checked for future versions
     gtdb_urls = [
-        "https://data.gtdb.ecogenomic.org/releases/latest/ar122_taxonomy.tsv.gz",
+        "https://data.gtdb.ecogenomic.org/releases/latest/ar53_taxonomy.tsv.gz",
         "https://data.gtdb.ecogenomic.org/releases/latest/bac120_taxonomy.tsv.gz",
         "https://data.gtdb.ecogenomic.org/releases/latest/MD5SUM",
         "https://data.gtdb.ecogenomic.org/releases/latest/bac120.tree",
-        "https://data.gtdb.ecogenomic.org/releases/latest/ar122.tree",
+        "https://data.gtdb.ecogenomic.org/releases/latest/ar53.tree",
         "https://data.gtdb.ecogenomic.org/releases/latest/genomic_files_reps/gtdb_proteins_aa_reps.tar.gz",
     ]
 
