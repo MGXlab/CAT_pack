@@ -206,6 +206,30 @@ def load_gtdb_md5sums(md5sums_file):
             fields = [f.strip() for f in line.split()]
             fname = pathlib.Path(fields[1]).name
             md5_dict[fname] = fields[0]
+
+        # at the time of GTDB release v207, and looking at earlier versions,
+        # the filenames in the "latest" section (https://data.gtdb.ecogenomic.org/releases/latest/)
+        # look like this: "bac120_taxonomy.tsv.gz", but the names
+        # in the MD5SUM file from the same location look like 
+        # this: "bac120_taxonomy_r207.tsv.gz"
+        # So, here doing an ad hoc check and removing
+            # getting listed version
+            # seeing if that's in the file name as _r<version>
+            # and removing that string from our dict keys if so
+
+        # getting version
+        gtdb_version = get_gtdb_latest_version()
+        version_string = f"_r{gtdb_version}"
+
+        for key in md5_dict:
+
+            if version_string in key:
+
+                # removing version string
+                new_name = key.replace(version_string, "")
+
+                md5_dict[new_name] = md5_dict.pop(key)
+
     return md5_dict
 
 
@@ -530,6 +554,7 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
     # Check files
     md5sums_file = output_dir / pathlib.Path("MD5SUM")
     md5sums_dict = load_gtdb_md5sums(md5sums_file)
+
     check_gtdb_md5s(output_dir, md5sums_dict, log_file, quiet)
 
     # Concatenate taxonomies
