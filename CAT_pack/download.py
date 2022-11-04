@@ -156,8 +156,8 @@ def process_nr(output_dir, log_file, quiet, prefix, cleanup):
         "--db_fasta {} \\\n"
         "--names {} \\\n"
         "--nodes {} \\\n"
-        "--acc2taxid {} \\\n"
-        "-o path/to/prepare_output\n".format(
+        "--acc2tax {} \\\n"
+        "--db_dir path/to/prepare_output\n".format(
             nr_gz.resolve(),
             names_dmp.resolve(),
             nodes_dmp.resolve(),
@@ -672,8 +672,8 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
         "--db_fasta {} \\\n"
         "--names {} \\\n"
         "--nodes {} \\\n"
-        "--acc2taxid {} \\\n"
-        "-o path/to/prepare_output\n".format(
+        "--acc2tax {} \\\n"
+        "--db_dir path/to/prepare_output\n".format(
             all_seqs_fp.resolve(),
             names_dmp.resolve(),
             nodes_dmp.resolve(),
