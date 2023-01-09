@@ -7,7 +7,7 @@ import add_names
 import bins
 import contigs
 import reads
-import prepare
+import prepare_nt
 import single_bin
 import summarise
 
@@ -62,7 +62,7 @@ def main():
     if len(sys.argv) == 1:
         usage()
     elif sys.argv[1] == 'prepare':
-        prepare.run()
+        prepare_nt.run()
     elif sys.argv[1] == 'contigs':
         contigs.run()
     elif sys.argv[1] == 'bin':

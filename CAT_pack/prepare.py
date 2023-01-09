@@ -437,7 +437,7 @@ def prepare(step_list, args):
     if 'download_prot_accession2taxid_file' in step_list:
         setattr(args,
                 'prot_accession2taxid_file',
-                '{0}{1}.prot.accession2taxid.FULL.gz'.format(
+                '{0}{1}.nucl_gb.accession2taxid.gz'.format(
                     args.taxonomy_folder, args.date))
 
         download_prot_accession2taxid_file(

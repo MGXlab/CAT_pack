@@ -129,10 +129,10 @@ def find_LCA_for_ORF(hits, fastaid2LCAtaxid, taxid2parent):
 def find_questionable_taxids(lineage, taxids_with_multiple_offspring):
     questionable_taxids = []
 
-    if lineage == ['1']:
+    if lineage == ['1'] or lineage==['root']:
         return questionable_taxids
     
-    if len(lineage) == 2 and lineage[1:] == ['1']:
+    if len(lineage) == 2 and (lineage[1:] == ['1'] or lineage[1:]==['root']):
         return questionable_taxids 
     
     for (i, taxid) in enumerate(lineage):

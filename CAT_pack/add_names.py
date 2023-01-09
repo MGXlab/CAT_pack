@@ -78,14 +78,14 @@ def run():
 
     with open(args.input_file, 'r') as f1:
         for line in f1:
-            if line.startswith('#'):
+            if line.startswith('#') and not line.startswith('##'):
                 line = line[2:].rstrip().split('\t')
 
                 if 'lineage' in line:
                     lineage_index = line.index('lineage')
                 else:
                     message = ('{0} is not a supported classification file.'
-                            ''.format(input_file))
+                            ''.format(args.input_file))
                     shared.give_user_feedback(
                             message, args.log_file, args.quiet, error=True)
 
@@ -93,6 +93,8 @@ def run():
                     
                 try:
                     scores_index = line.index('lineage scores')
+                    print('lineage index is {}\n\n\n\n\n\n'.format(lineage_index))
+
                 except:
                     scores_index = None
 
@@ -102,7 +104,7 @@ def run():
         else:
             message = ('{0} is not a supported classification file.'.format(
                 args.input_file))
-            shared.give_user_feedback(message, log_file, quiet, error=True)
+            shared.give_user_feedback(message, args.log_file, args.quiet, error=True)
 
             sys.exit(1)
             

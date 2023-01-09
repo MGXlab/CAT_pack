@@ -124,10 +124,12 @@ def parse_arguments():
 def run():
     args = parse_arguments()
 
-    message = '# CAT v{0}.'.format(about.__version__)
+    message = '# CAT v{0}.\n'.format(about.__version__)
     shared.give_user_feedback(message, args.log_file, args.quiet,
         show_time=False)
-
+    message = '# Running command: {0}\n\n'.format(' '.join(sys.argv[1:]))
+    shared.give_user_feedback(message, args.log_file, args.quiet,
+        show_time=False)
     
     # Checks
     
