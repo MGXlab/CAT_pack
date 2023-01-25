@@ -7,7 +7,7 @@ import add_names
 import bins
 import contigs
 import reads
-import prepare_nt
+import prepare
 import single_bin
 import summarise
 
