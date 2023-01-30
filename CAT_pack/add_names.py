@@ -35,7 +35,7 @@ def parse_arguments():
     extra_args = [arg for (i, arg) in enumerate(extra_args) if
                   (i, arg) != (0, 'add_names')]
     if len(extra_args) > 0:
-        sys.exit('error: too much arguments supplied:\n{0}'.format(
+        sys.exit('error: too many arguments supplied:\n{0}'.format(
             '\n'.join(extra_args)))
 
     # Add extra arguments.
