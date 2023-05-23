@@ -252,7 +252,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
         if help_ is None:
             help_ = "Either 'nr' or 'gtdb'."
         argument_group.add_argument(
-            "-db",
+            "--db",
             dest="db",
             metavar="",
             required=required,
