@@ -65,11 +65,12 @@ def parse_arguments():
         
     # Check experimental features.
     if not args.IkwId:
-        if args.top < 50:
-            sys.exit("error: --top can only be set lower than 50 in "
-                    "combination with the --I_know_what_Im_doing flag. See "
-                    "README.md as to why this is the case.")
-
+        if args.r > 15 and args.alignment_file:
+            sys.exit("error: [-r / --range] can only be set higher than 15 in "
+                    "combination with [-a / --diamond_alignment] with the "
+                    "[--I_know_what_Im_doing] flag. See README.md as to why "
+                    "this is the case.")
+            
     # Add extra arguments.
     shared.expand_arguments(args)
             
