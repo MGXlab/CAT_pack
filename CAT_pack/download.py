@@ -347,20 +347,20 @@ def fastaIterator(fasta_in, gid2taxid):
 
 
     Positional argunents:
-      fasta_in: pathlib.Path object: Path to the fasta
+      fasta_in: pathlib.Path object: Path to the fasta.
       gid2taxid: dict: A dictionart with taxid for a genome accession of the
-        form {"RS_CCF_XXXXX" : "s__Escherichia coli", ...}
+        form {"RS_CCF_XXXXX" : "s__Escherichia coli", ...}.
 
     Return:
-      None, if the file is not a valid fasta. Breaks the iteration
+      None, if the file is not a valid fasta. Breaks the iteration.
 
     Yields fastaRecord objects which are named tuples holding the following
     information:
-      - id: str: Unique id of the fasta header, anything between the ">" and the
-        first space
+      - id: str: Unique id of the fasta header, anything between the ">" and
+        the first space.
       - seq: str: The sequence, capitalized and with trailing "*" stripped off
-      - uid: str: Unique id, "_" joined md5sum and length
-      - taxid: str: GTDB taxonomy that was assigned to the genome
+      - uid: str: Unique id, "_" joined md5sum and length.
+      - taxid: str: GTDB taxonomy that was assigned to the genome.
     """
     origin = fasta_in.name.replace("_protein.faa", "")
     taxid = gid2taxid[origin]
