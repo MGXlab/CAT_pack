@@ -12,8 +12,8 @@ def check_md5_gz(gz_file, md5_file, log_file, quiet):
     message = "Checking file integrity via MD5 checksum."
     shared.give_user_feedback(message, log_file, quiet)
 
-    with open(md5_file, "r") as f:
-        md5_exp = f.read().strip().split(" ")[0]
+    with open(md5_file, "r") as f1:
+        md5_exp = f1.read().strip().split(" ")[0]
 
     if md5_exp == "":
         message = ("WARNING: no MD5 found in {0}. Integrity of {1} can not be "
@@ -37,8 +37,8 @@ def gz_md5(input_gz, block_size=4096):
     message = "Calculating md5sum for file {}".format(input_gz)
     shared.give_user_feedback(message)
     md5 = hashlib.md5()
-    with open(input_gz, "rb") as f:
-        for chunk in iter(lambda: f.read(block_size), b""):
+    with open(input_gz, "rb") as f1:
+        for chunk in iter(lambda: f1.read(block_size), b""):
             md5.update(chunk)
 
     return md5.hexdigest()
@@ -51,8 +51,8 @@ def check_memory(Gb):
     if sys.platform == "linux" or sys.platform == "linux2":
         # It"s a Linux!
         meminfo_file = "/proc/meminfo"
-        with open(meminfo_file, "r") as f:
-            for line in f:
+        with open(meminfo_file, "r") as f1:
+            for line in f1:
                 if line.startswith("MemTotal:"):
                     mem = int(line.split(" ")[-2])
 
