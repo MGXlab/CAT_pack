@@ -1077,4 +1077,4 @@ def optionally_compressed_handle(file_path, mode):
 
 
 if __name__ == "__main__":
-    sys.exit("Run 'CAT' to run CAT or BAT.")
+    sys.exit("Run \'CAT\' to run CAT or BAT.")
