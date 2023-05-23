@@ -507,11 +507,11 @@ def concatenate_trees(bac_tree_fp, ar_tree_fp, all_tree_fp):
     # Load the bacteria tree as a string and make it a subtree
     bac_tree = bac_tree_fp.read_text()
     bac_tree = bac_tree.rstrip().replace(
-        "d__Bacteria;", ""100.0:d__Bacteria":1.0"
+        "d__Bacteria;", "'100.0:d__Bacteria':1.0"
     )
     # Load the Archaea tree as a string and make it a subtree
     ar_tree = ar_tree_fp.read_text()
-    ar_tree = ar_tree.rstrip().replace("d__Archaea;", ""100.0:d__Archaea":1.0")
+    ar_tree = ar_tree.rstrip().replace("d__Archaea;", "'100.0:d__Archaea':1.0")
     # Concatenate the subtrees under a node named root
     all_tree = "({},{})root;\n".format(ar_tree, bac_tree)
     # Write the file
