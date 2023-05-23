@@ -510,5 +510,5 @@ def run():
 
 
 if __name__ == "__main__":
-    sys.exit("Run \"CAT bins\" to run Bin Annotation Tool (BAT) on a "
+    sys.exit("Run \'CAT bins\' to run Bin Annotation Tool (BAT) on a "
              "set of bins.")
