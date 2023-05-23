@@ -263,7 +263,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
         )
     elif dest == "output_dir":
         if help_ is None:
-            help_ = "Directory where to store data"
+            help_ = "Path to folder where data will be stored."
         argument_group.add_argument(
             "-o",
             "--output_dir",
