@@ -14,45 +14,45 @@ import summarise
 
 def usage():
     message = (
-            'usage: CAT (download | prepare | contigs | bin | bins | '
-            'add_names | summarise) [-v / --version] [-h / --help]\n'
-            'CAT: error: one of the arguments download prepare contigs 
-            'bin bins add_names summarise is required')
+            "usage: CAT (download | prepare | contigs | bin | bins | "
+            "add_names | summarise) [-v / --version] [-h / --help]\n"
+            "CAT: error: one of the arguments download prepare contigs 
+            "bin bins add_names summarise is required")
     
-    sys.stdout.write('{0}\n'.format(message))
+    sys.stdout.write("{0}\n".format(message))
 
     return
     
     
 def version():
-    message = ('CAT v{0} ({1}) by {2}.'.format(
+    message = ("CAT v{0} ({1}) by {2}.".format(
         about.__version__, about.__date__, about.__author__))
 
-    sys.stdout.write('{0}\n'.format(message))
+    sys.stdout.write("{0}\n".format(message))
 
     return
     
     
 def help():
     message = (
-        'usage: CAT (prepare | contigs | bin | bins | add_names | '
-        'summarise) [-v / --version] [-h / --help]\n\n'
-        'Run Contig Annotation Tool (CAT) or '
-        'Bin Annotation Tool (BAT).\n\n'
-        'Required choice:\n'
-        '  download\t\tDownload and preprocess data from NCBI nr or GTDB.\n'
-        '  prepare\t\tConstruct database files.\n'
-        '  contigs\t\tRun CAT.\n'
-        '  bin\t\t\tRun BAT on a single bin.\n'
-        '  bins\t\t\tRun BAT on a set of bins.\n'
-        '  add_names\t\tAdd taxonomic names to CAT or BAT output files.\n'
-        '  summarise\t\tSummarise a named CAT or BAT classification file.'
-        '\n\n'
-        'Optional arguments:\n'
-        '  -v, --version\t\tPrint version information and exit.\n'
-        '  -h, --help\t\tShow this help message and exit.')
+        "usage: CAT (prepare | contigs | bin | bins | add_names | "
+        "summarise) [-v / --version] [-h / --help]\n\n"
+        "Run Contig Annotation Tool (CAT) or "
+        "Bin Annotation Tool (BAT).\n\n"
+        "Required choice:\n"
+        "  download\t\tDownload and preprocess data from NCBI nr or GTDB.\n"
+        "  prepare\t\tConstruct database files.\n"
+        "  contigs\t\tRun CAT.\n"
+        "  bin\t\t\tRun BAT on a single bin.\n"
+        "  bins\t\t\tRun BAT on a set of bins.\n"
+        "  add_names\t\tAdd taxonomic names to CAT or BAT output files.\n"
+        "  summarise\t\tSummarise a named CAT or BAT classification file."
+        "\n\n"
+        "Optional arguments:\n"
+        "  -v, --version\t\tPrint version information and exit.\n"
+        "  -h, --help\t\tShow this help message and exit.")
 
-    sys.stdout.write('{0}\n'.format(message))
+    sys.stdout.write("{0}\n".format(message))
 
     return
 
@@ -60,23 +60,23 @@ def help():
 def main():
     if len(sys.argv) == 1:
         usage()
-    elif sys.argv[1] == 'download':
+    elif sys.argv[1] == "download":
         download.run()
-    elif sys.argv[1] == 'prepare':
+    elif sys.argv[1] == "prepare":
         prepare.run()
-    elif sys.argv[1] == 'contigs':
+    elif sys.argv[1] == "contigs":
         contigs.run()
-    elif sys.argv[1] == 'bin':
+    elif sys.argv[1] == "bin":
         single_bin.run()
-    elif sys.argv[1] == 'bins':
+    elif sys.argv[1] == "bins":
         bins.run()
-    elif sys.argv[1] == 'add_names':
+    elif sys.argv[1] == "add_names":
         add_names.run()
-    elif sys.argv[1] == 'summarise':
+    elif sys.argv[1] == "summarise":
         summarise.run()
-    elif sys.argv[1] == '-v' or sys.argv[1] == '--version':
+    elif sys.argv[1] == "-v" or sys.argv[1] == "--version":
         version()
-    elif sys.argv[1] == '-h' or sys.argv[1] == '--help':
+    elif sys.argv[1] == "-h" or sys.argv[1] == "--help":
         help()
     else:
         usage()
@@ -84,5 +84,5 @@ def main():
     return
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
