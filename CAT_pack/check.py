@@ -294,14 +294,7 @@ def check_in_and_output_file(input_file, output_file, log_file, quiet):
 
 def check_top(top, r, log_file, quiet):
     error = False
-
-    if top < 50:
-        message = (
-                "WARNING: [--top] is set lower than 50. This might conflict "
-                "with future runs with higher settings of the "
-                "[-r / --range] parameter, see README.md.")
-        shared.give_user_feedback(message, log_file, quiet)
-        
+    
     if top <= r:
         message = "[--top] should be higher than [-r / --range]."
         shared.give_user_feedback(message, log_file, quiet, error=True)
