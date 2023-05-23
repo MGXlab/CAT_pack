@@ -620,7 +620,7 @@ def expand_arguments(args):
 
             log_file = "{0}.log".format(args.out_prefix)
 
-            with open(log_file, "w") as outf:
+            with open(log_file, "w") as outf1:
                 pass
     else:
         log_file = None
