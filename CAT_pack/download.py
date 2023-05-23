@@ -23,7 +23,8 @@ def parse_arguments():
             "Currently supports the NCBI non-redundant (nr) database "
             "and GTDB."
         ),
-        usage="CAT download --db (nr|gtdb) -o output_dir [options] [-h / --help]",
+        usage=("CAT download --db (nr|gtdb) -o output_dir "
+            "[options] [-h / --help]"),
         add_help=False,
     )
 
@@ -170,9 +171,9 @@ def process_nr(output_dir, log_file, quiet, prefix, cleanup):
     )
     shared.give_user_feedback(message, log_file, quiet, show_time=False)
 
-# GTDB
+# GTDB.
 
-## GENERAL
+## GENERAL.
 prefixes_to_rank_names = {
     "d__": "superkingdom",  # Using superkingdom for compatibility with NCBI.
     "p__": "phylum",
@@ -188,7 +189,7 @@ fastaRecord = namedtuple(
     ["id", "seq", "uid", "taxid"],
 )
 
-## FUNCTIONS
+## FUNCTIONS.
 def get_gtdb_latest_version():
     """Read the version number from the VERSION file."""
     version_url = "https://data.gtdb.ecogenomic.org/releases/latest/VERSION.txt"
@@ -196,7 +197,7 @@ def get_gtdb_latest_version():
     with urllib.request.urlopen(version_url) as f:
         version_data = f.read().decode()
 
-    version = "{0} ({1})".format(version_data.split("\n")[0], version_data.split("\n")[1])
+    version = "{0} ({1})".format(*version_data.split("\n"))
 
     return version
 
