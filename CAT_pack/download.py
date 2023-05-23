@@ -672,8 +672,8 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
 def run():
     args = parse_arguments()
     
-    if not output_dir.exists():
-        output_dir.mkdir(parents=True)
+    if not args.output_dir.exists():
+        args.output_dir.mkdir(parents=True)
         
     if args.no_log:
         log_file = None
