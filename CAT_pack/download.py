@@ -196,7 +196,7 @@ def get_gtdb_latest_version():
     with urllib.request.urlopen(version_url) as f:
         version_data = f.read().decode()
 
-    version = version_data.split("\n")[0].lstrip("v")
+    version = "{0} ({1})".format(version_data.split("\n")[0], version_data.split("\n")[1])
 
     return version
 
@@ -513,7 +513,7 @@ def concatenate_trees(bac_tree_fp, ar_tree_fp, all_tree_fp):
     ar_tree = ar_tree_fp.read_text()
     ar_tree = ar_tree.rstrip().replace("d__Archaea;", "'100.0:d__Archaea':1.0")
     # Concatenate the subtrees under a node named root
-    all_tree = "({},{})root;\n".format(ar_tree, bac_tree)
+    all_tree = "({0},{1})root;\n".format(ar_tree, bac_tree)
     # Write the file
     all_tree_fp.write_text(all_tree)
     
@@ -523,7 +523,13 @@ def concatenate_trees(bac_tree_fp, ar_tree_fp, all_tree_fp):
 def process_gtdb(output_dir, log_file, quiet, cleanup=False):
     # Using `latest` as an entry point.
     # This needs to be checked for future versions.
+    version = get_gtdb_latest_version()
+    
+    message = "Downloading GTDB {0}.".format(version)
+    shared.give_user_feedback(message, log_file, quiet)
+    
     gtdb_urls = [
+        "https://data.gtdb.ecogenomic.org/releases/latest/VERSION.txt",
         "https://data.gtdb.ecogenomic.org/releases/latest/ar53_taxonomy.tsv.gz",
         "https://data.gtdb.ecogenomic.org/releases/latest/bac120_taxonomy.tsv.gz",
         "https://data.gtdb.ecogenomic.org/releases/latest/MD5SUM.txt",
