@@ -469,4 +469,4 @@ def run():
 
 
 if __name__ == "__main__":
-    sys.exit("Run "CAT prepare" to construct a CAT/BAT database.")
+    sys.exit("Run \'CAT prepare\' to construct a CAT/BAT database.")
