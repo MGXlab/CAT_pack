@@ -16,7 +16,7 @@ def usage():
     message = (
             "usage: CAT (download | prepare | contigs | bin | bins | "
             "add_names | summarise) [-v / --version] [-h / --help]\n"
-            "CAT: error: one of the arguments download prepare contigs 
+            "CAT: error: one of the arguments download prepare contigs "
             "bin bins add_names summarise is required")
     
     sys.stdout.write("{0}\n".format(message))
