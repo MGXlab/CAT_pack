@@ -14,10 +14,10 @@ import summarise
 
 def usage():
     message = (
-            'usage: CAT (prepare | contigs | bin | bins | add_names | '
-            'summarise | download) [-v / --version] [-h / --help]\n'
-            'CAT: error: one of the arguments prepare contigs bin bins '
-            'add_names summarise is required')
+            'usage: CAT (download | prepare | contigs | bin | bins | '
+            'add_names | summarise) [-v / --version] [-h / --help]\n'
+            'CAT: error: one of the arguments download prepare contigs 
+            'bin bins add_names summarise is required')
     
     sys.stdout.write('{0}\n'.format(message))
 
@@ -40,13 +40,13 @@ def help():
         'Run Contig Annotation Tool (CAT) or '
         'Bin Annotation Tool (BAT).\n\n'
         'Required choice:\n'
+        '  download\t\tDownload and preprocess data from NCBI nr or GTDB.\n'
         '  prepare\t\tConstruct database files.\n'
         '  contigs\t\tRun CAT.\n'
         '  bin\t\t\tRun BAT on a single bin.\n'
         '  bins\t\t\tRun BAT on a set of bins.\n'
         '  add_names\t\tAdd taxonomic names to CAT or BAT output files.\n'
-        '  summarise\t\tSummarise a named CAT or BAT classification file.\n'
-        '  download\t\tDownload and preprocess data from nr or GTDB'
+        '  summarise\t\tSummarise a named CAT or BAT classification file.'
         '\n\n'
         'Optional arguments:\n'
         '  -v, --version\t\tPrint version information and exit.\n'
