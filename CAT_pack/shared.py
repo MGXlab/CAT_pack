@@ -632,7 +632,7 @@ def expand_arguments(args):
         database_folder_path = str(
             pathlib.Path(args.db_dir) / pathlib.Path("db")
         )
-        diamond_database_name = "{}.dmnd".format(args.common_prefix)
+        diamond_database_name = "{0}.dmnd".format(args.common_prefix)
         diamond_database_path = str(
             database_folder_path / pathlib.Path(diamond_database_name)
         )
@@ -640,7 +640,7 @@ def expand_arguments(args):
         taxonomy_folder_path = str(
             pathlib.Path(args.db_dir) / pathlib.Path("tax")
         )
-        fastaid2LCAtaxid_fname = "{}.fastaid2LCAtaxid".format(
+        fastaid2LCAtaxid_fname = "{0}.fastaid2LCAtaxid".format(
             args.common_prefix
         )
         fastaid2LCAtaxid_path = database_folder_path / pathlib.Path(
@@ -649,7 +649,7 @@ def expand_arguments(args):
         fastaid2LCAtaxid_file = str(fastaid2LCAtaxid_path)
 
         taxids_with_multiple_offspring_fname = (
-            "{}.taxids_with_multiple_offspring".format(args.common_prefix)
+            "{0}.taxids_with_multiple_offspring".format(args.common_prefix)
         )
         taxids_with_multiple_offspring_path = (
             database_folder_path
