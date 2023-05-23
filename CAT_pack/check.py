@@ -34,7 +34,7 @@ def check_md5_gz(gz_file, md5_file, log_file, quiet):
     return
 
 def gz_md5(input_gz, block_size=4096):
-    message = "Calculating md5sum for file {}".format(input_gz)
+    message = "Calculating md5sum for file {0}".format(input_gz)
     shared.give_user_feedback(message)
     md5 = hashlib.md5()
     with open(input_gz, "rb") as f1:
