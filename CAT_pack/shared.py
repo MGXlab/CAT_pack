@@ -100,7 +100,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
         )
     elif dest == "db_dir":
         if help_ is None:
-            help_ = "Path to folder where CAT/BAT database files will be created."
+            help_ = ("Path to folder where CAT/BAT database files will be "
+                    "created.")
         argument_group.add_argument(
             "--db_dir",
             dest="db_dir",
@@ -179,7 +180,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
         )
     elif dest == "cleanup":
         if help_ is None:
-            help_ = "Remove unnecessary files after all data have been processed."
+            help_ = ("Remove unnecessary files after all data have been "
+                    "processed.")
         argument_group.add_argument(
             "--cleanup",
             dest="cleanup",
