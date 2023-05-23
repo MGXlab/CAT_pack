@@ -44,7 +44,7 @@ def parse_arguments():
         optional,
         "common_prefix",
         False,
-        default="{}_CAT".format(date),
+        default="{0}_CAT".format(date),
         help_=("Prefix for all files to be created."),
     )
     shared.add_argument(optional, "quiet", False)
@@ -327,7 +327,7 @@ def prepare(step_list, args):
     db_dir = pathlib.Path(args.db_dir).resolve()
     db_dir.mkdir(exist_ok=True)
     if not args.no_log:
-        log_fname = "{}.log".format(args.common_prefix)
+        log_fname = "{0}.log".format(args.common_prefix)
         log_path = db_dir / pathlib.Path(log_fname)
         setattr(args, "log_file", log_path)
 
@@ -339,7 +339,7 @@ def prepare(step_list, args):
     # Check if names and nodes exist together.
     nodes_dmp_fp = tax_db / pathlib.Path("nodes.dmp")
     if not nodes_dmp_fp.exists():
-        message = "Copying nodes.dmp in {}".format(tax_db)
+        message = "Copying nodes.dmp in {0}.".format(tax_db)
         shared.give_user_feedback(
             message, args.log_file, args.quiet, show_time=True
         )
@@ -347,7 +347,7 @@ def prepare(step_list, args):
 
     names_dmp_fp = tax_db / pathlib.Path("names.dmp")
     if not names_dmp_fp.exists():
-        message = "Copying names.dmp in {}".format(tax_db)
+        message = "Copying names.dmp in {0}.".format(tax_db)
         shared.give_user_feedback(
             message, args.log_file, args.quiet, show_time=True
         )
@@ -363,7 +363,7 @@ def prepare(step_list, args):
                 message, args.log_file, args.quiet, show_time=True
             )
     else:
-        message = "Database folder is created at {}.".format(cat_db)
+        message = "Database folder is created at {0}.".format(cat_db)
         shared.give_user_feedback(
             message, args.log_file, args.quiet, show_time=True
         )
@@ -389,7 +389,7 @@ def prepare(step_list, args):
         )
 
     if "make_fastaid2LCAtaxid_file" in step_list:
-        fname = "{}.fastaid2LCAtaxid".format(args.common_prefix)
+        fname = "{0}.fastaid2LCAtaxid".format(args.common_prefix)
         fpath = cat_db / pathlib.Path(fname)
         setattr(args, "fastaid2LCAtaxid_file", fpath)
 
@@ -403,7 +403,7 @@ def prepare(step_list, args):
         )
 
     if "make_taxids_with_multiple_offspring_file" in step_list:
-        fname = "{}.taxids_with_multiple_offspring".format(args.common_prefix)
+        fname = "{0}.taxids_with_multiple_offspring".format(args.common_prefix)
         fpath = cat_db / pathlib.Path(fname)
         setattr(args, "taxids_with_multiple_offspring_file", fpath)
 
