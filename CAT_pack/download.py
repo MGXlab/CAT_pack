@@ -518,7 +518,7 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
     # This needs to be checked for future versions.
     version = get_gtdb_latest_version()
     
-    message = "Downloading files from GTDB {0}.".format(version)
+    message = "CAT will download files from GTDB {0}.".format(version)
     shared.give_user_feedback(message, log_file, quiet)
     
     gtdb_urls = [
