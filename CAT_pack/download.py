@@ -62,7 +62,7 @@ def download_singleton(target_url, local_path, log_file, quiet):
     try:
         urllib.request.urlretrieve(target_url, local_path)
     except:
-        message = "Failed downloading file: {}.".format(target_url)
+        message = "Failed downloading file: {0}.".format(target_url)
         shared.give_user_feedback(message, log_file, quiet)
         raise
         
@@ -80,19 +80,19 @@ def multi_download(url_list, output_dir, log_file, quiet, prefix=None):
     for url in url_list:
         url_leaf = url.split("/")[-1]
         if prefix:
-            output_basename = "{}.{}".format(prefix, url_leaf)
+            output_basename = "{0}.{1}".format(prefix, url_leaf)
         else:
             output_basename = url_leaf
         output_path = output_dir / pathlib.Path(output_basename)
         if output_path in existing_files:
             message = (
-                "Skipping download of file {} . It already exists.".format(
+                "Skipping download of file {0} . It already exists.".format(
                     output_path.name
                 )
             )
             shared.give_user_feedback(message, log_file, quiet)
         else:
-            message = "Downloading {}.".format(url_leaf)
+            message = "Downloading {0}.".format(url_leaf)
             shared.give_user_feedback(message, log_file, quiet)
             download_singleton(url, output_path, log_file, quiet)
 
@@ -125,18 +125,18 @@ def process_nr(output_dir, log_file, quiet, prefix, cleanup):
     check_nr_md5s(output_dir, log_file, quiet)
 
     # Process files.
-    tax_tar = "{}.{}".format(prefix, "taxdump.tar.gz")
+    tax_tar = "{0}.{1}".format(prefix, "taxdump.tar.gz")
     tax_tar_path = output_dir / pathlib.Path(tax_tar)
 
     with tarfile.open(tax_tar_path, "r:gz") as tar:
         for dmp in ["names.dmp", "nodes.dmp"]:
-            message = "Extracting {} from taxdump.tar.gz".format(dmp)
+            message = "Extracting {0} from taxdump.tar.gz".format(dmp)
             shared.give_user_feedback(message, log_file, quiet)
             tar.extract(dmp, path=output_dir)
 
             # Timestamp the extracted dmp file
             outf1 = output_dir / pathlib.Path(dmp)
-            timestamped_fname = "{}.{}".format(prefix, dmp)
+            timestamped_fname = "{0}.{1}".format(prefix, dmp)
             timestamped_outf1 = output_dir / pathlib.Path(timestamped_fname)
             outf1.rename(timestamped_outf1)
 
@@ -157,10 +157,10 @@ def process_nr(output_dir, log_file, quiet, prefix, cleanup):
         "Done!\n"
         "A CAT database can be build with\n\n"
         "CAT prepare \\\n"
-        "--db_fasta {} \\\n"
-        "--names {} \\\n"
-        "--nodes {} \\\n"
-        "--acc2taxid {} \\\n"
+        "--db_fasta {0} \\\n"
+        "--names {1} \\\n"
+        "--nodes {2} \\\n"
+        "--acc2taxid {3} \\\n"
         "-o path/to/prepare_output\n".format(
             nr_gz.resolve(),
             names_dmp.resolve(),
@@ -276,7 +276,7 @@ def write_nodes_dmp(taxonomies_tsv, nodes_dmp):
                 if parent not in seen_taxids:
                     if parent == "root":
                         outf1.write(
-                            "{}{}".format(
+                            "{0}{1}".format(
                                 "\t|\t".join(["root", "root", "no rank"]),
                                 "\t|\n",
                             )
@@ -287,7 +287,7 @@ def write_nodes_dmp(taxonomies_tsv, nodes_dmp):
                 if child not in seen_taxids:
                     seen_taxids.append(child)
                     outf1.write(
-                        "{}{}".format(
+                        "{0}{1}".format(
                             "\t|\t".join(
                                 [
                                     child,
@@ -305,7 +305,7 @@ def write_names_dmp(taxonomies_tsv, names_dmp):
     seen_taxids = []
     with open(taxonomies_tsv, "r") as f1, open(names_dmp, "w") as outf1:
         outf1.write(
-            "{}{}".format(
+            "{0}{1}".format(
                 "\t|\t".join(["root", "root", "scientific name"]), "\t|\n"
             )
         )
@@ -313,7 +313,7 @@ def write_names_dmp(taxonomies_tsv, names_dmp):
             taxid = line.split(";")[-1].strip()
             if taxid not in seen_taxids:
                 outf1.write(
-                    "{}{}".format(
+                    "{0}{1}".format(
                         "\t|\t".join([taxid, taxid, "scientific name"]),
                         "\t|\n",
                     )
@@ -409,7 +409,7 @@ def extract_duplicates(proteins_dir, gid2taxid, acc2taxid_fp, log_file, quiet):
             file_counter += 1
             for record in fastaIterator(f, gid2taxid):
                 # Write an entry.
-                outf1.write("{}\t{}\n".format(record.id, record.taxid))
+                outf1.write("{0}\t{1}\n".format(record.id, record.taxid))
 
                 # Check if duplicate.
                 is_multiplet = False
@@ -441,7 +441,7 @@ def extract_duplicates(proteins_dir, gid2taxid, acc2taxid_fp, log_file, quiet):
                 seq_counter += 1
 
             if file_counter % 1000 == 0 and file_counter != 0:
-                message = "Parsed {} sequences from {} files.".format(
+                message = "Parsed {0} sequences from {1} files.".format(
                     seq_counter, file_counter
                 )
                 shared.give_user_feedback(message, log_file, quiet)
@@ -454,9 +454,9 @@ def extract_duplicates(proteins_dir, gid2taxid, acc2taxid_fp, log_file, quiet):
             redundants = sum(map(len, [v for v in multiplets.values()]))
             message = (
                 "    Total files: {:>12}\n"
-                "{}Total sequences: {:>12}\n"
-                "{}     Multiplets: {:>12}\n"
-                "{}of which unique: {:>12}"
+                "{0}Total sequences: {:>12}\n"
+                "{1}     Multiplets: {:>12}\n"
+                "{2}of which unique: {:>12}"
                 "".format(
                     file_counter,
                     padding,
@@ -481,19 +481,19 @@ def write_singletons(
             file_counter += 1
             for record in fastaIterator(f, gid2taxid):
                 if record.uid not in duplicates:
-                    outf1.write(">{}\n{}\n".format(record.id, record.seq))
+                    outf1.write(">{0}\n{1}\n".format(record.id, record.seq))
                     seq_counter += 1
                 else:
                     skipped += 1
             if file_counter % 1000 == 0 and file_counter != 0:
                 message = (
-                    "Written {} sequences from {} files ({} skipped)".format(
+                    "Written {0} sequences from {1} files ({2} skipped)".format(
                         seq_counter, file_counter, skipped
                     )
                 )
                 shared.give_user_feedback(message, log_file, quiet)
         else:
-            message = "Written {} sequences from {} files ({} skipped)".format(
+            message = "Written {0} sequences from {1} files ({2} skipped)".format(
                 seq_counter, file_counter, skipped
             )
             shared.give_user_feedback(message, log_file, quiet)
@@ -571,7 +571,7 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
         with tarfile.open(proteins_tar, "r:gz") as tar:
             tar.extractall(output_dir)
     else:
-        message = "Proteins directory {} already exists.".format(
+        message = "Proteins directory {0} already exists.".format(
             proteins_dir.resolve()
         )
         shared.give_user_feedback(message, log_file, quiet)
@@ -580,21 +580,21 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
     # NODES.
     nodes_dmp = output_dir / pathlib.Path("nodes.dmp")
     if not nodes_dmp.exists():
-        message = "Writing nodes information to {}.".format(nodes_dmp.resolve())
+        message = "Writing nodes information to {0}.".format(nodes_dmp.resolve())
         shared.give_user_feedback(message, log_file, quiet)
         write_nodes_dmp(all_taxa_tsv, nodes_dmp)
     else:
-        message = "Nodes file found : {}.".format(nodes_dmp.resolve())
+        message = "Nodes file found : {0}.".format(nodes_dmp.resolve())
         shared.give_user_feedback(message, log_file, quiet)
 
     # NAMES.
     names_dmp = output_dir / pathlib.Path("names.dmp")
     if not names_dmp.exists():
-        message = "Writing names information to {}.".format(names_dmp.resolve())
+        message = "Writing names information to {0}.".format(names_dmp.resolve())
         shared.give_user_feedback(message, log_file, quiet)
         write_names_dmp(all_taxa_tsv, names_dmp)
     else:
-        message = "Names file found : {}.".format(names_dmp.resolve())
+        message = "Names file found : {0}.".format(names_dmp.resolve())
         shared.give_user_feedback(message, log_file, quiet)
 
     gid2taxid = genome_id_to_taxid(all_taxa_tsv)
@@ -612,9 +612,9 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
         duplicates = extract_duplicates(
             proteins_dir, gid2taxid, acc2taxid_fp, log_file, quiet
         )
-        with shared.optionally_compressed_handle(duplicates_fp, "w") as fa:
+        with shared.optionally_compressed_handle(duplicates_fp, "w") as outf1:
             for rec in duplicates.values():
-                fa.write(">{}\n{}\n".format(rec.id, rec.seq))
+                outf1.write(">{0}\n{1}\n".format(rec.id, rec.seq))
 
         # 2nd pass.
         # Write the unique sequences to a separate file.
@@ -659,10 +659,10 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
         "Done!\n"
         "A CAT database can be build with\n\n"
         "CAT prepare \\\n"
-        "--db_fasta {} \\\n"
-        "--names {} \\\n"
-        "--nodes {} \\\n"
-        "--acc2taxid {} \\\n"
+        "--db_fasta {0} \\\n"
+        "--names {1} \\\n"
+        "--nodes {2} \\\n"
+        "--acc2taxid {3} \\\n"
         "-o path/to/prepare_output\n".format(
             all_seqs_fp.resolve(),
             names_dmp.resolve(),
@@ -680,7 +680,7 @@ def run():
     if args.no_log:
         log_file = None
     else:
-        log_fname = "{}.CAT_download.log".format(args.date)
+        log_fname = "{0}.CAT_download.log".format(args.date)
         log_file = args.output_dir / pathlib.Path(log_fname)
 
     setattr(args, "log_file", log_file)
