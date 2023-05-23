@@ -72,11 +72,7 @@ def download_singleton(target_url, local_path, log_file, quiet):
 
 def multi_download(url_list, output_dir, log_file, quiet, prefix=None):
     """Download all required nr files in the specified output dir."""
-    if not output_dir.exists():
-        output_dir.mkdir(parents=True)
-        existing_files = []
-    else:
-        existing_files = list([p.resolve() for p in output_dir.iterdir()])
+    existing_files = list([p.resolve() for p in output_dir.iterdir()])
 
     for url in url_list:
         url_leaf = url.split("/")[-1]
@@ -675,7 +671,10 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
 
 def run():
     args = parse_arguments()
-
+    
+    if not output_dir.exists():
+        output_dir.mkdir(parents=True)
+        
     if args.no_log:
         log_file = None
     else:
@@ -683,7 +682,7 @@ def run():
         log_file = args.output_dir / pathlib.Path(log_fname)
 
     setattr(args, "log_file", log_file)
-
+    
     if args.db == "nr":
         process_nr(
             args.output_dir,
