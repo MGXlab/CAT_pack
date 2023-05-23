@@ -370,7 +370,7 @@ def fastaIterator(fasta_in, gid2taxid):
                 title = line[1:].rstrip()
                 break
             else:
-                # no break encountered - probably an empty file.
+                # No break encountered - probably an empty file.
                 return
         lines = []
         for line in f1:
@@ -415,7 +415,7 @@ def extract_duplicates(proteins_dir, gid2taxid, acc2taxid_fp, log_file, quiet):
                 # Check if duplicate.
                 is_multiplet = False
                 if record.uid not in seen_uids:
-                    # Store the first occurrence id
+                    # Store the first occurrence id.
                     seen_uids[record.uid] = record.id
                 else:
                     is_multiplet = True
@@ -451,7 +451,7 @@ def extract_duplicates(proteins_dir, gid2taxid, acc2taxid_fp, log_file, quiet):
         else:
             # Create some whitespace for aligned printing
             padding = len("[YYYY-MM-DD HH:MM:SS] ") * " "
-            # Calculate the total number of identified multiplets
+            # Calculate the total number of identified multiplets.
             redundants = sum(map(len, [v for v in multiplets.values()]))
             message = (
                 "    Total files: {:>12}\n"
@@ -487,16 +487,12 @@ def write_singletons(
                 else:
                     skipped += 1
             if file_counter % 1000 == 0 and file_counter != 0:
-                message = (
-                    "Written {0} sequences from {1} files ({2} skipped)".format(
-                        seq_counter, file_counter, skipped
-                    )
-                )
+                message = ("Written {0} sequences from {1} files ({2} skipped)"
+                        "".format(seq_counter, file_counter, skipped))
                 shared.give_user_feedback(message, log_file, quiet)
         else:
-            message = "Written {0} sequences from {1} files ({2} skipped)".format(
-                seq_counter, file_counter, skipped
-            )
+            message = ("Written {0} sequences from {1} files ({2} skipped)"
+                    "".format(seq_counter, file_counter, skipped))
             shared.give_user_feedback(message, log_file, quiet)
             
     return
@@ -581,11 +577,13 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
     # NODES.
     nodes_dmp = output_dir / pathlib.Path("nodes.dmp")
     if not nodes_dmp.exists():
-        message = "Writing nodes information to {0}.".format(nodes_dmp.resolve())
+        message = "Writing nodes information to {0}.".format(
+                nodes_dmp.resolve())
         shared.give_user_feedback(message, log_file, quiet)
         write_nodes_dmp(all_taxa_tsv, nodes_dmp)
     else:
-        message = "Nodes file found : {0}.".format(nodes_dmp.resolve())
+        message = "Nodes file found : {0}.".format(
+                nodes_dmp.resolve())
         shared.give_user_feedback(message, log_file, quiet)
 
     # NAMES.
@@ -701,4 +699,5 @@ def run():
 
 
 if __name__ == "__main__":
-    sys.exit("Run \'CAT download\' to download and preprocess data from NCBI nr or GTDB.")
+    sys.exit("Run \'CAT download\' to download and preprocess data from "
+            "NCBI nr or GTDB.")
