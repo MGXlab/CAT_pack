@@ -197,7 +197,7 @@ def get_gtdb_latest_version():
     with urllib.request.urlopen(version_url) as f:
         version_data = f.read().decode()
 
-    version = "{0} ({1})".format(*version_data.split("\n"))
+    version = "{0} ({2})".format(*version_data.split("\n"))
 
     return version
 
