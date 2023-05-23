@@ -206,7 +206,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
         )
     elif dest == "r":
         if help_ is None:
-            help_ = "r parameter [0-49] (default: {0:.0f}).".format(default)
+            help_ = "r parameter [0-100] (default: {0:.0f}).".format(default)
         argument_group.add_argument(
             "-r",
             "--range",
@@ -214,7 +214,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
             metavar="",
             required=required,
             type=float,
-            choices=[i for i in range(50)],
+            choices=[i for i in range(101)],
             action=DecimalAction,
             default=default,
             help=help_,
@@ -566,12 +566,10 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "top":
         if help_ is None:
             help_ = (
-                "DIAMOND top parameter [0-50] (default: {0}). Governs "
+                "DIAMOND top parameter [0-100] (default: {0}). Governs "
                 "hits within range of best hit that are written to the "
                 "alignment file. This is not the [-r / --range] "
-                "parameter! Can only be set with the "
-                "[--I_know_what_Im_doing] flag, see README.md."
-                "".format(default)
+                "parameter! See README.md.".format(default)
             )
         argument_group.add_argument(
             "--top",
@@ -579,7 +577,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
             metavar="",
             required=required,
             type=float,
-            choices=[i for i in range(51)],
+            choices=[i for i in range(101)],
             default=default,
             help=help_,
         )
@@ -599,7 +597,7 @@ def add_all_diamond_arguments(argument_group):
     add_argument(argument_group, "index_chunks", False, default=4)
     add_argument(argument_group, "tmpdir", False)
     add_argument(argument_group, "compress", False)
-    add_argument(argument_group, "top", False, default=50)
+    add_argument(argument_group, "top", False, default=15)
 
     return
 
