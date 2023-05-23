@@ -62,7 +62,7 @@ def download_singleton(target_url, local_path, log_file, quiet):
     try:
         urllib.request.urlretrieve(target_url, local_path)
     except:
-        message = "Failed downloading file: {}".format(target_url)
+        message = "Failed downloading file: {}.".format(target_url)
         shared.give_user_feedback(message, log_file, quiet)
         raise
         
@@ -92,7 +92,7 @@ def multi_download(url_list, output_dir, log_file, quiet, prefix=None):
             )
             shared.give_user_feedback(message, log_file, quiet)
         else:
-            message = "Downloading {}".format(url_leaf)
+            message = "Downloading {}.".format(url_leaf)
             shared.give_user_feedback(message, log_file, quiet)
             download_singleton(url, output_path, log_file, quiet)
 
