@@ -135,10 +135,10 @@ def process_nr(output_dir, log_file, quiet, prefix, cleanup):
             tar.extract(dmp, path=output_dir)
 
             # Timestamp the extracted dmp file
-            fout = output_dir / pathlib.Path(dmp)
+            outf1 = output_dir / pathlib.Path(dmp)
             timestamped_fname = "{}.{}".format(prefix, dmp)
-            timestamped_fout = output_dir / pathlib.Path(timestamped_fname)
-            fout.rename(timestamped_fout)
+            timestamped_outf1 = output_dir / pathlib.Path(timestamped_fname)
+            outf1.rename(timestamped_outf1)
 
     if cleanup is True:
         targets = [tax_tar_path.resolve()]
@@ -204,8 +204,8 @@ def get_gtdb_latest_version():
 def load_gtdb_md5sums(md5sums_file):
     """Create a dictionary from the MD5SUMS file."""
     md5_dict = {}
-    with open(md5sums_file, "r") as fin:
-        for line in fin:
+    with open(md5sums_file, "r") as f1:
+        for line in f1:
             fields = [f.strip() for f in line.split()]
             fname = pathlib.Path(fields[1]).name
             md5_dict[fname] = fields[0]
@@ -229,11 +229,11 @@ def check_gtdb_md5s(data_dir, md5_dict, log_file, quiet):
 
 
 def concatenate_taxonomies_gz(ar_tsv_gz, bac_tsv_gz, output_tsv):
-    with open(output_tsv, "w") as fout:
+    with open(output_tsv, "w") as outf1:
         for f in [ar_tsv_gz, bac_tsv_gz]:
-            with shared.optionally_compressed_handle(f, "r") as fin:
-                for line in fin:
-                    fout.write(line)
+            with shared.optionally_compressed_handle(f, "r") as f1:
+                for line in f1:
+                    outf1.write(line)
 
     return
 
@@ -266,8 +266,8 @@ def parent_child_pairs(lineage_string):
 def write_nodes_dmp(taxonomies_tsv, nodes_dmp):
     """Write the nodes.dmp from the taxonomy files."""
     seen_taxids = []
-    with open(taxonomies_tsv, "r") as fin, open(nodes_dmp, "w") as fout:
-        for line in fin:
+    with open(taxonomies_tsv, "r") as f1, open(nodes_dmp, "w") as outf1:
+        for line in f1:
             fields = [f.strip() for f in line.split("\t")]
             lineage_string = fields[1]
             pairs = parent_child_pairs(lineage_string)
@@ -275,7 +275,7 @@ def write_nodes_dmp(taxonomies_tsv, nodes_dmp):
                 parent, child = pair[0], pair[1]
                 if parent not in seen_taxids:
                     if parent == "root":
-                        fout.write(
+                        outf1.write(
                             "{}{}".format(
                                 "\t|\t".join(["root", "root", "no rank"]),
                                 "\t|\n",
@@ -286,7 +286,7 @@ def write_nodes_dmp(taxonomies_tsv, nodes_dmp):
                         seen_taxids.append(parent)
                 if child not in seen_taxids:
                     seen_taxids.append(child)
-                    fout.write(
+                    outf1.write(
                         "{}{}".format(
                             "\t|\t".join(
                                 [
@@ -303,16 +303,16 @@ def write_nodes_dmp(taxonomies_tsv, nodes_dmp):
 
 def write_names_dmp(taxonomies_tsv, names_dmp):
     seen_taxids = []
-    with open(taxonomies_tsv, "r") as fin, open(names_dmp, "w") as fout:
-        fout.write(
+    with open(taxonomies_tsv, "r") as f1, open(names_dmp, "w") as outf1:
+        outf1.write(
             "{}{}".format(
                 "\t|\t".join(["root", "root", "scientific name"]), "\t|\n"
             )
         )
-        for line in fin:
+        for line in f1:
             taxid = line.split(";")[-1].strip()
             if taxid not in seen_taxids:
-                fout.write(
+                outf1.write(
                     "{}{}".format(
                         "\t|\t".join([taxid, taxid, "scientific name"]),
                         "\t|\n",
@@ -325,8 +325,8 @@ def write_names_dmp(taxonomies_tsv, names_dmp):
 def genome_id_to_taxid(taxonomy_tsv):
     """Return a dictionary with GTDB taxid for each genome."""
     mapping = {}
-    with open(taxonomy_tsv, "r") as fin:
-        for line in fin:
+    with open(taxonomy_tsv, "r") as f1:
+        for line in f1:
             fields = [f.strip() for f in line.split("\t")]
             genome_id = fields[0]
             taxid = fields[1].split(";")[-1]
@@ -363,8 +363,8 @@ def fastaIterator(fasta_in, gid2taxid):
     """
     origin = fasta_in.name.replace("_protein.faa", "")
     taxid = gid2taxid[origin]
-    with open(fasta_in, "r") as fin:
-        for line in fin:
+    with open(fasta_in, "r") as f1:
+        for line in f1:
             if line[0] == ">":
                 title = line[1:].rstrip()
                 break
@@ -372,7 +372,7 @@ def fastaIterator(fasta_in, gid2taxid):
                 # no break encountered - probably an empty file.
                 return
         lines = []
-        for line in fin:
+        for line in f1:
             if line[0] == ">":
                 name = title.split(" ")[0]
                 seq = (
@@ -403,13 +403,13 @@ def extract_duplicates(proteins_dir, gid2taxid, acc2taxid_fp, log_file, quiet):
     seen_uids = {}
     multiplets = {}
     seq_counter, file_counter = 0, 0
-    with shared.optionally_compressed_handle(acc2taxid_fp, "w") as fout:
-        fout.write("accession.version\ttaxid\n")
+    with shared.optionally_compressed_handle(acc2taxid_fp, "w") as outf1:
+        outf1.write("accession.version\ttaxid\n")
         for f in proteins_dir.rglob("*/*.faa"):
             file_counter += 1
             for record in fastaIterator(f, gid2taxid):
                 # Write an entry.
-                fout.write("{}\t{}\n".format(record.id, record.taxid))
+                outf1.write("{}\t{}\n".format(record.id, record.taxid))
 
                 # Check if duplicate.
                 is_multiplet = False
@@ -445,8 +445,8 @@ def extract_duplicates(proteins_dir, gid2taxid, acc2taxid_fp, log_file, quiet):
                     seq_counter, file_counter
                 )
                 shared.give_user_feedback(message, log_file, quiet)
-        # This else is part of the outter for-loop
-        # It executes when the for loop finishes
+        # This else is part of the outter for-loop.
+        # It executes when the for loop finishes.
         else:
             # Create some whitespace for aligned printing
             padding = len("[YYYY-MM-DD HH:MM:SS] ") * " "
@@ -476,12 +476,12 @@ def write_singletons(
     proteins_dir, duplicates, gid2taxid, singletons_fp, log_file, quiet
 ):
     seq_counter, file_counter, skipped = 0, 0, 0
-    with shared.optionally_compressed_handle(singletons_fp, "w") as fout:
+    with shared.optionally_compressed_handle(singletons_fp, "w") as outf1:
         for f in proteins_dir.rglob("*/*.faa"):
             file_counter += 1
             for record in fastaIterator(f, gid2taxid):
                 if record.uid not in duplicates:
-                    fout.write(">{}\n{}\n".format(record.id, record.seq))
+                    outf1.write(">{}\n{}\n".format(record.id, record.seq))
                     seq_counter += 1
                 else:
                     skipped += 1
@@ -622,11 +622,11 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
         shared.give_user_feedback(message, log_file, quiet)
         
         # Concatenate the two files into one.
-        with shared.optionally_compressed_handle(all_seqs_fp, "w") as fout:
+        with shared.optionally_compressed_handle(all_seqs_fp, "w") as outf1:
             for f in [duplicates_fp, singletons_fp]:
-                with shared.optionally_compressed_handle(f, "r") as fin:
-                    for line in fin:
-                        fout.write(line)
+                with shared.optionally_compressed_handle(f, "r") as f1:
+                    for line in f1:
+                        outf1.write(line)
 
     if cleanup is True:
         remove_targets = [
