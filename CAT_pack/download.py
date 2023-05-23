@@ -535,7 +535,7 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
     multi_download(gtdb_urls, output_dir, log_file, quiet, prefix=None)
 
     # Check files.
-    md5sums_file = output_dir / pathlib.Path("MD5SUM")
+    md5sums_file = output_dir / pathlib.Path("MD5SUM.txt")
     md5sums_dict = load_gtdb_md5sums(md5sums_file)
     check_gtdb_md5s(output_dir, md5sums_dict, log_file, quiet)
 
