@@ -157,5 +157,5 @@ def run():
 
 
 if __name__ == "__main__":
-    sys.exit("Run \"CAT add_names\" to add taxonomic names to CAT or BAT "
+    sys.exit("Run \'CAT add_names\' to add taxonomic names to CAT or BAT "
             "output files.")
