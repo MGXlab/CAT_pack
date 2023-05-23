@@ -250,7 +250,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
         )
     elif dest == "db":
         if help_ is None:
-            help_ = "One of 'nr' or 'gtdb'"
+            help_ = "Either 'nr' or 'gtdb'."
         argument_group.add_argument(
             "-db",
             dest="db",
