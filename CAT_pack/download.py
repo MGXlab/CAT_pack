@@ -21,7 +21,7 @@ def parse_arguments():
         description=(
             "Download and preprocess sequence and taxonomy information. "
             "Currently supports the NCBI non-redundant (nr) database "
-            "and GTDB".
+            "and GTDB."
         ),
         usage="CAT download -db [nr|gtdb] -o output_dir",
         add_help=False,
