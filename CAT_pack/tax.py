@@ -144,8 +144,8 @@ def find_questionable_taxids(lineage, taxids_with_multiple_offspring):
 
 
 def star_lineage(lineage, taxids_with_multiple_offspring):
-    questionable_taxids = find_questionable_taxids(lineage,
-                                                   taxids_with_multiple_offspring)
+    questionable_taxids = find_questionable_taxids(
+            lineage, taxids_with_multiple_offspring)
 
     starred_lineage = [taxid if
             taxid not in questionable_taxids else
