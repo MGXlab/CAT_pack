@@ -23,15 +23,15 @@ def parse_arguments():
             "Currently supports the NCBI non-redundant (nr) database "
             "and GTDB."
         ),
-        usage="CAT download -db [nr|gtdb] -o output_dir",
+        usage="CAT download -db (nr|gtdb) -o output_dir [options] [-h / --help]",
         add_help=False,
     )
 
-    required = parser.add_argument_group("Required Arguments")
+    required = parser.add_argument_group("Required arguments")
     shared.add_argument(required, "db", True)
     shared.add_argument(required, "output_dir", True)
 
-    optional = parser.add_argument_group("Optional Arguments")
+    optional = parser.add_argument_group("Optional arguments")
     shared.add_argument(optional, "cleanup", False)
     shared.add_argument(optional, "quiet", False)
     shared.add_argument(optional, "no_log", False)
