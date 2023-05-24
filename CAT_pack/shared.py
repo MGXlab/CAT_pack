@@ -99,8 +99,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
         )
     elif dest == "db_dir":
         if help_ is None:
-            help_ = ("Path to folder where CAT/BAT database files will be "
-                    "created.")
+            help_ = ("Path to directory where CAT/BAT database files will "
+                    "be created.")
         argument_group.add_argument(
             "--db_dir",
             dest="db_dir",
@@ -112,7 +112,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
         )
     elif dest == "database_folder":
         if help_ is None:
-            help_ = "Path to folder that contains database files."
+            help_ = "Path to directory that contains database files."
         argument_group.add_argument(
             "-d",
             "--database_folder",
@@ -126,7 +126,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
         )
     elif dest == "taxonomy_folder":
         if help_ is None:
-            help_ = "Path to folder that contains taxonomy files."
+            help_ = "Path to directory that contains taxonomy files."
         argument_group.add_argument(
             "-t",
             "--taxonomy_folder",
@@ -190,7 +190,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
         )
     elif dest == "bin_suffix":
         if help_ is None:
-            help_ = "Suffix of bins in bin folder (default: {0})." "".format(
+            help_ = "Suffix of bins in bin directory (default: {0}).".format(
                 default
             )
         argument_group.add_argument(
@@ -264,7 +264,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
         )
     elif dest == "output_dir":
         if help_ is None:
-            help_ = "Path to folder where data will be stored."
+            help_ = "Path to direcotry where data will be stored."
         argument_group.add_argument(
             "-o",
             "--output_dir",
@@ -1055,15 +1055,15 @@ def is_gz(file_path):
 
 
 def optionally_compressed_handle(file_path, mode):
-    """Return an appropriate file handle to operate on
+    """Return an appropriate file handle to operate on.
 
     Arguments:
-      file_path: str or PathLike: File path
-      mode: str: The passed mode to open the file on
+      file_path: str or PathLike: File path.
+      mode: str: The passed mode to open the file on.
 
     Return:
         A file handle either gzip opened or plainly opened for
-        reading/writing/appending in text mode
+        reading/writing/appending in text mode.
     """
     if mode == "r" or mode == "rb":
         mode = "rt"
