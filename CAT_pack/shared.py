@@ -291,10 +291,10 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "alignment_file":
         if help_ is None:
             help_ = (
-                "Path to alignment table. If supplied, the alignment "
-                "step is skipped and classification is carried out "
-                "directly. A predicted proteins fasta file should also be "
-                "supplied with argument [-p / --proteins]."
+                "Path to alignment table. If supplied, the alignment step is "
+                "skipped and classification is carried out directly. A "
+                "predicted proteins fasta file should also be supplied with "
+                "argument [-p / --proteins]."
             )
         argument_group.add_argument(
             "-a",
@@ -321,8 +321,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "path_to_prodigal":
         if help_ is None:
             help_ = (
-                "Path to Prodigal binaries. Supply if CAT/BAT cannot "
-                "find Prodigal"
+                "Path to Prodigal binaries. Supply if CAT/BAT cannot find "
+                "Prodigal"
             )
         argument_group.add_argument(
             "--path_to_prodigal",
@@ -444,8 +444,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "only_official":
         if help_ is None:
             help_ = (
-                "Only output official raxonomic ranks (superkingdom, "
-                "phylum, class, order, family, genus, species)."
+                "Only output official raxonomic ranks (superkingdom, phylum, "
+                "class, order, family, genus, species)."
             )
         argument_group.add_argument(
             "--only_official",
@@ -457,8 +457,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "exclude_scores":
         if help_ is None:
             help_ = (
-                "Do not include bit-score support scores in the lineage "
-                "of a classification output file."
+                "Do not include bit-score support scores in the lineage of a "
+                "classification output file."
             )
         argument_group.add_argument(
             "--exclude_scores",
@@ -506,9 +506,9 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "block_size":
         if help_ is None:
             help_ = (
-                "DIAMOND block-size parameter (default: {0}). Lower "
-                "numbers will decrease memory and temporary disk space "
-                "usage.".format(default)
+                "DIAMOND block-size parameter (default: {0}). Lower numbers "
+                "will decrease memory and temporary disk space usage."
+                "".format(default)
             )
         argument_group.add_argument(
             "--block_size",
@@ -522,9 +522,9 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "index_chunks":
         if help_ is None:
             help_ = (
-                "DIAMOND index-chunks parameter (default: {0}). Set to "
-                "1 on high memory machines. The parameter has no effect "
-                "on temporary disk space usage.".format(default)
+                "DIAMOND index-chunks parameter (default: {0}). Set to 1 "
+                "on high memory machines. The parameter has no effect on "
+                "temporary disk space usage.".format(default)
             )
         argument_group.add_argument(
             "--index_chunks",
@@ -538,8 +538,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "tmpdir":
         if help_ is None:
             help_ = (
-                "Directory for temporary DIAMOND files (default: "
-                "directory to which output files are written)."
+                "Directory for temporary DIAMOND files (default: directory to "
+                "which output files are written)."
             )
         argument_group.add_argument(
             "--tmpdir",
@@ -563,10 +563,10 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "top":
         if help_ is None:
             help_ = (
-                "DIAMOND top parameter [0-100] (default: {0}). Governs "
-                "hits within range of best hit that are written to the "
-                "alignment file. This is not the [-r / --range] "
-                "parameter! See README.md.".format(default)
+                "DIAMOND top parameter [0-100] (default: {0}). Governs hits "
+                "within range of best hit that are written to the alignment "
+                "file. This is not the [-r / --range] parameter! "
+                "See README.md.".format(default)
             )
         argument_group.add_argument(
             "--top",
@@ -764,7 +764,13 @@ def print_variables(args, step_list=None):
 
 
 def give_user_feedback(
-    message, log_file=None, quiet=False, show_time=True, error=False, warning=False):
+    message,
+    log_file=None,
+    quiet=False,
+    show_time=True,
+    error=False,
+    warning=False
+):
     if error:
         message = "ERROR: {0}".format(message)
         
@@ -799,8 +805,8 @@ def run_prodigal(
 ):
     message = (
         "Running Prodigal for ORF prediction. Files {0} and {1} will be "
-        "generated. Do not forget to cite Prodigal when using CAT or BAT "
-        "in your publication.".format(proteins_fasta, proteins_gff)
+        "generated. Do not forget to cite Prodigal when using CAT or BAT in "
+        "your publication.".format(proteins_fasta, proteins_gff)
     )
     give_user_feedback(message, log_file, quiet)
 
@@ -846,9 +852,8 @@ def run_diamond(args):
         compression = "0"
 
     message = (
-        "Homology search with DIAMOND is starting. Please be patient. Do "
-        "not forget to cite DIAMOND when using CAT or BAT in your "
-        "publication.\n"
+        "Homology search with DIAMOND is starting. Please be patient. Do not "
+        "forget to cite DIAMOND when using CAT or BAT in your publication.\n"
         "\t\t\tquery: {0}\n"
         "\t\t\tdatabase: {1}\n"
         "\t\t\tmode: {2}\n"
@@ -921,8 +926,7 @@ def run_diamond(args):
         setattr(args, "alignment_file", "{0}.gz".format(args.alignment_file))
 
     message = "Homology search done! File {0} created.".format(
-        args.alignment_file
-    )
+        args.alignment_file)
     give_user_feedback(message, args.log_file, args.quiet)
 
     return
@@ -942,8 +946,8 @@ def import_contig_names(fasta_file, log_file, quiet):
                 if contig in contig_names:
                     message = (
                         "your fasta file contains duplicate headers. The "
-                        "first duplicate encountered is {0}, but there "
-                        "might be more...".format(contig)
+                        "first duplicate encountered is {0}, but there might "
+                        "be more...".format(contig)
                     )
                     give_user_feedback(message, log_file, quiet, error=True)
 
