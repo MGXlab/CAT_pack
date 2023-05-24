@@ -329,8 +329,7 @@ def check_fasta(file_, log_file, quiet):
 
 
 def check_whether_ORFs_are_based_on_contigs(
-        contig_names, contig2ORFs, log_file, quiet
-):
+        contig_names, contig2ORFs, log_file, quiet):
     for contig in contig2ORFs:
         if contig not in contig_names:
             message = (
