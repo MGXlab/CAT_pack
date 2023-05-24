@@ -151,7 +151,7 @@ def process_nr(output_dir, log_file, quiet, prefix, cleanup):
     acc2taxid_gz = list(output_dir.glob("*accession2taxid.FULL.gz"))[0]
     message = (
         "\n-----------------\n\n"
-        "Done!\n"
+        "Done!\n\n"
         "A CAT database can be build with:\n\n"
         "CAT prepare \\\n"
         "--db_fasta {0} \\\n"
@@ -654,7 +654,7 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
                 target.unlink()
     message = (
         "\n-----------------\n\n"
-        "Done!\n"
+        "Done!\n\n"
         "A CAT database can be build with:\n\n"
         "CAT prepare \\\n"
         "--db_fasta {0} \\\n"
