@@ -644,7 +644,7 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
             all_taxa_tsv,
             proteins_tar,
         ]
-        message = "Cleanup specified. Removing unnecessary files and dirs."
+        message = "Cleanup specified. Removing unnecessary files and folders."
         shared.give_user_feedback(message, log_file, quiet)
 
         for target in remove_targets:
