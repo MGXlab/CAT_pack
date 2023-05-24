@@ -152,7 +152,7 @@ def process_nr(output_dir, log_file, quiet, prefix, cleanup):
     message = (
         "\n-----------------\n\n"
         "Done!\n"
-        "A CAT database can be build with\n\n"
+        "A CAT database can be build with:\n\n"
         "CAT prepare \\\n"
         "--db_fasta {0} \\\n"
         "--names {1} \\\n"
@@ -450,10 +450,10 @@ def extract_duplicates(proteins_dir, gid2taxid, acc2taxid_fp, log_file, quiet):
             # Calculate the total number of identified multiplets.
             redundants = sum(map(len, [v for v in multiplets.values()]))
             message = (
-                "    Total files: {:>12}\n"
-                "{0}Total sequences: {:>12}\n"
-                "{1}     Multiplets: {:>12}\n"
-                "{2}of which unique: {:>12}"
+                "    Total files: {0:>12}\n"
+                "{1}Total sequences: {2:>12}\n"
+                "{3}     Multiplets: {4:>12}\n"
+                "{5}of which unique: {6:>12}"
                 "".format(
                     file_counter,
                     padding,
@@ -652,7 +652,7 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
     message = (
         "\n-----------------\n\n"
         "Done!\n"
-        "A CAT database can be build with\n\n"
+        "A CAT database can be build with:\n\n"
         "CAT prepare \\\n"
         "--db_fasta {0} \\\n"
         "--names {1} \\\n"
