@@ -13,7 +13,7 @@ def parse_arguments():
             prog="CAT summarise",
             description="Summarise a named CAT or BAT classification file.",
             usage=("CAT summarise -i FILE -o FILE (-c FILE) "
-                "[options] [-h / --help]"),
+                   "[options] [-h / --help]"),
             add_help=False)
     
     required = parser.add_argument_group("Required arguments")
@@ -28,9 +28,13 @@ def parse_arguments():
     shared.add_argument(required, "output_file", True)
     
     optional = parser.add_argument_group("Optional arguments")
-    shared.add_argument(optional, "contigs_fasta", False,
-            help_=("Path to contigs fasta file. Required if you want to "
-                "summarise a contig classification file."))
+    shared.add_argument(
+        optional,
+        "contigs_fasta",
+        False,
+        help_=("Path to contigs fasta file. Required if you want to "
+               "summarise a contig classification file.")
+    )
     shared.add_argument(optional, "force", False)
     shared.add_argument(optional, "quiet", False)
     shared.add_argument(optional, "help", False)
@@ -79,28 +83,28 @@ def import_contig_lengths(contigs_fasta, log_file, quiet):
 
 def summarise_contigs(args):
     message = "# CAT v{0}.".format(about.__version__)
-    shared.give_user_feedback(message, args.log_file, args.quiet,
-            show_time=False)
+    shared.give_user_feedback(
+        message, args.log_file, args.quiet, show_time=False)
 
     errors = []
 
     errors.append(
-            check.check_input_file(args.input_file, args.log_file, args.quiet))
+        check.check_input_file(args.input_file, args.log_file, args.quiet))
 
     if not args.force:
         errors.append(
-                check.check_output_file(
-                    args.output_file, args.log_file, args.quiet))
+            check.check_output_file(args.output_file, args.log_file, args.quiet))
 
     errors.append(
-            check.check_in_and_output_file(
-                args.input_file, args.output_file, args.log_file, args.quiet))
+        check.check_in_and_output_file(
+            args.input_file, args.output_file, args.log_file, args.quiet)
+    )
 
     if True in errors:
         sys.exit(1)
         
     contig2length = import_contig_lengths(
-            args.contigs_fasta, args.log_file, args.quiet)
+        args.contigs_fasta, args.log_file, args.quiet)
 
     message = "Summarising..."
     shared.give_user_feedback(message, args.log_file, args.quiet)
@@ -112,19 +116,19 @@ def summarise_contigs(args):
                 
                 if line[0] != "# contig":
                     message = "{0} is not a CAT classification file.".format(
-                            args.input_file)
+                        args.input_file)
                     shared.give_user_feedback(
-                            message, args.log_file, args.quiet, error=True)
+                        message, args.log_file, args.quiet, error=True)
 
                     if line[0] == "# bin":
                         message = (
-                                "{0} appears to be a BAT classification file. "
-                                "If you want to summarise bin "
-                                "classifications, simply don\"t supply a "
-                                "contigs fasta and everything should be fine."
-                                "".format(args.input_file))
+                            "{0} appears to be a BAT classification file. If "
+                            "you want to summarise bin classifications, simply "
+                            "don\'t supply a contigs fasta and everything "
+                            "should be fine.".format(args.input_file)
+                        )
                         shared.give_user_feedback(
-                                message, args.log_file, args.quiet, error=True)
+                            message, args.log_file, args.quiet, error=True)
                         
                     sys.exit(1)
                     
@@ -132,20 +136,21 @@ def summarise_contigs(args):
                     superkingdom_index = line.index("superkingdom")
                 except:
                     message = (
-                            "official ranks not found in header of {0}. Make "
-                            "sure that the CAT classification file is named "
-                            "with official ranks with \"CAT add_names "
-                            "--only_official\".".format(args.input_file))
+                        "official ranks not found in header of {0}. Make sure "
+                        "that the CAT classification file is named with official "
+                        "ranks with \'CAT add_names --only_official\'."
+                        "".format(args.input_file)
+                    )
                     shared.give_user_feedback(
-                            message, args.log_file, args.quiet, error=True)
+                        message, args.log_file, args.quiet, error=True)
 
                     sys.exit(1)
 
                 break
         else:
             message = "input file does not have a recognisable header."
-            shared.give_user_feedback(message, args.log_file, args.quiet,
-                    error=True)
+            shared.give_user_feedback(
+                message, args.log_file, args.quiet, error=True)
 
             sys.exit(1)
             
@@ -184,12 +189,13 @@ def summarise_contigs(args):
             
             if contig not in contig2length:
                 message = (
-                        "contig {0} in CAT classification file is not found "
-                        "in supplied contigs fasta file. Are you sure the CAT "
-                        "classification file is based on the contigs fasta?"
-                        "".format(contig))
-                shared.give_user_feedback(message, args.log_file, args.quiet,
-                        error=True)
+                    "contig {0} in CAT classification file is not found in "
+                    "supplied contigs fasta file. Are you sure the CAT "
+                    "classification file is based on the contigs fasta?"
+                    "".format(contig)
+                )
+                shared.give_user_feedback(
+                    message, args.log_file, args.quiet, error=True)
 
                 sys.exit(1)
 
@@ -217,21 +223,23 @@ def summarise_contigs(args):
 
     if len(doubles) != 0:
         message = (
-                "some contigs have multiple classifications. CAT summarise "
-                "currently does not allow for this. Contigs with multiple "
-                "classifications: {0}.".format(", ".join(list(doubles))))
-        shared.give_user_feedback(message, args.log_file, args.quiet,
-                error=True)
+            "some contigs have multiple classifications. CAT summarise currently "
+            "does not allow for this. Contigs with multiple classifications: {0}."
+            "".format(", ".join(list(doubles)))
+        )
+        shared.give_user_feedback(
+            message, args.log_file, args.quiet, error=True)
 
         sys.exit(1)
         
     if n != len(contig2length):
         message = (
-                "the number of classified contigs is not the same as the "
-                "number of contigs in contigs fasta. Are you sure the CAT "
-                "classification file is based on the contigs fasta?")
-        shared.give_user_feedback(message, args.log_file, args.quiet,
-                error=True)
+            "the number of classified contigs is not the same as the number of "
+            "contigs in contigs fasta. Are you sure the CAT classification "
+            "file is based on the contigs fasta?"
+        )
+        shared.give_user_feedback(
+            message, args.log_file, args.quiet, error=True)
 
         sys.exit(1)
 
@@ -239,36 +247,43 @@ def summarise_contigs(args):
         n_contigs = len(contig2length)
         total_length = sum(contig2length.values())
         n_classified_contigs = n_contigs - len(length["no taxid assigned"])
-        total_classified_length = total_length - sum(
-                length["no taxid assigned"])
+        total_classified_length = total_length - sum(length["no taxid assigned"])
 
-        outf1.write("# total number of contigs in {0} is {1:,d} representing "
-                "{2:,d} positions.\n".format(
-                    args.contigs_fasta, n_contigs, total_length))
-        outf1.write("# {0:,d} contigs have taxonomy assigned ({1:.2f}%) "
-                "representing {2:,d} positions ({3:.2f}%) in {4}.\n".format(
-                    n_classified_contigs,
-                    n_classified_contigs / n_contigs * 100,
-                    total_classified_length,
-                    total_classified_length / total_length * 100,
-                    args.input_file))
+        outf1.write(
+            "# total number of contigs in {0} is {1:,d} representing "
+            "{2:,d} positions.\n"
+            "".format(args.contigs_fasta, n_contigs, total_length)
+        )
+        outf1.write(
+            "# {0:,d} contigs have taxonomy assigned ({1:.2f}%) "
+            "representing {2:,d} positions ({3:.2f}%) in {4}.\n"
+            "".format(
+                n_classified_contigs,
+                n_classified_contigs / n_contigs * 100,
+                total_classified_length,
+                total_classified_length / total_length * 100,
+                args.input_file
+            )
+        )
         outf1.write("#\n")
         outf1.write(
-                "# rank\t"
-                "clade\t"
-                "number of contigs\t"
-                "number of ORFs\t"
-                "number of positions\n")
+            "# rank\t"
+            "clade\t"
+            "number of contigs\t"
+            "number of ORFs\t"
+            "number of positions\n"
+        )
 
         for rank in official_ranks:
-            for clade in sorted(length[rank],
-                    key=lambda x: sum(length[rank][x]), reverse=True):
+            for clade in sorted(
+                length[rank], key=lambda x: sum(length[rank][x]), reverse=True):
                 outf1.write("{0}\t{1}\t{2}\t{3}\t{4}\n".format(
                     rank,
                     clade,
                     len(length[rank][clade]),
                     sum(ORFs[rank][clade]),
-                    sum(length[rank][clade])))
+                    sum(length[rank][clade])
+                ))
 
     message = "{0} is created!".format(args.output_file)
     shared.give_user_feedback(message, args.log_file, args.quiet)
@@ -278,22 +293,22 @@ def summarise_contigs(args):
     
 def summarise_bins(args):
     message = "# CAT v{0}.".format(about.__version__)
-    shared.give_user_feedback(message, args.log_file, args.quiet,
-            show_time=False)
+    shared.give_user_feedback(
+        message, args.log_file, args.quiet, show_time=False)
     
     errors = []
 
     errors.append(
-            check.check_input_file(args.input_file, args.log_file, args.quiet))
+        check.check_input_file(args.input_file, args.log_file, args.quiet))
 
     if not args.force:
         errors.append(
-                check.check_output_file(
-                    args.output_file, args.log_file, args.quiet))
+            check.check_output_file(args.output_file, args.log_file, args.quiet))
 
     errors.append(
-            check.check_in_and_output_file(
-                args.input_file, args.output_file, args.log_file, args.quiet))
+        check.check_in_and_output_file(
+            args.input_file, args.output_file, args.log_file, args.quiet)
+    )
 
     if True in errors:
         sys.exit(1)
@@ -308,19 +323,19 @@ def summarise_bins(args):
                 
                 if line[0] != "# bin":
                     message = "{0} is not a BAT classification file.".format(
-                            args.input_file)
+                        args.input_file)
                     shared.give_user_feedback(
-                            message, args.log_file, args.quiet, error=True)
+                        message, args.log_file, args.quiet, error=True)
 
                     if line[0] == "# contig":
                         message = (
-                                "{0} appears to be a CAT classification file. "
-                                "If you want to summarise contig "
-                                "classifications, supply a contigs fasta with "
-                                "argument [-c / --contigs_fasta].".format(
-                                    args.input_file))
+                            "{0} appears to be a CAT classification file. If "
+                            "you want to summarise contig classifications, supply "
+                            "a contigs fasta with argument [-c / --contigs_fasta]."
+                            "".format(args.input_file)
+                        )
                         shared.give_user_feedback(
-                                message, args.log_file, args.quiet, error=True)
+                            message, args.log_file, args.quiet, error=True)
                         
                     sys.exit(1)
                     
@@ -328,20 +343,21 @@ def summarise_bins(args):
                     superkingdom_index = line.index("superkingdom")
                 except:
                     message = (
-                            "official ranks not found in header of {0}. Make "
-                            "sure that the BAT classification file is named "
-                            "with official ranks with \"CAT add_names "
-                            "--only_official\".".format(args.input_file))
+                        "official ranks not found in header of {0}. Make sure that "
+                        "the BAT classification file is named with official ranks "
+                        "with \'CAT add_names --only_official\'."
+                        "".format(args.input_file)
+                    )
                     shared.give_user_feedback(
-                            message, args.log_file, args.quiet, error=True)
+                        message, args.log_file, args.quiet, error=True)
 
                     sys.exit(1)
 
                 break
         else:
             message = "input file does not have a recognisable header."
-            shared.give_user_feedback(message, args.log_file, args.quiet,
-                    error=True)
+            shared.give_user_feedback(
+                message, args.log_file, args.quiet, error=True)
 
             sys.exit(1)
             
@@ -392,26 +408,29 @@ def summarise_bins(args):
                 
     if len(doubles) != 0:
         message = (
-                "some bins have multiple classifications. CAT summarise "
-                "currently does not allow for this. Bins with multiple "
-                "classifications: {0}.".format(", ".join(list(doubles))))
-        shared.give_user_feedback(message, args.log_file, args.quiet,
-                error=True)
+            "some bins have multiple classifications. CAT summarise currently "
+            "does not allow for this. Bins with multiple classifications: {0}."
+            "".format(", ".join(list(doubles)))
+        )
+        shared.give_user_feedback(
+            message, args.log_file, args.quiet, error=True)
 
         sys.exit(1)
         
     n_classified_bins = n - n_bins["no taxid assigned"]
 
     with open(args.output_file, "w") as outf1:
-        outf1.write("# total number of bins is {0:,d}, of which {1:,d} "
-                "({2:.2f}%) have taxonomy assigned.\n".format(
-                    n, n_classified_bins, n_classified_bins / n * 100))
+        outf1.write(
+            "# total number of bins is {0:,d}, of which {1:,d} "
+            "({2:.2f}%) have taxonomy assigned.\n"
+            "".format(n, n_classified_bins, n_classified_bins / n * 100)
+        )
         outf1.write("#\n")
         outf1.write("# rank\tclade\tnumber of bins\n")
 
         for rank in official_ranks:
-            for clade in sorted(n_bins[rank],
-                    key=lambda x: n_bins[rank][x], reverse=True):
+            for clade in sorted(
+                n_bins[rank], key=lambda x: n_bins[rank][x], reverse=True):
                 outf1.write("{0}\t{1}\t{2}\n".format(
                     rank, clade, n_bins[rank][clade]))
                             
