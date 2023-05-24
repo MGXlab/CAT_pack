@@ -81,7 +81,6 @@ def memory_bottleneck(args):
     (total_memory, error) = check.check_memory(args.min_mem)
     if error:
         message = (
-            "WARNING: "
             "At least {0}GB of memory is recommended for large database "
             "construction (e.g. nr). {1}GB is found on your system. "
             "You can try to find a machine with more memory if you run into "
@@ -91,10 +90,7 @@ def memory_bottleneck(args):
             )
         )
         shared.give_user_feedback(
-            message,
-            args.log_file,
-            args.quiet,
-        )
+                message, args.log_file, args.quiet, warning=True)
 
     return
 
