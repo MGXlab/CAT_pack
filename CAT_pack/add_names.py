@@ -11,16 +11,18 @@ import tax
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
-            prog="CAT add_names",
-            description="Add taxonomic names to CAT or BAT output files.",
-            usage=("CAT add_names -i FILE -o FILE -t DIR "
-                "[options] [-h / --help]"),
-            add_help=False)
+        prog="CAT add_names",
+        description="Add taxonomic names to CAT or BAT output files.",
+        usage="CAT add_names -i FILE -o FILE -t DIR [options] [-h / --help]",
+        add_help=False)
     
     required = parser.add_argument_group("Required arguments")
-    shared.add_argument(required, "input_file", True,
-            help_=("Path to input file. Can be classification or ORF2LCA "
-                "output file from CAT or BAT."))
+    shared.add_argument(
+        required,
+        "input_file",
+        True,
+        help_=("Path to input file. Can be classification or ORF2LCA output "
+               "file from CAT or BAT."))
     shared.add_argument(required, "output_file", True)
     shared.add_argument(required, "taxonomy_folder", True)
 
@@ -49,29 +51,34 @@ def run():
     args = parse_arguments()
 
     message = "# CAT v{0}.".format(about.__version__)
-    shared.give_user_feedback(message, args.log_file, args.quiet,
-            show_time=False)
+    shared.give_user_feedback(
+        message, args.log_file, args.quiet, show_time=False
+    )
 
     errors = []
 
     errors.append(
-            check.check_input_file(args.input_file, args.log_file, args.quiet))
+            check.check_input_file(args.input_file, args.log_file, args.quiet)
+    )
 
     if not args.force:
         errors.append(
                 check.check_output_file(
-                    args.output_file, args.log_file, args.quiet))
+                    args.output_file, args.log_file, args.quiet)
+        )
 
     errors.append(
             check.check_in_and_output_file(
-                args.input_file, args.output_file, args.log_file, args.quiet))
+                args.input_file, args.output_file, args.log_file, args.quiet)
+    )
 
     if True in errors:
         sys.exit(1)
 
     (taxid2parent,
             taxid2rank) = tax.import_nodes(
-                    args.nodes_dmp, args.log_file, args.quiet)
+                    args.nodes_dmp, args.log_file, args.quiet
+    )
     taxid2name = tax.import_names(args.names_dmp, args.log_file, args.quiet)
 
     message = "Appending names..."
@@ -86,9 +93,10 @@ def run():
                     lineage_index = line.index("lineage")
                 else:
                     message = ("{0} is not a supported classification file."
-                            "".format(input_file))
+                               "".format(input_file))
                     shared.give_user_feedback(
-                            message, args.log_file, args.quiet, error=True)
+                        message, args.log_file, args.quiet, error=True
+                    )
 
                     sys.exit(1)
                     
@@ -101,8 +109,8 @@ def run():
 
                 break
         else:
-            message = ("{0} is not a supported classification file.".format(
-                args.input_file))
+            message = ("{0} is not a supported classification file."
+                       "".format(args.input_file))
             shared.give_user_feedback(message, log_file, quiet, error=True)
 
             sys.exit(1)
@@ -114,7 +122,7 @@ def run():
             if line.startswith("#"):
                 if args.only_official:
                     outf1.write("{0}\tsuperkingdom\tphylum\tclass\torder\t"
-                            "family\tgenus\tspecies\n".format(line))
+                                "family\tgenus\tspecies\n".format(line))
                 else:
                     outf1.write("{0}\tfull lineage names\n".format(line))
                     
@@ -144,10 +152,12 @@ def run():
 
             if args.only_official:
                 names = tax.convert_to_official_names(
-                        lineage, taxid2rank, taxid2name, scores)
+                    lineage, taxid2rank, taxid2name, scores
+                )
             else:
                 names = tax.convert_to_names(
-                        lineage, taxid2rank, taxid2name, scores)
+                    lineage, taxid2rank, taxid2name, scores
+                )
 
             outf1.write("{0}\t{1}\n".format("\t".join(line), "\t".join(names)))
 
@@ -159,4 +169,4 @@ def run():
 
 if __name__ == "__main__":
     sys.exit("Run \'CAT add_names\' to add taxonomic names to CAT or BAT "
-            "output files.")
+             "output files.")
