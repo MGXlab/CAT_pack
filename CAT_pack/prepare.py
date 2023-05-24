@@ -45,7 +45,7 @@ def parse_arguments():
         "common_prefix",
         False,
         default="{0}_CAT".format(date),
-        help_=("Prefix for all files to be created."),
+        help_="Prefix for all files to be created."
     )
     shared.add_argument(optional, "quiet", False)
     shared.add_argument(optional, "verbose", False)
@@ -54,20 +54,15 @@ def parse_arguments():
 
     specific = parser.add_argument_group("DIAMOND specific optional arguments")
     shared.add_argument(
-        specific, "nproc", False, default=multiprocessing.cpu_count()
-    )
+        specific, "nproc", False, default=multiprocessing.cpu_count())
 
     (args, extra_args) = parser.parse_known_args()
 
-    extra_args = [
-        arg for (i, arg) in enumerate(extra_args) if (i, arg) != (0, "prepare")
-    ]
+    extra_args = [arg for (i, arg) in enumerate(extra_args) if
+                  (i, arg) != (0, "prepare")]
     if len(extra_args) > 0:
-        sys.exit(
-            "error: too much arguments supplied:\n{0}".format(
-                "\n".join(extra_args)
-            )
-        )
+        sys.exit("error: too much arguments supplied:\n{0}".format(
+            "\n".join(extra_args)))
 
     # Add extra arguments.
     setattr(args, "date", date)
@@ -86,8 +81,7 @@ def memory_bottleneck(args):
             "You can try to find a machine with more memory if you run into "
             "issues or download preconstructed database files from "
             "tbb.bio.uu.nl/bastiaan/CAT_prepare/.".format(
-                args.min_mem, total_memory
-            )
+                args.min_mem, total_memory)
         )
         shared.give_user_feedback(
                 message, args.log_file, args.quiet, warning=True)
@@ -104,11 +98,9 @@ def make_diamond_database(
     log_file,
     quiet,
     verbose,
-    ):
-    message = (
-        "Constructing DIAMOND database {0}.dmnd from {1} using {2} "
-        "cores.".format(common_prefix, fasta_file, nproc)
-    )
+):
+    message = ("Constructing DIAMOND database {0}.dmnd from {1} using {2} "
+               "cores.".format(common_prefix, fasta_file, nproc))
     shared.give_user_feedback(message, log_file, quiet)
 
     diamond_database_prefix = db_dir / pathlib.Path(common_prefix)
@@ -121,7 +113,7 @@ def make_diamond_database(
         "-d",
         diamond_database_prefix,
         "-p",
-        str(nproc),
+        str(nproc)
     ]
 
     if not verbose:
@@ -174,9 +166,7 @@ def import_prot_accession2taxid(
 
     prot_accession2taxid = {}
 
-    with shared.optionally_compressed_handle(
-        prot_accession2taxid_file, "r"
-    ) as f1:
+    with shared.optionally_compressed_handle(prot_accession2taxid_file, "r") as f1:
         for n, line in enumerate(f1):
 
             line = line.rstrip().split("\t")
@@ -201,15 +191,14 @@ def make_fastaid2LCAtaxid_file(
     prot_accession2taxid_file,
     taxid2parent,
     log_file,
-    quiet,
-    ):
+    quiet
+):
     (
         fastaid2prot_accessions,
         prot_accessions_whitelist,
     ) = import_fasta_headers(fasta_file, log_file, quiet)
     prot_accession2taxid = import_prot_accession2taxid(
-        prot_accession2taxid_file, prot_accessions_whitelist, log_file, quiet
-    )
+        prot_accession2taxid_file, prot_accessions_whitelist, log_file, quiet)
 
     message = "Finding LCA of all protein accession numbers in fasta headers."
     shared.give_user_feedback(message, log_file, quiet)
@@ -343,8 +332,7 @@ def prepare(step_list, args):
     if not names_dmp_fp.exists():
         message = "Copying names.dmp in {0}.".format(tax_db)
         shared.give_user_feedback(
-            message, args.log_file, args.quiet, show_time=True
-        )
+            message, args.log_file, args.quiet, show_time=True)
         shutil.copyfile(args.names_dmp, names_dmp_fp)
 
     # ... 2. a dir with the .dmnd and LCA files.
@@ -354,13 +342,11 @@ def prepare(step_list, args):
         if any(cat_db.glob("*.dmnd")):
             message = "A DIAMOND database exists. Skipping creation."
             shared.give_user_feedback(
-                message, args.log_file, args.quiet, show_time=True
-            )
+                message, args.log_file, args.quiet, show_time=True)
     else:
         message = "Database folder is created at {0}.".format(cat_db)
         shared.give_user_feedback(
-            message, args.log_file, args.quiet, show_time=True
-        )
+            message, args.log_file, args.quiet, show_time=True)
         cat_db.mkdir()
 
     if "make_diamond_database" in step_list:
@@ -375,12 +361,10 @@ def prepare(step_list, args):
             args.verbose,
         )
 
-    if ("make_fastaid2LCAtaxid_file" in step_list) or (
-        "make_taxids_with_multiple_offspring_file" in step_list
-        ):
+    if ("make_fastaid2LCAtaxid_file" in step_list or 
+        "make_taxids_with_multiple_offspring_file" in step_list):
         taxid2parent, taxid2rank = tax.import_nodes(
-            args.nodes_dmp, args.log_file, args.quiet
-        )
+            args.nodes_dmp, args.log_file, args.quiet)
 
     if "make_fastaid2LCAtaxid_file" in step_list:
         fname = "{0}.fastaid2LCAtaxid".format(args.common_prefix)
@@ -406,13 +390,13 @@ def prepare(step_list, args):
             taxid2parent,
             args.log_file,
             args.quiet
-            )
+        )
         write_taxids_with_multiple_offspring_file(
             args.taxids_with_multiple_offspring_file,
             taxid2offspring,
             args.log_file,
             args.quiet
-            )
+        )
 
     message = "\n-----------------\n\n{0} CAT prepare is done!".format(
         shared.timestamp())
@@ -426,8 +410,7 @@ def prepare(step_list, args):
         "-t / --taxonomy_folder {1}".format(cat_db, tax_db)
     )
     shared.give_user_feedback(
-        message, args.log_file, args.quiet, show_time=False
-    )
+        message, args.log_file, args.quiet, show_time=False)
 
     return
 
@@ -452,8 +435,7 @@ def run():
             "created by CAT to launch a build."
         )
         shared.give_user_feedback(
-            message, args.log_file, args.quiet, show_time=True
-        )
+            message, args.log_file, args.quiet, show_time=True)
     else:
         prepare(step_list, args)
 
