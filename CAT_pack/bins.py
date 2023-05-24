@@ -16,7 +16,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser(
             prog="CAT bins",
             description="Run Bin Annotation Tool (BAT) on a set of bins.",
-            usage="CAT bins -b -d -t [options] [-h / --help]",
+            usage="CAT bins -b DIR -d DIR -t DIR [options] [-h / --help]",
             add_help=False)
 
     required = parser.add_argument_group("Required arguments")
