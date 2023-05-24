@@ -491,101 +491,109 @@ def run():
 
                         if not args.no_stars:
                             lineage = tax.star_lineage(
-                                    lineage, taxids_with_multiple_offspring)
+                                lineage, taxids_with_multiple_offspring
+                            )
 
                         outf2.write("{0}\t{1}\t{2}\t{3}\t{4}\n".format(
                             ORF,
                             bin_,
                             n_hits,
                             ";".join(lineage[::-1]),
-                            top_bitscore))
+                            top_bitscore)
+                                   )
                                        
                     LCAs_ORFs.append((taxid, top_bitscore),)
                     
             if len(LCAs_ORFs) == 0:
                 outf1.write("{0}\tno taxid assigned\tno hits to database\n"
-                        "".format(bin_))
+                            "".format(bin_))
 
                 continue
 
-            (lineages,
-                    lineages_scores,
-                    based_on_n_ORFs) = tax.find_weighted_LCA(
-                            LCAs_ORFs, taxid2parent, args.f)
+            (
+                lineages, lineages_scores, based_on_n_ORFs
+            ) = tax.find_weighted_LCA(
+                LCAs_ORFs, taxid2parent, args.f
+            )
 
             if lineages == "no ORFs with taxids found.":
                 outf1.write("{0}\tno taxid assigned\t"
-                        "hits not found in taxonomy files\n".format(bin_))
+                            "hits not found in taxonomy files\n".format(bin_))
 
                 continue
 
             if lineages == "no lineage whitelisted.":
                 outf1.write(
-                        "{0}\tno taxid assigned\t"
-                        "no lineage reached minimum bit-score support\n"
-                        "".format(bin_))
+                    "{0}\tno taxid assigned\t"
+                    "no lineage reached minimum bit-score support\n"
+                    "".format(bin_)
+                )
 
                 continue
             
             # The bin has a valid classification.
             n_classified_bins += 1
 
-            total_n_ORFs = sum([len(contig2ORFs[contig]) for
-                contig in bin2contigs[bin_] if contig in contig2ORFs])
+            total_n_ORFs = sum(
+                [len(contig2ORFs[contig]) for
+                 contig in bin2contigs[bin_] if contig in contig2ORFs]
+            )
             
             for (i, lineage) in enumerate(lineages):
                 if not args.no_stars:
                     lineage = tax.star_lineage(
-                            lineage, taxids_with_multiple_offspring)
+                            lineage, taxids_with_multiple_offspring
+                    )
                 
                 scores = ["{0:.2f}".format(score) for
-                        score in lineages_scores[i]]
+                          score in lineages_scores[i]]
                 
                 if len(lineages) == 1:
                     # There is only one classification.
                     outf1.write(
-                            "{0}\t"
-                            "taxid assigned\t"
-                            "based on {1}/{2} ORFs\t"
-                            "{3}\t"
-                            "{4}\n".format(
-                                bin_,
-                                based_on_n_ORFs,
-                                total_n_ORFs,
-                                ";".join(lineage[::-1]),
-                                ";".join(scores[::-1])))
+                        "{0}\t"
+                        "taxid assigned\t"
+                        "based on {1}/{2} ORFs\t"
+                        "{3}\t"
+                        "{4}\n".format(
+                            bin_,
+                            based_on_n_ORFs,
+                            total_n_ORFs,
+                            ";".join(lineage[::-1]),
+                            ";".join(scores[::-1])
+                        )
+                    )
                 else:
                     # There are multiple classifications.
                     outf1.write(
-                            "{0}\t"
-                            "taxid assigned ({1}/{2})\t"
-                            "based on {3}/{4} ORFs\t"
-                            "{5}\t"
-                            "{6}\n".format(
-                                bin_,
-                                i + 1,
-                                len(lineages),
-                                based_on_n_ORFs,
-                                total_n_ORFs,
-                                ";".join(lineage[::-1]),
-                                ";".join(scores[::-1])))
+                        "{0}\t"
+                        "taxid assigned ({1}/{2})\t"
+                        "based on {3}/{4} ORFs\t"
+                        "{5}\t"
+                        "{6}\n".format(
+                            bin_,
+                            i + 1,
+                            len(lineages),
+                            based_on_n_ORFs,
+                            total_n_ORFs,
+                            ";".join(lineage[::-1]),
+                            ";".join(scores[::-1])))
                                    
-    message = ("\n-----------------\n\n"
-            "{0} BAT is done! {1:,d}/{2:,d} bins have taxonomy assigned."
-            "".format(shared.timestamp(), n_classified_bins, len(bin2contigs)))
-    shared.give_user_feedback(message, args.log_file, args.quiet,
-            show_time=False)
+    message = (
+        "\n-----------------\n\n"
+        "{0} BAT is done! {1:,d}/{2:,d} bins have taxonomy assigned."
+        "".format(shared.timestamp(), n_classified_bins, len(bin2contigs))
+    )
+    shared.give_user_feedback(
+        message, args.log_file, args.quiet, show_time=False
+    )
   
     if args.f < 0.5:
         message = ("since f is set to smaller than 0.5, one bin "
-                "may have multiple classifications.")
+                   "may have multiple classifications.")
         shared.give_user_feedback(
-                message,
-                args.log_file,
-                args.quiet,
-                show_time=False,
-                warning=True
-                )
+            message, args.log_file, args.quiet, show_time=False, warning=True
+        )
 
     return
 
