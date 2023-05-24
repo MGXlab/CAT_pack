@@ -507,10 +507,15 @@ def run():
             show_time=False)
   
     if args.f < 0.5:
-        message = ("\nWARNING: since f is set to smaller than 0.5, one bin "
+        message = ("since f is set to smaller than 0.5, one bin "
                 "may have multiple classifications.")
-        shared.give_user_feedback(message, args.log_file, args.quiet,
-                show_time=False)
+        shared.give_user_feedback(
+                message,
+                args.log_file,
+                args.quiet,
+                show_time=False,
+                warning=True
+                )
 
     return
 
