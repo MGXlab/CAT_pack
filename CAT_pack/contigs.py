@@ -14,7 +14,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser(
             prog="CAT contigs",
             description="Run Contig Annotation Tool (CAT).",
-            usage="CAT contigs -c -d -t [options] [-h / --help]",
+            usage="CAT contigs -c FILE -d DIR -t DIR [options] [-h / --help]",
             add_help=False)
     
     required = parser.add_argument_group("Required arguments")
