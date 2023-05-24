@@ -608,8 +608,7 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
         ## 1st pass.
         ## Write acc2taxid file, extract duplicates in their own fasta.
         duplicates = extract_duplicates(
-            proteins_dir, gid2taxid, acc2taxid_fp, log_file, quiet
-        )
+                proteins_dir, gid2taxid, acc2taxid_fp, log_file, quiet)
         with shared.optionally_compressed_handle(duplicates_fp, "w") as outf1:
             for rec in duplicates.values():
                 outf1.write(">{0}\n{1}\n".format(rec.id, rec.seq))
@@ -619,8 +618,13 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
         message = "2nd pass: Retrieving unique sequences."
         shared.give_user_feedback(message, log_file, quiet)
         write_singletons(
-            proteins_dir, duplicates, gid2taxid, singletons_fp, log_file, quiet
-        )
+                proteins_dir,
+                duplicates,
+                gid2taxid,
+                singletons_fp,
+                log_file,
+                quiet
+                )
 
         message = "Concatenating sequence files."
         shared.give_user_feedback(message, log_file, quiet)
