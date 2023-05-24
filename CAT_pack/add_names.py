@@ -13,7 +13,8 @@ def parse_arguments():
     parser = argparse.ArgumentParser(
             prog="CAT add_names",
             description="Add taxonomic names to CAT or BAT output files.",
-            usage="CAT add_names -i -o -t [options] [-h / --help]",
+            usage=("CAT add_names -i FILE -o FILE -t DIR "
+                "[options] [-h / --help]"),
             add_help=False)
     
     required = parser.add_argument_group("Required arguments")
