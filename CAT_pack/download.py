@@ -212,6 +212,9 @@ def load_gtdb_md5sums(md5sums_file):
 
 def check_gtdb_md5s(data_dir, md5_dict, log_file, quiet):
     for f in data_dir.glob("*.gz"):
+        if f.name not in md5_dict:
+            continue
+            
         md5 = check.gz_md5(f)
         if md5_dict[f.name] != md5:
             message = "MD5 of {0} does not check out.".format(f.resolve())
