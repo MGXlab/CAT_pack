@@ -17,7 +17,7 @@ def check_md5_gz(gz_file, md5_file, log_file, quiet):
 
     if md5_exp == "":
         message = ("no MD5 found in {0}. Integrity of {1} can not be "
-                "established.".format(md5_file, gz_file))
+                   "established.".format(md5_file, gz_file))
         shared.give_user_feedback(message, log_file, quiet, warning=True)
     else:
         md5 = gz_md5(gz_file)
@@ -77,8 +77,8 @@ def check_out_prefix(out_prefix, log_file, quiet):
     error = False
 
     if os.path.isdir(out_prefix):
-        message = "prefix for output files ({0}) is a directory.".format(
-                out_prefix)
+        message = ("prefix for output files ({0}) is a directory."
+                   "".format(out_prefix))
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
@@ -87,7 +87,7 @@ def check_out_prefix(out_prefix, log_file, quiet):
 
     if not os.path.isdir(dir_):
         message = ("can not find output directory {0} to which output files "
-                "should be written.".format(dir_))
+                   "should be written.".format(dir_))
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
@@ -107,7 +107,7 @@ def check_prodigal_binaries(path_to_prodigal, log_file, quiet):
         shared.give_user_feedback(message, log_file, quiet)
     except OSError:
         message = ("can not find Prodigal. Please check whether it is "
-                "installed or the path to the binaries is provided.")
+                   "installed or the path to the binaries is provided.")
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
@@ -128,7 +128,7 @@ def check_diamond_binaries(path_to_diamond, log_file, quiet):
         shared.give_user_feedback(message, log_file, quiet)
     except OSError:
         message = ("can not find DIAMOND. Please check whether it is "
-                "installed or the path to the binaries is provided.")
+                   "installed or the path to the binaries is provided.")
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
@@ -165,18 +165,19 @@ def check_bin_folder(bin_folder, bin_suffix, log_file, quiet):
 
     if len(tmp) == 0:
         message = (
-                "no bins found with suffix {0} in bin folder. You can set the "
-                "suffix with the [-s / --bin_suffix] argument.".format(
-                    bin_suffix))
+            "no bins found with suffix {0} in bin folder. You can set the "
+            "suffix with the [-s / --bin_suffix] argument.".format(bin_suffix)
+        )
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
     elif len(tmp) == 1:
         message = (
-                "a single bin is found. You can run BAT in single bin mode, "
-                "with \"CAT bin\" as opposed to \"CAT bins\" for a set of "
-                "bins. Both modes will give the same results, but you might "
-                "find single mode more convenient for your workflow.")
+            "a single bin is found. You can run BAT in single bin mode, with "
+            "\'CAT bin\' as opposed to \'CAT bins\' for a set of bins. Both "
+            "modes will give the same results, but you might find single mode "
+            "more convenient for your workflow."
+        )
         shared.give_user_feedback(message, log_file, quiet, warning=True)
 
     return error
@@ -190,9 +191,9 @@ def check_bin_fasta(bin_fasta, log_file, quiet):
 
     if os.path.isdir(bin_fasta):
         message = (
-                "{0} is a directory. If you want to classify more than 1 bin "
-                "you can run \"CAT bins\" instead of \"CAT bin\".".format(
-                    bin_fasta))
+            "{0} is a directory. If you want to classify more than 1 bin you "
+            "can run \'CAT bins\' instead of \'CAT bin\'.".format(bin_fasta)
+        )
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
@@ -210,7 +211,8 @@ def check_folders_for_run(
         taxids_with_multiple_offspring_file,
         step_list,
         log_file,
-        quiet):
+        quiet
+):
     error = False
 
     if not os.path.isdir(taxonomy_folder):
@@ -221,7 +223,7 @@ def check_folders_for_run(
     else:
         if not nodes_dmp or not names_dmp:
             message = ("nodes.dmp and / or names.dmp not found in the "
-                    "taxonomy folder.")
+                       "taxonomy folder.")
             shared.give_user_feedback(message, log_file, quiet, error=True)
 
             error = True
@@ -246,7 +248,7 @@ def check_folders_for_run(
 
         if not taxids_with_multiple_offspring_file:
             message = ("file taxids_with_multiple_offspring not found in "
-                    "database folder.")
+                       "database folder.")
             shared.give_user_feedback(message, log_file, quiet, error=True)
 
             error = True
@@ -259,9 +261,9 @@ def check_output_file(output_file, log_file, quiet):
 
     if os.path.isfile(output_file):
         message = (
-                "output file {0} already exists. You can choose to overwrite "
-                "existing files with the [--force] argument.".format(
-                    output_file))
+            "output file {0} already exists. You can choose to overwrite "
+            "existing files with the [--force] argument.".format(output_file)
+        )
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
@@ -327,14 +329,16 @@ def check_fasta(file_, log_file, quiet):
 
 
 def check_whether_ORFs_are_based_on_contigs(
-        contig_names, contig2ORFs, log_file, quiet):
+        contig_names, contig2ORFs, log_file, quiet
+):
     for contig in contig2ORFs:
         if contig not in contig_names:
             message = (
-                    "found a protein in the predicted proteins fasta file "
-                    "that can not be traced back to one of the contigs in the "
-                    "contigs fasta file: {0}. Proteins should be named "
-                    "contig_name_#.".format(contig2ORFs[contig][0]))
+                "found a protein in the predicted proteins fasta file that "
+                "can not be traced back to one of the contigs in the contigs "
+                "fasta file: {0}. Proteins should be named contig_name_#."
+                "".format(contig2ORFs[contig][0])
+            )
             shared.give_user_feedback(message, log_file, quiet, error=True)
 
             sys.exit(1)
