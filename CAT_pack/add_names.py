@@ -52,24 +52,20 @@ def run():
 
     message = "# CAT v{0}.".format(about.__version__)
     shared.give_user_feedback(
-        message, args.log_file, args.quiet, show_time=False
-    )
+        message, args.log_file, args.quiet, show_time=False)
 
     errors = []
 
     errors.append(
-            check.check_input_file(args.input_file, args.log_file, args.quiet)
-    )
+        check.check_input_file(args.input_file, args.log_file, args.quiet))
 
     if not args.force:
         errors.append(
-                check.check_output_file(
-                    args.output_file, args.log_file, args.quiet)
-        )
+            check.check_output_file(args.output_file, args.log_file, args.quiet))
 
     errors.append(
-            check.check_in_and_output_file(
-                args.input_file, args.output_file, args.log_file, args.quiet)
+        check.check_in_and_output_file(
+            args.input_file, args.output_file, args.log_file, args.quiet)
     )
 
     if True in errors:
@@ -77,8 +73,7 @@ def run():
 
     (taxid2parent,
             taxid2rank) = tax.import_nodes(
-                    args.nodes_dmp, args.log_file, args.quiet
-    )
+        args.nodes_dmp, args.log_file, args.quiet)
     taxid2name = tax.import_names(args.names_dmp, args.log_file, args.quiet)
 
     message = "Appending names..."
@@ -95,8 +90,7 @@ def run():
                     message = ("{0} is not a supported classification file."
                                "".format(input_file))
                     shared.give_user_feedback(
-                        message, args.log_file, args.quiet, error=True
-                    )
+                        message, args.log_file, args.quiet, error=True)
 
                     sys.exit(1)
                     
