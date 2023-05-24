@@ -12,7 +12,8 @@ def parse_arguments():
     parser = argparse.ArgumentParser(
             prog="CAT summarise",
             description="Summarise a named CAT or BAT classification file.",
-            usage="CAT summarise -i -o (-c) [options] [-h / --help]",
+            usage=("CAT summarise -i FILE -o FILE (-c FILE) "
+                "[options] [-h / --help]"),
             add_help=False)
     
     required = parser.add_argument_group("Required arguments")
