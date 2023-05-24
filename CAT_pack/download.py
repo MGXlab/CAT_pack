@@ -586,7 +586,8 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
     # NAMES.
     names_dmp = output_dir / pathlib.Path("names.dmp")
     if not names_dmp.exists():
-        message = "Writing names information to {0}.".format(names_dmp.resolve())
+        message = "Writing names information to {0}.".format(
+            names_dmp.resolve())
         shared.give_user_feedback(message, log_file, quiet)
         write_names_dmp(all_taxa_tsv, names_dmp)
     else:
