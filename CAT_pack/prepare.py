@@ -21,11 +21,11 @@ def parse_arguments():
         prog="CAT prepare",
         description="Construct CAT/BAT database files.",
         usage=(
-            "CAT prepare --db_fasta path/to/seqs.fa.gz "
-            "--acc2tax path/to/accession2taxid.txt "
-            "--names path/to/names.dmp "
-            "--nodes path/to/nodes.dmp "
-            "--db_dir path/to/db_dir "
+            "CAT prepare --db_fasta FILE "
+            "--acc2tax FILE "
+            "--names FILE "
+            "--nodes FILE "
+            "--db_dir DIR "
             "[options] [-h / --help]"
         ),
         add_help=False,
