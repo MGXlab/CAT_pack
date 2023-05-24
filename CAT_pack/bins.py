@@ -80,7 +80,7 @@ def parse_arguments():
         if args.top < 15:
             sys.exit(
                 "error: [--top] can only be set lower than 15 with the "
-                "[--I_know_what_Im_doing] flag. See README.md as to why ""this "
+                "[--I_know_what_Im_doing] flag. See README.md as to why this "
                 "is the case."
             )
             
