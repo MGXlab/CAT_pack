@@ -104,7 +104,7 @@ def make_diamond_database(
     log_file,
     quiet,
     verbose,
-):
+    ):
     message = (
         "Constructing DIAMOND database {0}.dmnd from {1} using {2} "
         "cores.".format(common_prefix, fasta_file, nproc)
@@ -168,8 +168,7 @@ def import_fasta_headers(fasta_file, log_file, quiet):
 
 
 def import_prot_accession2taxid(
-    prot_accession2taxid_file, prot_accessions_whitelist, log_file, quiet
-):
+    prot_accession2taxid_file, prot_accessions_whitelist, log_file, quiet):
     message = "Loading file {0}.".format(prot_accession2taxid_file)
     shared.give_user_feedback(message, log_file, quiet)
 
@@ -203,7 +202,7 @@ def make_fastaid2LCAtaxid_file(
     taxid2parent,
     log_file,
     quiet,
-):
+    ):
     (
         fastaid2prot_accessions,
         prot_accessions_whitelist,
@@ -302,8 +301,7 @@ def find_offspring(fastaid2LCAtaxid_file, taxid2parent, log_file, quiet):
 
 
 def write_taxids_with_multiple_offspring_file(
-    taxids_with_multiple_offspring_file, taxid2offspring, log_file, quiet
-):
+    taxids_with_multiple_offspring_file, taxid2offspring, log_file, quiet):
     message = "Writing {0}.".format(taxids_with_multiple_offspring_file)
     shared.give_user_feedback(message, log_file, quiet)
 
@@ -379,7 +377,7 @@ def prepare(step_list, args):
 
     if ("make_fastaid2LCAtaxid_file" in step_list) or (
         "make_taxids_with_multiple_offspring_file" in step_list
-    ):
+        ):
         taxid2parent, taxid2rank = tax.import_nodes(
             args.nodes_dmp, args.log_file, args.quiet
         )
@@ -407,21 +405,19 @@ def prepare(step_list, args):
             args.fastaid2LCAtaxid_file,
             taxid2parent,
             args.log_file,
-            args.quiet,
-        )
+            args.quiet
+            )
         write_taxids_with_multiple_offspring_file(
             args.taxids_with_multiple_offspring_file,
             taxid2offspring,
             args.log_file,
-            args.quiet,
-        )
+            args.quiet
+            )
 
     message = "\n-----------------\n\n{0} CAT prepare is done!".format(
-        shared.timestamp()
-    )
+        shared.timestamp())
     shared.give_user_feedback(
-        message, args.log_file, args.quiet, show_time=False
-    )
+        message, args.log_file, args.quiet, show_time=False)
 
     message = (
         "\nSupply the following arguments to CAT or BAT if you want to "
