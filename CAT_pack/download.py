@@ -472,8 +472,7 @@ def extract_duplicates(proteins_dir, gid2taxid, acc2taxid_fp, log_file, quiet):
 
 
 def write_singletons(
-    proteins_dir, duplicates, gid2taxid, singletons_fp, log_file, quiet
-):
+    proteins_dir, duplicates, gid2taxid, singletons_fp, log_file, quiet):
     seq_counter, file_counter, skipped = 0, 0, 0
     with shared.optionally_compressed_handle(singletons_fp, "w") as outf1:
         for f in proteins_dir.rglob("*/*.faa"):
