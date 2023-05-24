@@ -83,7 +83,7 @@ def multi_download(url_list, output_dir, log_file, quiet, prefix=None):
         output_path = output_dir / pathlib.Path(output_basename)
         if output_path in existing_files:
             message = (
-                "Skipping download of file {0} . It already exists.".format(
+                "Skipping download of file {0}. It already exists.".format(
                     output_path.name
                 )
             )
