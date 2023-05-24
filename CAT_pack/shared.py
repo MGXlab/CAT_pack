@@ -46,7 +46,6 @@ def timestamp():
 
 
 def add_argument(argument_group, dest, required, default=None, help_=None):
-
     if dest == "contigs_fasta":
         if help_ is None:
             help_ = "Path to contigs fasta file."
