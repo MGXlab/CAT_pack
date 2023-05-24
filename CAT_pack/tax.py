@@ -63,7 +63,7 @@ def import_fastaid2LCAtaxid(fastaid2LCAtaxid_file, all_hits, log_file, quiet):
 
 
 def import_taxids_with_multiple_offspring(
-        taxids_with_multiple_offspring_file, log_file, quiet):
+    taxids_with_multiple_offspring_file, log_file, quiet):
     message = "Loading file {0}.".format(taxids_with_multiple_offspring_file)
     shared.give_user_feedback(message, log_file, quiet)
 
@@ -116,8 +116,10 @@ def find_LCA_for_ORF(hits, fastaid2LCAtaxid, taxid2parent):
             pass
         
     if len(list_of_lineages) == 0:
-        return ("no taxid found ({0})".format(";".join([i[0] for i in hits])),
-                top_bitscore)
+        return (
+            "no taxid found ({0})".format(";".join([i[0] for i in hits])),
+            top_bitscore
+        )
 
     overlap = set.intersection(*map(set, list_of_lineages))
 
@@ -174,9 +176,10 @@ def find_weighted_LCA(LCAs_ORFs, taxid2parent, f):
 
     if len(list_of_lineages) == 0:
         return (
-                "no ORFs with taxids found.",
-                "no ORFs with taxids found.",
-                "no ORFs with taxids found.")
+            "no ORFs with taxids found.",
+            "no ORFs with taxids found.",
+            "no ORFs with taxids found."
+        )
 
     taxid2bitscore = {}
     for (i, lineage) in enumerate(list_of_lineages):
@@ -195,9 +198,10 @@ def find_weighted_LCA(LCAs_ORFs, taxid2parent, f):
 
     if len(whitelisted_lineages) == 0:
         return (
-                "no lineage whitelisted.",
-                "no lineage whitelisted.",
-                "no lineage whitelisted.")
+            "no lineage whitelisted.",
+            "no lineage whitelisted.",
+            "no lineage whitelisted."
+        )
 
     whitelisted_lineages = sorted(whitelisted_lineages,
             key=lambda x: len(x), reverse=True)
@@ -211,7 +215,7 @@ def find_weighted_LCA(LCAs_ORFs, taxid2parent, f):
             longest_lineages.append(whitelisted_lineage)
 
             scores = [taxid2bitscore[taxid] / sum(list_of_bitscores) for
-                    taxid in whitelisted_lineage]
+                      taxid in whitelisted_lineage]
             longest_lineages_scores.append(scores)
 
             taxid_trace |= set(whitelisted_lineage)
@@ -248,7 +252,7 @@ def convert_to_names(lineage, taxid2rank, taxid2name, scores=None):
 
 def convert_to_official_names(lineage, taxid2rank, taxid2name, scores=None):
     official_ranks = ["superkingdom", "phylum", "class", "order", "family",
-            "genus", "species"]
+                      "genus", "species"]
     lineage_ranks = [taxid2rank[taxid.rstrip("*")] for taxid in lineage]
 
     official_names = ["no support"] * 7
