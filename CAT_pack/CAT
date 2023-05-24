@@ -14,10 +14,12 @@ import summarise
 
 def usage():
     message = (
-            "usage: CAT (download | prepare | contigs | bin | bins | "
-            "add_names | summarise) [-v / --version] [-h / --help]\n"
-            "CAT: error: one of the arguments download prepare contigs "
-            "bin bins add_names summarise is required")
+        "usage: CAT (download | prepare | contigs | bin | bins | add_names | "
+        "summarise) [-v / --version] [-h / --help]\n"
+        "CAT: error: one of the arguments "
+        "download prepare contigs bin bins add_names summarise "
+        "is required"
+    )
     
     sys.stdout.write("{0}\n".format(message))
 
@@ -35,8 +37,8 @@ def version():
     
 def help():
     message = (
-        "usage: CAT (prepare | contigs | bin | bins | add_names | "
-        "summarise) [-v / --version] [-h / --help]\n\n"
+        "usage: CAT (prepare | contigs | bin | bins | add_names | summarise) "
+        "[-v / --version] [-h / --help]\n\n"
         "Run Contig Annotation Tool (CAT) or "
         "Bin Annotation Tool (BAT).\n\n"
         "Required choice:\n"
@@ -50,7 +52,8 @@ def help():
         "\n\n"
         "Optional arguments:\n"
         "  -v, --version\t\tPrint version information and exit.\n"
-        "  -h, --help\t\tShow this help message and exit.")
+        "  -h, --help\t\tShow this help message and exit."
+    )
 
     sys.stdout.write("{0}\n".format(message))
 
