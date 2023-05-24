@@ -77,9 +77,9 @@ def memory_bottleneck(args):
     if error:
         message = (
             "At least {0}GB of memory is recommended for large database "
-            "construction (e.g. nr). {1}GB is found on your system. "
-            "You can try to find a machine with more memory if you run into "
-            "issues or download preconstructed database files from "
+            "construction (e.g. nr). {1}GB is found on your system. You can "
+            "try to find a machine with more memory if you run into issues or "
+            "download preconstructed database files from "
             "tbb.bio.uu.nl/bastiaan/CAT_prepare/.".format(
                 args.min_mem, total_memory)
         )
