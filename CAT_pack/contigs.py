@@ -115,8 +115,8 @@ def run():
     elif not args.proteins_fasta and args.alignment_file:
         message = (
             "if you want CAT to directly do the classification, you should "
-            "not only supply an alignment table but also a "
-            "predicted protein fasta file with argument [-p / --proteins]."
+            "not only supply an alignment table but also a predicted protein "
+            "fasta file with argument [-p / --proteins]."
         )
         shared.give_user_feedback(
             message, args.log_file, args.quiet, error=True)
