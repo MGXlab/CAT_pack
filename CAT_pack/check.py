@@ -16,9 +16,9 @@ def check_md5_gz(gz_file, md5_file, log_file, quiet):
         md5_exp = f1.read().strip().split(" ")[0]
 
     if md5_exp == "":
-        message = ("WARNING: no MD5 found in {0}. Integrity of {1} can not be "
+        message = ("no MD5 found in {0}. Integrity of {1} can not be "
                 "established.".format(md5_file, gz_file))
-        shared.give_user_feedback(message, log_file, quiet)
+        shared.give_user_feedback(message, log_file, quiet, warning=True)
     else:
         md5 = gz_md5(gz_file)
 
@@ -173,11 +173,11 @@ def check_bin_folder(bin_folder, bin_suffix, log_file, quiet):
         error = True
     elif len(tmp) == 1:
         message = (
-                "WARNING: a single bin is found. You can run BAT in single "
-                "bin mode, with \"CAT bin\" as opposed to \"CAT bins\" for a "
-                "set of bins. Both modes will give the same results, but you "
-                "might find single mode more convenient for your workflow.")
-        shared.give_user_feedback(message, log_file, quiet)
+                "a single bin is found. You can run BAT in single bin mode, "
+                "with \"CAT bin\" as opposed to \"CAT bins\" for a set of "
+                "bins. Both modes will give the same results, but you might "
+                "find single mode more convenient for your workflow.")
+        shared.give_user_feedback(message, log_file, quiet, warning=True)
 
     return error
 
