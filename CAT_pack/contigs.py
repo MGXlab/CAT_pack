@@ -368,7 +368,8 @@ def run():
             if lineages == "no lineage whitelisted.":
                 outf1.write(
                     "{0}\tno taxid assigned\t"
-                    "no lineage reached minimum bit-score support\n".format(contig)
+                    "no lineage reached minimum bit-score support\n"
+                    "".format(contig)
                 )
 
                 continue
