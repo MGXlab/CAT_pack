@@ -780,10 +780,13 @@ def print_variables(args, step_list=None):
 
 
 def give_user_feedback(
-    message, log_file=None, quiet=False, show_time=True, error=False
-):
+    message, log_file=None, quiet=False, show_time=True, error=False, warning=False
+    ):
     if error:
         message = "ERROR: {0}".format(message)
+        
+    if warning:
+        message = "WARNING: {0}".format(message)
 
     if show_time:
         message = "{0} {1}".format(timestamp(), message)
