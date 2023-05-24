@@ -180,7 +180,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "cleanup":
         if help_ is None:
             help_ = ("Remove unnecessary files after all data have been "
-                    "processed.")
+                     "processed.")
         argument_group.add_argument(
             "--cleanup",
             dest="cleanup",
@@ -191,8 +191,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "bin_suffix":
         if help_ is None:
             help_ = "Suffix of bins in bin directory (default: {0}).".format(
-                default
-            )
+                default)
         argument_group.add_argument(
             "-s",
             "--bin_suffix",
@@ -221,8 +220,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "f":
         if help_ is None:
             help_ = "f parameter [0-0.99] (default: {0:.2f})." "".format(
-                default
-            )
+                default)
         argument_group.add_argument(
             "-f",
             "--fraction",
@@ -627,36 +625,28 @@ def expand_arguments(args):
     setattr(args, "log_file", log_file)
 
     if "db_dir" in args:
-
         database_folder_path = str(
-            pathlib.Path(args.db_dir) / pathlib.Path("db")
-        )
+            pathlib.Path(args.db_dir) / pathlib.Path("db"))
         diamond_database_name = "{0}.dmnd".format(args.common_prefix)
         diamond_database_path = str(
-            database_folder_path / pathlib.Path(diamond_database_name)
-        )
+            database_folder_path / pathlib.Path(diamond_database_name))
 
         taxonomy_folder_path = str(
-            pathlib.Path(args.db_dir) / pathlib.Path("tax")
-        )
+            pathlib.Path(args.db_dir) / pathlib.Path("tax"))
         fastaid2LCAtaxid_fname = "{0}.fastaid2LCAtaxid".format(
-            args.common_prefix
-        )
+            args.common_prefix)
         fastaid2LCAtaxid_path = database_folder_path / pathlib.Path(
-            fastaid2LCAtaxid_fname
-        )
+            fastaid2LCAtaxid_fname)
         fastaid2LCAtaxid_file = str(fastaid2LCAtaxid_path)
 
         taxids_with_multiple_offspring_fname = (
-            "{0}.taxids_with_multiple_offspring".format(args.common_prefix)
-        )
+            "{0}.taxids_with_multiple_offspring".format(args.common_prefix))
         taxids_with_multiple_offspring_path = (
             database_folder_path
             / pathlib.Path(taxids_with_multiple_offspring_fname)
         )
         taxids_with_multiple_offspring_file = str(
-            taxids_with_multiple_offspring_path
-        )
+            taxids_with_multiple_offspring_path)
 
         setattr(args, "database_folder", database_folder_path)
         setattr(args, "taxonomy_folder", taxonomy_folder_path)
@@ -702,16 +692,14 @@ def explore_taxonomy_folder(args):
             # No need to check for this
             elif file_.endswith("prot.accession2taxid.FULL.gz"):
                 prot_accession2taxid_file = "{0}{1}".format(
-                    args.taxonomy_folder, file_
-                )
+                    args.taxonomy_folder, file_)
             elif (
                 file_.endswith("prot.accession2taxid.gz")
                 and prot_accession2taxid_file is None
             ):
                 # Legacy prot_accession2taxid_file.
                 prot_accession2taxid_file = "{0}{1}".format(
-                    args.taxonomy_folder, file_
-                )
+                    args.taxonomy_folder, file_)
 
     setattr(args, "nodes_dmp", nodes_dmp)
     setattr(args, "names_dmp", names_dmp)
@@ -729,19 +717,16 @@ def explore_database_folder(args):
     if os.path.isdir(args.database_folder):
         for file_ in os.listdir(args.database_folder):
             if file_.endswith(
-                (".fa", ".fasta", ".fna", "fa.gz", "fasta.gz", "fna.gz")
-            ):
+                (".fa", ".fasta", ".fna", "fa.gz", "fasta.gz", "fna.gz")):
                 fasta_file = "{0}{1}".format(args.database_folder, file_)
             elif file_.endswith(".dmnd"):
                 diamond_database = "{0}{1}".format(args.database_folder, file_)
             elif file_.endswith("fastaid2LCAtaxid"):
                 fastaid2LCAtaxid_file = "{0}{1}".format(
-                    args.database_folder, file_
-                )
+                    args.database_folder, file_)
             elif file_.endswith("taxids_with_multiple_offspring"):
-                taxids_with_multiple_offspring_file = "{0}{1}" "".format(
-                    args.database_folder, file_
-                )
+                taxids_with_multiple_offspring_file = "{0}{1}".format(
+                    args.database_folder, file_)
 
     setattr(args, "db_fasta", fasta_file)
     setattr(args, "diamond_database", diamond_database)
@@ -770,8 +755,7 @@ def print_variables(args, step_list=None):
         if step_list is not None:
             message = "\nStep list: {0}".format(step_list)
             give_user_feedback(
-                message, args.log_file, args.quiet, show_time=False
-            )
+                message, args.log_file, args.quiet, show_time=False)
 
         message = "\n-----------------\n"
         give_user_feedback(message, args.log_file, args.quiet, show_time=False)
@@ -780,8 +764,7 @@ def print_variables(args, step_list=None):
 
 
 def give_user_feedback(
-    message, log_file=None, quiet=False, show_time=True, error=False, warning=False
-    ):
+    message, log_file=None, quiet=False, show_time=True, error=False, warning=False):
     if error:
         message = "ERROR: {0}".format(message)
         
@@ -1035,8 +1018,7 @@ def parse_tabular_alignment(alignment_file, one_minus_r, log_file, quiet):
             hit = line[1]
 
             ORF2hits[ORF].append(
-                (hit, bitscore),
-            )
+                (hit, bitscore),)
             all_hits.add(hit)
         else:
             # The hit is not included because its bit-score is too low.
