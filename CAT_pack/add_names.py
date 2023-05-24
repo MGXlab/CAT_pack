@@ -61,7 +61,9 @@ def run():
 
     if not args.force:
         errors.append(
-            check.check_output_file(args.output_file, args.log_file, args.quiet))
+            check.check_output_file(
+                args.output_file, args.log_file, args.quiet)
+        )
 
     errors.append(
         check.check_in_and_output_file(
