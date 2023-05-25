@@ -598,7 +598,29 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
     proteins_dir = output_dir / pathlib.Path("protein_faa_reps")
     if not proteins_dir.is_dir():
         with tarfile.open(proteins_tar, "r:gz") as tar:
-            tar.extractall(output_dir)
+            
+            import os
+            
+            def is_within_directory(directory, target):
+                
+                abs_directory = os.path.abspath(directory)
+                abs_target = os.path.abspath(target)
+            
+                prefix = os.path.commonprefix([abs_directory, abs_target])
+                
+                return prefix == abs_directory
+            
+            def safe_extract(tar, path=".", members=None, *, numeric_owner=False):
+            
+                for member in tar.getmembers():
+                    member_path = os.path.join(path, member.name)
+                    if not is_within_directory(path, member_path):
+                        raise Exception("Attempted Path Traversal in Tar File")
+            
+                tar.extractall(path, members, numeric_owner=numeric_owner) 
+                
+            
+            safe_extract(tar, output_dir)
     else:
         message = "Proteins directory {0} already exists.".format(
             proteins_dir.resolve()
