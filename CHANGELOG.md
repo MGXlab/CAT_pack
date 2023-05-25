@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.X
+* GTDB support.
+* Sequence databases (NCBI nr or GTDB) can be downloaded with `CAT download`, and CAT databases constructed with `CAT prepare`.
+* Sensible defaults of DIAMOND parameters for high memory machines: `--top 11 --block_size 12 --index_chunks 1`.
+* Preparations for Read Annotation Tool (RAT).
+
 ## 5.2.3
 Minor bug fix for `CAT add_names`.
 
