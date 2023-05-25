@@ -474,7 +474,7 @@ def extract_duplicates(proteins_dir, gid2taxid, acc2taxid_fp, log_file, quiet):
         # This else is part of the outter for-loop.
         # It executes when the for loop finishes.
         else:
-            # Create some whitespace for aligned printing
+            # Create some whitespace for aligned printing.
             padding = len("[YYYY-MM-DD HH:MM:SS] ") * " "
             
             # Calculate the total number of identified multiplets.
@@ -516,11 +516,11 @@ def write_singletons(
                     skipped += 1
                     
             if file_counter % 1000 == 0 and file_counter != 0:
-                message = ("Written {0} sequences from {1} files ({2} skipped)"
+                message = ("Written {0} sequences from {1} files ({2} skipped)."
                         "".format(seq_counter, file_counter, skipped))
                 shared.give_user_feedback(message, log_file, quiet)
         else:
-            message = ("Written {0} sequences from {1} files ({2} skipped)"
+            message = ("Written {0} sequences from {1} files ({2} skipped)."
                     "".format(seq_counter, file_counter, skipped))
             shared.give_user_feedback(message, log_file, quiet)
             
@@ -530,17 +530,20 @@ def write_singletons(
 def concatenate_trees(bac_tree_fp, ar_tree_fp, all_tree_fp):
     """Concatenate the newick trees under a common root in a new file."""
 
-    # Load the bacteria tree as a string and make it a subtree
+    # Load the Bacteria tree as a string and make it a subtree.
     bac_tree = bac_tree_fp.read_text()
     bac_tree = bac_tree.rstrip().replace(
         "d__Bacteria;", "'100.0:d__Bacteria':1.0"
     )
-    # Load the Archaea tree as a string and make it a subtree
+    
+    # Load the Archaea tree as a string and make it a subtree.
     ar_tree = ar_tree_fp.read_text()
     ar_tree = ar_tree.rstrip().replace("d__Archaea;", "'100.0:d__Archaea':1.0")
-    # Concatenate the subtrees under a node named root
+    
+    # Concatenate the subtrees under a node named root.
     all_tree = "({0},{1})root;\n".format(ar_tree, bac_tree)
-    # Write the file
+    
+    # Write the file.
     all_tree_fp.write_text(all_tree)
     
     return
