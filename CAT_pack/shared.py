@@ -689,7 +689,7 @@ def explore_taxonomy_folder(args):
                 nodes_dmp = "{0}{1}".format(args.taxonomy_folder, file_)
             elif file_ == "names.dmp":
                 names_dmp = "{0}{1}".format(args.taxonomy_folder, file_)
-            # No need to check for this
+            # No need to check for this.
             elif file_.endswith("prot.accession2taxid.FULL.gz"):
                 prot_accession2taxid_file = "{0}{1}".format(
                     args.taxonomy_folder, file_)
