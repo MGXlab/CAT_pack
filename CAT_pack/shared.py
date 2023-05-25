@@ -813,19 +813,13 @@ def run_prodigal(
     try:
         command = [
             path_to_prodigal,
-            "-i",
-            contigs_fasta,
-            "-a",
-            proteins_fasta,
-            "-o",
-            proteins_gff,
-            "-p",
-            "meta",
-            "-g",
-            "11",
+            "-i", contigs_fasta,
+            "-a", proteins_fasta,
+            "-o", proteins_gff,
+            "-p", "meta",
+            "-g", "11",
             "-q",
-            "-f",
-            "gff",
+            "-f", "gff"
         ]
         subprocess.check_call(command)
     except:
@@ -873,37 +867,25 @@ def run_diamond(args):
             args.block_size,
             args.index_chunks,
             args.tmpdir,
-            compression,
+            compression
         )
     )
     give_user_feedback(message, args.log_file, args.quiet)
 
     try:
         command = [
-            args.path_to_diamond,
-            "blastp",
-            "-d",
-            args.diamond_database,
-            "-q",
-            args.proteins_fasta,
-            "--top",
-            str(args.top),
-            "--matrix",
-            "BLOSUM62",
-            "--evalue",
-            "0.001",
-            "-o",
-            args.alignment_file,
-            "-p",
-            str(args.nproc),
-            "--block-size",
-            str(args.block_size),
-            "--index-chunks",
-            str(args.index_chunks),
-            "--tmpdir",
-            args.tmpdir,
-            "--compress",
-            compression,
+            args.path_to_diamond, "blastp",
+            "-d", args.diamond_database,
+            "-q", args.proteins_fasta,
+            "--top", str(args.top),
+            "--matrix", "BLOSUM62",
+            "--evalue", "0.001",
+            "-o", args.alignment_file,
+            "-p", str(args.nproc),
+            "--block-size", str(args.block_size),
+            "--index-chunks", str(args.index_chunks),
+            "--tmpdir", args.tmpdir,
+            "--compress", compression
         ]
 
         if not args.verbose:
