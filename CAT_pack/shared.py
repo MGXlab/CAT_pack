@@ -594,7 +594,7 @@ def add_all_diamond_arguments(argument_group):
     add_argument(argument_group, "index_chunks", False, default=1)
     add_argument(argument_group, "tmpdir", False)
     add_argument(argument_group, "compress", False)
-    add_argument(argument_group, "top", False, default=15)
+    add_argument(argument_group, "top", False, default=11)
 
     return
 
