@@ -336,7 +336,7 @@ def genome_id_to_taxid(taxonomy_tsv):
 def fastaIterator(fasta_in, gid2taxid):
     """Yield fastaRecord tuples with more information.
 
-    This is adapted from biopython"s SimpleFastaParser.
+    This is adapted from biopython's SimpleFastaParser.
     https://github.com/biopython/biopython/blob/eec86d4bcb04bfcf86495f92f12faf3ff98a288d/Bio/SeqIO/FastaIO.py#L24
 
     The gid2taxid dictionary holds the mapping of a given genome accession
@@ -515,7 +515,7 @@ def concatenate_trees(bac_tree_fp, ar_tree_fp, all_tree_fp):
 
 
 def process_gtdb(output_dir, log_file, quiet, cleanup=False):
-    # Using `latest` as an entry point.
+    # Using "latest" as an entry point.
     # This needs to be checked for future versions.
     version = get_gtdb_latest_version()
     
@@ -705,4 +705,4 @@ def run():
 
 if __name__ == "__main__":
     sys.exit("Run \'CAT download\' to download and preprocess data from "
-            "NCBI nr or GTDB.")
+             "NCBI nr or GTDB.")
