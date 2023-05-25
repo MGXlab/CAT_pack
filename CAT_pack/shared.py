@@ -522,8 +522,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "index_chunks":
         if help_ is None:
             help_ = (
-                "DIAMOND index-chunks parameter (default: {0}). Set to 1 "
-                "on high memory machines. The parameter has no effect on "
+                "DIAMOND index-chunks parameter (default: {0}). Set to 4 "
+                "on low memory machines. The parameter has no effect on "
                 "temporary disk space usage.".format(default)
             )
         argument_group.add_argument(
@@ -590,8 +590,8 @@ def add_all_diamond_arguments(argument_group):
     )
     add_argument(argument_group, "sensitive", False)
     add_argument(argument_group, "no_self_hits", False)
-    add_argument(argument_group, "block_size", False, default=2.0)
-    add_argument(argument_group, "index_chunks", False, default=4)
+    add_argument(argument_group, "block_size", False, default=12.0)
+    add_argument(argument_group, "index_chunks", False, default=1)
     add_argument(argument_group, "tmpdir", False)
     add_argument(argument_group, "compress", False)
     add_argument(argument_group, "top", False, default=15)
