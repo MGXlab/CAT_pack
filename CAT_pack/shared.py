@@ -46,7 +46,6 @@ def timestamp():
 
 
 def add_argument(argument_group, dest, required, default=None, help_=None):
-
     if dest == "contigs_fasta":
         if help_ is None:
             help_ = "Path to contigs fasta file."
@@ -100,7 +99,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
         )
     elif dest == "db_dir":
         if help_ is None:
-            help_ = "Path to directory where CAT will create its files"
+            help_ = ("Path to directory where CAT/BAT database files will "
+                    "be created.")
         argument_group.add_argument(
             "--db_dir",
             dest="db_dir",
@@ -112,7 +112,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
         )
     elif dest == "database_folder":
         if help_ is None:
-            help_ = "Path to folder that contains database files."
+            help_ = "Path to directory that contains database files."
         argument_group.add_argument(
             "-d",
             "--database_folder",
@@ -126,7 +126,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
         )
     elif dest == "taxonomy_folder":
         if help_ is None:
-            help_ = "Path to folder that contains taxonomy files."
+            help_ = "Path to directory that contains taxonomy files."
         argument_group.add_argument(
             "-t",
             "--taxonomy_folder",
@@ -179,7 +179,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
         )
     elif dest == "cleanup":
         if help_ is None:
-            help_ = "Remove unnecessary files after all data have been processed."
+            help_ = ("Remove unnecessary files after all data have been "
+                     "processed.")
         argument_group.add_argument(
             "--cleanup",
             dest="cleanup",
@@ -189,9 +190,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
         )
     elif dest == "bin_suffix":
         if help_ is None:
-            help_ = "Suffix of bins in bin folder (default: {0})." "".format(
-                default
-            )
+            help_ = "Suffix of bins in bin directory (default: {0}).".format(
+                default)
         argument_group.add_argument(
             "-s",
             "--bin_suffix",
@@ -204,7 +204,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
         )
     elif dest == "r":
         if help_ is None:
-            help_ = "r parameter [0-49] (default: {0:.0f}).".format(default)
+            help_ = "r parameter [0-100] (default: {0:.0f}).".format(default)
         argument_group.add_argument(
             "-r",
             "--range",
@@ -212,7 +212,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
             metavar="",
             required=required,
             type=float,
-            choices=[i for i in range(50)],
+            choices=[i for i in range(101)],
             action=DecimalAction,
             default=default,
             help=help_,
@@ -220,8 +220,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "f":
         if help_ is None:
             help_ = "f parameter [0-0.99] (default: {0:.2f})." "".format(
-                default
-            )
+                default)
         argument_group.add_argument(
             "-f",
             "--fraction",
@@ -250,9 +249,9 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
         )
     elif dest == "db":
         if help_ is None:
-            help_ = "One of 'nr' or 'gtdb'"
+            help_ = "Either 'nr' or 'gtdb'."
         argument_group.add_argument(
-            "-db",
+            "--db",
             dest="db",
             metavar="",
             required=required,
@@ -263,7 +262,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
         )
     elif dest == "output_dir":
         if help_ is None:
-            help_ = "Directory where to store data"
+            help_ = "Path to direcotry where data will be stored."
         argument_group.add_argument(
             "-o",
             "--output_dir",
@@ -292,10 +291,10 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "alignment_file":
         if help_ is None:
             help_ = (
-                "Path to alignment table. If supplied, the alignment "
-                "step is skipped and classification is carried out "
-                "directly. A predicted proteins fasta file should also be "
-                "supplied with argument [-p / --proteins]."
+                "Path to alignment table. If supplied, the alignment step is "
+                "skipped and classification is carried out directly. A "
+                "predicted proteins fasta file should also be supplied with "
+                "argument [-p / --proteins]."
             )
         argument_group.add_argument(
             "-a",
@@ -322,8 +321,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "path_to_prodigal":
         if help_ is None:
             help_ = (
-                "Path to Prodigal binaries. Supply if CAT/BAT cannot "
-                "find Prodigal"
+                "Path to Prodigal binaries. Supply if CAT/BAT cannot find "
+                "Prodigal"
             )
         argument_group.add_argument(
             "--path_to_prodigal",
@@ -445,8 +444,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "only_official":
         if help_ is None:
             help_ = (
-                "Only output official raxonomic ranks (superkingdom, "
-                "phylum, class, order, family, genus, species)."
+                "Only output official raxonomic ranks (superkingdom, phylum, "
+                "class, order, family, genus, species)."
             )
         argument_group.add_argument(
             "--only_official",
@@ -458,8 +457,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "exclude_scores":
         if help_ is None:
             help_ = (
-                "Do not include bit-score support scores in the lineage "
-                "of a classification output file."
+                "Do not include bit-score support scores in the lineage of a "
+                "classification output file."
             )
         argument_group.add_argument(
             "--exclude_scores",
@@ -507,9 +506,9 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "block_size":
         if help_ is None:
             help_ = (
-                "DIAMOND block-size parameter (default: {0}). Lower "
-                "numbers will decrease memory and temporary disk space "
-                "usage.".format(default)
+                "DIAMOND block-size parameter (default: {0}). Lower numbers "
+                "will decrease memory and temporary disk space usage."
+                "".format(default)
             )
         argument_group.add_argument(
             "--block_size",
@@ -523,9 +522,9 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "index_chunks":
         if help_ is None:
             help_ = (
-                "DIAMOND index-chunks parameter (default: {0}). Set to "
-                "1 on high memory machines. The parameter has no effect "
-                "on temporary disk space usage.".format(default)
+                "DIAMOND index-chunks parameter (default: {0}). Set to 4 "
+                "on low memory machines. The parameter has no effect on "
+                "temporary disk space usage.".format(default)
             )
         argument_group.add_argument(
             "--index_chunks",
@@ -539,8 +538,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "tmpdir":
         if help_ is None:
             help_ = (
-                "Directory for temporary DIAMOND files (default: "
-                "directory to which output files are written)."
+                "Directory for temporary DIAMOND files (default: directory to "
+                "which output files are written)."
             )
         argument_group.add_argument(
             "--tmpdir",
@@ -564,12 +563,10 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "top":
         if help_ is None:
             help_ = (
-                "DIAMOND top parameter [0-50] (default: {0}). Governs "
-                "hits within range of best hit that are written to the "
-                "alignment file. This is not the [-r / --range] "
-                "parameter! Can only be set with the "
-                "[--I_know_what_Im_doing] flag, see README.md."
-                "".format(default)
+                "DIAMOND top parameter [0-100] (default: {0}). Governs hits "
+                "within range of best hit that are written to the alignment "
+                "file. This is not the [-r / --range] parameter! "
+                "See README.md.".format(default)
             )
         argument_group.add_argument(
             "--top",
@@ -577,7 +574,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
             metavar="",
             required=required,
             type=float,
-            choices=[i for i in range(51)],
+            choices=[i for i in range(101)],
             default=default,
             help=help_,
         )
@@ -593,11 +590,11 @@ def add_all_diamond_arguments(argument_group):
     )
     add_argument(argument_group, "sensitive", False)
     add_argument(argument_group, "no_self_hits", False)
-    add_argument(argument_group, "block_size", False, default=2.0)
-    add_argument(argument_group, "index_chunks", False, default=4)
+    add_argument(argument_group, "block_size", False, default=12.0)
+    add_argument(argument_group, "index_chunks", False, default=1)
     add_argument(argument_group, "tmpdir", False)
     add_argument(argument_group, "compress", False)
-    add_argument(argument_group, "top", False, default=50)
+    add_argument(argument_group, "top", False, default=11)
 
     return
 
@@ -620,7 +617,7 @@ def expand_arguments(args):
 
             log_file = "{0}.log".format(args.out_prefix)
 
-            with open(log_file, "w") as outf:
+            with open(log_file, "w") as outf1:
                 pass
     else:
         log_file = None
@@ -628,36 +625,28 @@ def expand_arguments(args):
     setattr(args, "log_file", log_file)
 
     if "db_dir" in args:
-
         database_folder_path = str(
-            pathlib.Path(args.db_dir) / pathlib.Path("db")
-        )
-        diamond_database_name = "{}.dmnd".format(args.common_prefix)
+            pathlib.Path(args.db_dir) / pathlib.Path("db"))
+        diamond_database_name = "{0}.dmnd".format(args.common_prefix)
         diamond_database_path = str(
-            database_folder_path / pathlib.Path(diamond_database_name)
-        )
+            database_folder_path / pathlib.Path(diamond_database_name))
 
         taxonomy_folder_path = str(
-            pathlib.Path(args.db_dir) / pathlib.Path("tax")
-        )
-        fastaid2LCAtaxid_fname = "{}.fastaid2LCAtaxid".format(
-            args.common_prefix
-        )
+            pathlib.Path(args.db_dir) / pathlib.Path("tax"))
+        fastaid2LCAtaxid_fname = "{0}.fastaid2LCAtaxid".format(
+            args.common_prefix)
         fastaid2LCAtaxid_path = database_folder_path / pathlib.Path(
-            fastaid2LCAtaxid_fname
-        )
+            fastaid2LCAtaxid_fname)
         fastaid2LCAtaxid_file = str(fastaid2LCAtaxid_path)
 
         taxids_with_multiple_offspring_fname = (
-            "{}.taxids_with_multiple_offspring".format(args.common_prefix)
-        )
+            "{0}.taxids_with_multiple_offspring".format(args.common_prefix))
         taxids_with_multiple_offspring_path = (
             database_folder_path
             / pathlib.Path(taxids_with_multiple_offspring_fname)
         )
         taxids_with_multiple_offspring_file = str(
-            taxids_with_multiple_offspring_path
-        )
+            taxids_with_multiple_offspring_path)
 
         setattr(args, "database_folder", database_folder_path)
         setattr(args, "taxonomy_folder", taxonomy_folder_path)
@@ -700,19 +689,17 @@ def explore_taxonomy_folder(args):
                 nodes_dmp = "{0}{1}".format(args.taxonomy_folder, file_)
             elif file_ == "names.dmp":
                 names_dmp = "{0}{1}".format(args.taxonomy_folder, file_)
-            # No need to check for this
+            # No need to check for this.
             elif file_.endswith("prot.accession2taxid.FULL.gz"):
                 prot_accession2taxid_file = "{0}{1}".format(
-                    args.taxonomy_folder, file_
-                )
+                    args.taxonomy_folder, file_)
             elif (
                 file_.endswith("prot.accession2taxid.gz")
                 and prot_accession2taxid_file is None
             ):
                 # Legacy prot_accession2taxid_file.
                 prot_accession2taxid_file = "{0}{1}".format(
-                    args.taxonomy_folder, file_
-                )
+                    args.taxonomy_folder, file_)
 
     setattr(args, "nodes_dmp", nodes_dmp)
     setattr(args, "names_dmp", names_dmp)
@@ -730,19 +717,16 @@ def explore_database_folder(args):
     if os.path.isdir(args.database_folder):
         for file_ in os.listdir(args.database_folder):
             if file_.endswith(
-                (".fa", ".fasta", ".fna", "fa.gz", "fasta.gz", "fna.gz")
-            ):
+                (".fa", ".fasta", ".fna", "fa.gz", "fasta.gz", "fna.gz")):
                 fasta_file = "{0}{1}".format(args.database_folder, file_)
             elif file_.endswith(".dmnd"):
                 diamond_database = "{0}{1}".format(args.database_folder, file_)
             elif file_.endswith("fastaid2LCAtaxid"):
                 fastaid2LCAtaxid_file = "{0}{1}".format(
-                    args.database_folder, file_
-                )
+                    args.database_folder, file_)
             elif file_.endswith("taxids_with_multiple_offspring"):
-                taxids_with_multiple_offspring_file = "{0}{1}" "".format(
-                    args.database_folder, file_
-                )
+                taxids_with_multiple_offspring_file = "{0}{1}".format(
+                    args.database_folder, file_)
 
     setattr(args, "db_fasta", fasta_file)
     setattr(args, "diamond_database", diamond_database)
@@ -771,8 +755,7 @@ def print_variables(args, step_list=None):
         if step_list is not None:
             message = "\nStep list: {0}".format(step_list)
             give_user_feedback(
-                message, args.log_file, args.quiet, show_time=False
-            )
+                message, args.log_file, args.quiet, show_time=False)
 
         message = "\n-----------------\n"
         give_user_feedback(message, args.log_file, args.quiet, show_time=False)
@@ -781,10 +764,18 @@ def print_variables(args, step_list=None):
 
 
 def give_user_feedback(
-    message, log_file=None, quiet=False, show_time=True, error=False
+    message,
+    log_file=None,
+    quiet=False,
+    show_time=True,
+    error=False,
+    warning=False
 ):
     if error:
         message = "ERROR: {0}".format(message)
+        
+    if warning:
+        message = "WARNING: {0}".format(message)
 
     if show_time:
         message = "{0} {1}".format(timestamp(), message)
@@ -814,27 +805,21 @@ def run_prodigal(
 ):
     message = (
         "Running Prodigal for ORF prediction. Files {0} and {1} will be "
-        "generated. Do not forget to cite Prodigal when using CAT or BAT "
-        "in your publication.".format(proteins_fasta, proteins_gff)
+        "generated. Do not forget to cite Prodigal when using CAT or BAT in "
+        "your publication.".format(proteins_fasta, proteins_gff)
     )
     give_user_feedback(message, log_file, quiet)
 
     try:
         command = [
             path_to_prodigal,
-            "-i",
-            contigs_fasta,
-            "-a",
-            proteins_fasta,
-            "-o",
-            proteins_gff,
-            "-p",
-            "meta",
-            "-g",
-            "11",
+            "-i", contigs_fasta,
+            "-a", proteins_fasta,
+            "-o", proteins_gff,
+            "-p", "meta",
+            "-g", "11",
             "-q",
-            "-f",
-            "gff",
+            "-f", "gff"
         ]
         subprocess.check_call(command)
     except:
@@ -861,9 +846,8 @@ def run_diamond(args):
         compression = "0"
 
     message = (
-        "Homology search with DIAMOND is starting. Please be patient. Do "
-        "not forget to cite DIAMOND when using CAT or BAT in your "
-        "publication.\n"
+        "Homology search with DIAMOND is starting. Please be patient. Do not "
+        "forget to cite DIAMOND when using CAT or BAT in your publication.\n"
         "\t\t\tquery: {0}\n"
         "\t\t\tdatabase: {1}\n"
         "\t\t\tmode: {2}\n"
@@ -883,37 +867,25 @@ def run_diamond(args):
             args.block_size,
             args.index_chunks,
             args.tmpdir,
-            compression,
+            compression
         )
     )
     give_user_feedback(message, args.log_file, args.quiet)
 
     try:
         command = [
-            args.path_to_diamond,
-            "blastp",
-            "-d",
-            args.diamond_database,
-            "-q",
-            args.proteins_fasta,
-            "--top",
-            str(args.top),
-            "--matrix",
-            "BLOSUM62",
-            "--evalue",
-            "0.001",
-            "-o",
-            args.alignment_file,
-            "-p",
-            str(args.nproc),
-            "--block-size",
-            str(args.block_size),
-            "--index-chunks",
-            str(args.index_chunks),
-            "--tmpdir",
-            args.tmpdir,
-            "--compress",
-            compression,
+            args.path_to_diamond, "blastp",
+            "-d", args.diamond_database,
+            "-q", args.proteins_fasta,
+            "--top", str(args.top),
+            "--matrix", "BLOSUM62",
+            "--evalue", "0.001",
+            "-o", args.alignment_file,
+            "-p", str(args.nproc),
+            "--block-size", str(args.block_size),
+            "--index-chunks", str(args.index_chunks),
+            "--tmpdir", args.tmpdir,
+            "--compress", compression
         ]
 
         if not args.verbose:
@@ -936,8 +908,7 @@ def run_diamond(args):
         setattr(args, "alignment_file", "{0}.gz".format(args.alignment_file))
 
     message = "Homology search done! File {0} created.".format(
-        args.alignment_file
-    )
+        args.alignment_file)
     give_user_feedback(message, args.log_file, args.quiet)
 
     return
@@ -957,8 +928,8 @@ def import_contig_names(fasta_file, log_file, quiet):
                 if contig in contig_names:
                     message = (
                         "your fasta file contains duplicate headers. The "
-                        "first duplicate encountered is {0}, but there "
-                        "might be more...".format(contig)
+                        "first duplicate encountered is {0}, but there might "
+                        "be more...".format(contig)
                     )
                     give_user_feedback(message, log_file, quiet, error=True)
 
@@ -1033,8 +1004,7 @@ def parse_tabular_alignment(alignment_file, one_minus_r, log_file, quiet):
             hit = line[1]
 
             ORF2hits[ORF].append(
-                (hit, bitscore),
-            )
+                (hit, bitscore),)
             all_hits.add(hit)
         else:
             # The hit is not included because its bit-score is too low.
@@ -1046,22 +1016,22 @@ def parse_tabular_alignment(alignment_file, one_minus_r, log_file, quiet):
 
 
 def is_gz(file_path):
-    """Check if given file_paht is gzipped based on suffix"""
+    """Check if given file_paht is gzipped based on suffix."""
     if isinstance(file_path, pathlib.Path):
         file_path = file_path.name
     return file_path.endswith(".gz") or file_path.endswith(".z")
 
 
 def optionally_compressed_handle(file_path, mode):
-    """Return an appropriate file handle to operate on
+    """Return an appropriate file handle to operate on.
 
     Arguments:
-      file_path: str or PathLike: File path
-      mode: str: The passed mode to open the file on
+      file_path: str or PathLike: File path.
+      mode: str: The passed mode to open the file on.
 
     Return:
         A file handle either gzip opened or plainly opened for
-        reading/writing/appending in text mode
+        reading/writing/appending in text mode.
     """
     if mode == "r" or mode == "rb":
         mode = "rt"
@@ -1077,4 +1047,4 @@ def optionally_compressed_handle(file_path, mode):
 
 
 if __name__ == "__main__":
-    sys.exit("Run 'CAT' to run CAT or BAT.")
+    sys.exit("Run \'CAT\' to run CAT or BAT.")
