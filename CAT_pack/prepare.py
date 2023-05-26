@@ -317,20 +317,28 @@ def prepare(step_list, args):
     # It should contain...
     # ... 1. a taxonomy folder with names and nodes.
     tax_db = db_dir / pathlib.Path("tax")
-    tax_db.mkdir(exist_ok=True)
+    
+    if tax_db.isdir():
+        message = "Taxonomy folder {0} exists.".format(tax_db)
+        shared.give_user_feedback(
+            message, args.log_file, args.quiet, show_time=True)
+    else:
+        message = "Taxonomy folder {0} is created.".format(tax_db)
+        shared.give_user_feedback(
+            message, args.log_file, args.quiet, show_time=True)
+        tax_db.mkdir()
 
     # Check if names and nodes exist together.
     nodes_dmp_fp = tax_db / pathlib.Path("nodes.dmp")
     if not nodes_dmp_fp.exists():
-        message = "Copying nodes.dmp in {0}.".format(tax_db)
+        message = "Copying nodes.dmp in taxonomy folder."
         shared.give_user_feedback(
-            message, args.log_file, args.quiet, show_time=True
-        )
+            message, args.log_file, args.quiet, show_time=True)
         shutil.copyfile(args.nodes_dmp, nodes_dmp_fp)
 
     names_dmp_fp = tax_db / pathlib.Path("names.dmp")
     if not names_dmp_fp.exists():
-        message = "Copying names.dmp in {0}.".format(tax_db)
+        message = "Copying names.dmp in taxonomy folder."
         shared.give_user_feedback(
             message, args.log_file, args.quiet, show_time=True)
         shutil.copyfile(args.names_dmp, names_dmp_fp)
@@ -339,6 +347,10 @@ def prepare(step_list, args):
     cat_db = db_dir / pathlib.Path("db")
 
     if cat_db.is_dir():
+        message = "Database folder {0} exists.".format(cat_db)
+        shared.give_user_feedback(
+            message, args.log_file, args.quiet, show_time=True)
+        
         if any(cat_db.glob("*.dmnd")):
             message = "A DIAMOND database exists. Skipping creation."
             shared.give_user_feedback(
