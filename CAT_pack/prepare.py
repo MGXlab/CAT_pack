@@ -318,7 +318,7 @@ def prepare(step_list, args):
     # ... 1. a taxonomy folder with names and nodes.
     tax_db = db_dir / pathlib.Path("tax")
     
-    if tax_db.isdir():
+    if tax_db.is_dir():
         message = "Taxonomy folder {0} exists.".format(tax_db)
         shared.give_user_feedback(
             message, args.log_file, args.quiet, show_time=True)
