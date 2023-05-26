@@ -344,7 +344,7 @@ def prepare(step_list, args):
             shared.give_user_feedback(
                 message, args.log_file, args.quiet, show_time=True)
     else:
-        message = "Database folder is created at {0}.".format(cat_db)
+        message = "Database folder {0} is created.".format(cat_db)
         shared.give_user_feedback(
             message, args.log_file, args.quiet, show_time=True)
         cat_db.mkdir()
