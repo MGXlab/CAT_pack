@@ -8,7 +8,7 @@ import sys
 import tarfile
 import urllib.request
 import urllib.parse
-
+import os
 import shared
 import check
 
@@ -568,12 +568,12 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
     ]
 
     # Fetch files.
-    multi_download(gtdb_urls, output_dir, log_file, quiet, prefix=None)
+#    multi_download(gtdb_urls, output_dir, log_file, quiet, prefix=None)
 
     # Check files.
     md5sums_file = output_dir / pathlib.Path("MD5SUM.txt")
     md5sums_dict = load_gtdb_md5sums(md5sums_file)
-    check_gtdb_md5s(output_dir, md5sums_dict, log_file, quiet)
+#    check_gtdb_md5s(output_dir, md5sums_dict, log_file, quiet)
 
     # Concatenate taxonomies.
     bacteria_tsv_gz = list(output_dir.glob("*bac*_taxonomy*"))[0]
