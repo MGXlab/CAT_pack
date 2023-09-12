@@ -603,6 +603,7 @@ def expand_arguments(args):
     if "r" in args:
         setattr(args, "one_minus_r", (100 - args.r) / 100)
 
+    log_file = None
     if "out_prefix" in args:
         if not args.tmpdir:
             tmpdir = "{0}/".format(args.out_prefix.rsplit("/", 1)[0])
@@ -619,8 +620,6 @@ def expand_arguments(args):
 
             with open(log_file, "w") as outf1:
                 pass
-    else:
-        log_file = None
 
     setattr(args, "log_file", log_file)
 
