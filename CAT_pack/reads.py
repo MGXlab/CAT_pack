@@ -19,6 +19,7 @@ from io import StringIO
 import json
 
 import about
+
 import check
 import shared
 import tax
@@ -1161,27 +1162,12 @@ def make_unclassified_seq_fasta(seq_fasta, unclassified_seq_ids,
     if seq_fasta.endswith('.gz'):
         fasta_dict={}
         f1=gzip.open(seq_fasta, 'rt')
-        record=''
-        for line in f1:
-            tmp=str(line)
-            if tmp.startswith('@') and record:
-                seq_id=record[1:].split()[0]
-                
-                if seq_id in unclassified_seq_ids:
-                    tmp2=SeqIO.to_dict(SeqIO.parse(StringIO(record), f_format))
-                    fasta_dict.update(tmp2)
-                record=tmp
-            else:
-                record+=tmp
-        tmp2=SeqIO.to_dict(SeqIO.parse(StringIO(record), f_format))
-        seq_id=record[1:].split()[0]
-        if seq_id in unclassified_seq_ids:
-            fasta_dict.update(tmp2)
-            
+        fasta_dict=SeqIO.to_dict(SeqIO.parse(f1, f_format))
+
     else:
         f1=open(seq_fasta)
         fasta_dict=SeqIO.to_dict(SeqIO.parse(f1, f_format))
-        print(seq_fasta)
+        #print(seq_fasta)
     with open(unclassified_seq_fasta, f_mode) as outf:
         # print(unclassified_seq_ids)
         suffices=['/1', '/2', '_1', '_2']
@@ -1189,9 +1175,11 @@ def make_unclassified_seq_fasta(seq_fasta, unclassified_seq_ids,
             if seq in fasta_dict:
                 seq=seq
             else:
+
                 for s in suffices:
                     if seq+s in fasta_dict:
                         seq+=s
+                        # print(seq)
             outf.write('>{0}{1}\n{2}\n'.format(fasta_dict[seq].id, suffix,
                                             fasta_dict[seq].seq))
     
@@ -1207,7 +1195,7 @@ def get_unclassified_contigs(contig2bin, c2c, b2c):
     for c in c2c:
         classified=False
         if c in contig2bin:
-            if [contig2bin[c]]:
+            if b2c[contig2bin[c]]:
                 mag_lineage=b2c[contig2bin[c]][0]
                 if len(mag_lineage)>2 or (len(mag_lineage)==2 and 
                                           mag_lineage[1]!='131567'):
@@ -1301,7 +1289,14 @@ def invert_bin_dict(bin_dict):
 
 
 
-
+# def test_gzip(seq_fasta, unclassified_seq_ids, f_format):
+    
+#     if seq_fasta.endswith('.gz'):
+#         fasta_dict={}
+#         f1=gzip.open(seq_fasta, 'rt')
+#         fasta_dict=SeqIO.to_dict(SeqIO.parse(f1, f_format))
+    
+#     return fasta_dict
 
 
 # if __name__ == '__main__':
