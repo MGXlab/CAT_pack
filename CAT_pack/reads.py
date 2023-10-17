@@ -362,7 +362,8 @@ def run():
     if args.mode=='direct_mapping':
         setattr(args,'read2classification',True)
         message = ('Chosen mode: {0}. Classifying unclassified contigs and'
-                    ' unmapped reads with diamond.'.format(args.mode))
+                    ' unmapped reads with diamond if no classification file is'
+                    ' supplied.'.format(args.mode))
         shared.give_user_feedback(message, args.log_file, args.quiet,
             show_time=True)
         
@@ -374,34 +375,34 @@ def run():
         # I need to mark all the read ids as fw or rev, pull out the sequences,
         # and then write the input fasta as one document for all reads and 
         # contigs I want to classify
-        message = ('Grabbing unmapped and unclassified sequences...')
-        shared.give_user_feedback(message, args.log_file, args.quiet,
-            show_time=True)
-        all_unclassified=list()
-        
-        uncl_unm_fasta='{0}.unclassified_unmapped.fasta'.format(args.out_prefix)
-        unclassified_contigs = get_unclassified_contigs(contig2bin,
-                                                        c2c, b2c)
-        all_unclassified+=list(unclassified_contigs)
-        make_unclassified_seq_fasta(args.contigs_fasta, unclassified_contigs,
-                                    uncl_unm_fasta, 'fasta', 'w')
-        
-        message = ('Contigs written! Appending forward reads...')
-        shared.give_user_feedback(message, args.log_file, args.quiet,
-            show_time=True)
-        make_unclassified_seq_fasta(reads_files[0], unmapped_reads['fw'],
-                                    uncl_unm_fasta, 'fastq', 'a','_1')
-        all_unclassified+=['{}_1'.format(i) for i in unmapped_reads['fw']]
-        
-        message = ('Appending reverse reads...')
-        shared.give_user_feedback(message, args.log_file, args.quiet,
-            show_time=True)
-        make_unclassified_seq_fasta(reads_files[1], unmapped_reads['rev'],
-                                    uncl_unm_fasta, 'fastq', 'a','_2')
-        all_unclassified+=['{}_2'.format(i) for i in unmapped_reads['rev']]
-        # Run diamond on unclassified contigs and unmapped reads
-        if not args.alignment_unmapped and not args.unmapped2classification: 
-
+        if not args.alignment_unmapped and not args.unmapped2classification:
+            message = ('No unmapped2classification file supplied .Grabbing '
+                       'unmapped and unclassified sequences...')
+            shared.give_user_feedback(message, args.log_file, args.quiet,
+                show_time=True)
+            all_unclassified=list()
+            
+            uncl_unm_fasta='{0}.unclassified_unmapped.fasta'.format(args.out_prefix)
+            unclassified_contigs = get_unclassified_contigs(contig2bin,
+                                                            c2c, b2c)
+            all_unclassified+=list(unclassified_contigs)
+            make_unclassified_seq_fasta(args.contigs_fasta, unclassified_contigs,
+                                        uncl_unm_fasta, 'fasta', 'w')
+            
+            message = ('Contigs written! Appending forward reads...')
+            shared.give_user_feedback(message, args.log_file, args.quiet,
+                show_time=True)
+            make_unclassified_seq_fasta(reads_files[0], unmapped_reads['fw'],
+                                        uncl_unm_fasta, 'fastq', 'a','_1')
+            all_unclassified+=['{}_1'.format(i) for i in unmapped_reads['fw']]
+            
+            message = ('Appending reverse reads...')
+            shared.give_user_feedback(message, args.log_file, args.quiet,
+                show_time=True)
+            make_unclassified_seq_fasta(reads_files[1], unmapped_reads['rev'],
+                                        uncl_unm_fasta, 'fastq', 'a','_2')
+            all_unclassified+=['{}_2'.format(i) for i in unmapped_reads['rev']]
+            # Run diamond on unclassified contigs and unmapped reads
             setattr(args,
                     'alignment_file',
                     '{0}.unclassified_unmapped.alignment.diamond'.format(args.out_prefix))
@@ -411,6 +412,15 @@ def run():
             setattr(args,
                     'alignment_file',
                     args.alignment_unmapped)
+        if args.alignment_unmapped and not args.unmapped2classification:
+            all_unclassified=list()
+            unclassified_contigs = get_unclassified_contigs(contig2bin,
+                                                            c2c, b2c)
+            all_unclassified+=list(unclassified_contigs)
+            all_unclassified+=['{}_1'.format(i) for i in unmapped_reads['fw']]
+            all_unclassified+=['{}_2'.format(i) for i in unmapped_reads['rev']]
+       
+            
         # Now, the diamond alignment has to be parsed with a CAT function
         if not args.unmapped2classification:
     
@@ -454,7 +464,8 @@ def run():
             
     message = 'Writing output tables.'
     shared.give_user_feedback(message, args.log_file, args.quiet,
-            show_time=True)    
+            show_time=True)   
+    
     make_tax_table(c2c,
                    contigs, 
                    unmapped_reads,
@@ -465,6 +476,7 @@ def run():
                    sum_of_reads, 
                    args.out_prefix,
                    u2c)
+        
     
     make_bin_table(contig2bin, 
                    contigs, 
@@ -478,10 +490,7 @@ def run():
     if args.read2classification:
         reads=classify_reads(reads, c2c, b2c, u2c)
         write_read_table(reads, args.out_prefix, max_primary)
-        # print("Writing read dictionary to file...")
-        # json.dump(reads, open('/home/tina/Documents/RAT/debug_direct_mapping/'
-        #                       '20211104_read_dict.json', 'w'))
-        # print("Written!")
+
     
     message = (
             '\n-----------------\n\n'
@@ -595,8 +604,10 @@ def classify_reads(read_dict, contig2classification, bin2classification, unmappe
                 # If there is bin classification, store it
                 if bin2classification:
                     try:
-                        if read_dict[read]['bin'][r]=='unbinned':
+                        if (read_dict[read]['bin'][r]=='unbinned' or
+                            len(bin2classification[read_dict[read]['bin'][r]])<1):
                             read_dict[read]['taxon_bin'].append('')
+                        
                         else:
                             read_dict[read]['taxon_bin'].append(';'.join(bin2classification[read_dict[read]['bin'][r]][0]))
                         worked+=1
@@ -606,7 +617,7 @@ def classify_reads(read_dict, contig2classification, bin2classification, unmappe
                 
                 # If there is a contig classification, store it
                 contig=read_dict[read]['contig'][r]
-                if (contig2classification[contig]==[] or 
+                if (contig2classification[contig]==[] or
                     len(contig2classification[contig][0])<2 or 
                     (len(contig2classification[contig][0])==2 and 
                     contig2classification[contig][0][1]=='131567')):
@@ -625,6 +636,7 @@ def classify_reads(read_dict, contig2classification, bin2classification, unmappe
                         read_dict[read]['taxon_contig_dm'].append(';'.join(unmapped2classification[contig][0]))
         # If the read is not mapped:
         else:
+            
             fw='{}_1'.format(read)
             rev='{}_2'.format(read)
             if fw in unmapped2classification:
@@ -823,8 +835,11 @@ def make_tax_table(c2c_dict,
         
         # If the contig is in contig2bin, that means that it is binned and therefore
         # will be assigned the lineage of the bin and not the contig
-        elif contig in contig2bin:
+        elif (contig in contig2bin and 
+              len(bin2classification[contig2bin[contig]])>0):
+        
             taxon=';'.join(bin2classification[contig2bin[contig]][0])
+         
             if taxon not in taxon_dict:
                 taxon_dict[taxon]={
                         'n_reads': 0,
@@ -1040,20 +1055,11 @@ def process_bam_file(BAM_fw_file, BAM_rev_file=False, path_to_samtools='samtools
 
 
     # build read_dictionary with list of 0-2 contigs that each read/mate maps to
-    # @Tina: call this mapping instead of read?
-    for read in proc.stdout:
-        read=read.decode("utf-8").rstrip().split('\t')
-        read_id, flag, contig, score=read[0], int(read[1]), read[2], int(read[4])
+    for mapping in proc.stdout:
+        mapping=mapping.decode("utf-8").rstrip().split('\t')
+        read_id, flag, contig, score=mapping[0], int(mapping[1]), mapping[2], int(mapping[4])
         
         if not paired and bin(flag)[-1]=='1':
-            # @Tina: Why do you put the 'and not paired' in there? Is it quicker
-            # Than just overwriting paired everytime? If that's true it's probably
-            # even quicker still to swap the arguments: if not paired and bin(fl etc...
-            # Python will only go the second (more costly) if the first is met.
-            # Also are ALL reads flagged with [-1] == '1' if they come from
-            # paired fastq files? Because if they do we can just do this on the
-            # first line only, and if they don't we might have a problem later
-            # because we assume pair information in the same line.
             paired=True
         
         if read_id not in read_dict:
@@ -1288,16 +1294,5 @@ def invert_bin_dict(bin_dict):
     return contig2bin
 
 
-
-# def test_gzip(seq_fasta, unclassified_seq_ids, f_format):
-    
-#     if seq_fasta.endswith('.gz'):
-#         fasta_dict={}
-#         f1=gzip.open(seq_fasta, 'rt')
-#         fasta_dict=SeqIO.to_dict(SeqIO.parse(f1, f_format))
-    
-#     return fasta_dict
-
-
-# if __name__ == '__main__':
-#     sys.exit('Run \'CAT\' to run CAT, BAT, or RAT.')
+if __name__ == '__main__':
+    sys.exit('Run \'CAT\' to run CAT, BAT, or RAT.')
