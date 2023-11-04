@@ -26,7 +26,7 @@ def parse_arguments():
             "Currently supports the NCBI non-redundant (nr) database "
             "and GTDB."
         ),
-        usage="CAT download --db (nr | gtdb) -o DIR [options] [-h / --help]",
+        usage="CAT download --db (nr | GTDB) -o DIR [options] [-h / --help]",
         add_help=False,
     )
 
@@ -754,7 +754,7 @@ def run():
             prefix=args.date,
             cleanup=args.cleanup,
         )
-    elif args.db == "gtdb":
+    elif args.db == "GTDB":
         process_gtdb(args.output_dir, args.log_file, args.quiet, args.cleanup)
         
     return
