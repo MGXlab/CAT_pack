@@ -4,6 +4,7 @@ import argparse
 from collections import namedtuple
 import datetime
 import hashlib
+import os
 import pathlib
 import shutil
 import sys
