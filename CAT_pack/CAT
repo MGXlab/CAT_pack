@@ -8,7 +8,6 @@ import bins
 import contigs
 import download
 import prepare
-import single_bin
 import summarise
 
 
