@@ -237,7 +237,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
         )
     elif dest == "db":
         if help_ is None:
-            help_ = "Either 'nr' or 'GTDB'."
+            help_ = "Either nr  or GTDB."
         argument_group.add_argument(
             "--db",
             dest="db",
@@ -250,7 +250,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
         )
     elif dest == "output_dir":
         if help_ is None:
-            help_ = "Path to direcotry where data will be stored."
+            help_ = "Path to directory where data will be stored."
         argument_group.add_argument(
             "-o",
             "--output_dir",
