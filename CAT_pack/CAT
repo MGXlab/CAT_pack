@@ -14,10 +14,10 @@ import summarise
 
 def usage():
     message = (
-        "usage: CAT (download | prepare | contigs | bin | bins | add_names | "
+        "usage: CAT (download | prepare | contigs | bins | add_names | "
         "summarise) [-v / --version] [-h / --help]\n"
         "CAT: error: one of the arguments "
-        "download prepare contigs bin bins add_names summarise "
+        "download prepare contigs bins add_names summarise "
         "is required"
     )
     
@@ -45,8 +45,7 @@ def help():
         "  download\t\tDownload and preprocess data from NCBI nr or GTDB.\n"
         "  prepare\t\tConstruct database files.\n"
         "  contigs\t\tRun CAT.\n"
-        "  bin\t\t\tRun BAT on a single bin.\n"
-        "  bins\t\t\tRun BAT on a set of bins.\n"
+        "  bins\t\t\tRun BAT.\n"
         "  add_names\t\tAdd taxonomic names to CAT or BAT output files.\n"
         "  summarise\t\tSummarise a named CAT or BAT classification file."
         "\n\n"
@@ -69,8 +68,6 @@ def main():
         prepare.run()
     elif sys.argv[1] == "contigs":
         contigs.run()
-    elif sys.argv[1] == "bin":
-        single_bin.run()
     elif sys.argv[1] == "bins":
         bins.run()
     elif sys.argv[1] == "add_names":

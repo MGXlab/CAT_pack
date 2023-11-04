@@ -305,6 +305,7 @@ def run():
     with open(args.bin2classification_output_file, "w") as outf1, open(args.ORF2LCA_output_file, "w") as outf2:
         outf1.write("# bin\tclassification\treason\tlineage\tlineage scores\n")
 
+        outf2.write("# r: {0}\n".format(args.r))
         outf2.write("# ORF\tbin\tnumber of hits\tlineage\ttop bit-score\n")
 
         # The list contains only a single bin, but I keep the code like this

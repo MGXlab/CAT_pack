@@ -1,4 +1,4 @@
-#!/usr/bin/env/ python3
+ #!/usr/bin/env/ python3
 
 import hashlib
 import os
@@ -16,7 +16,7 @@ def check_md5_gz(gz_file, md5_file, log_file, quiet):
         md5_exp = f1.read().strip().split(" ")[0]
 
     if md5_exp == "":
-        message = ("no MD5 found in {0}. Integrity of {1} can not be "
+        message = ("no MD5 found in {0}. Integrity of {1} cannot be "
                    "established.".format(md5_file, gz_file))
         shared.give_user_feedback(message, log_file, quiet, warning=True)
     else:
@@ -86,7 +86,7 @@ def check_out_prefix(out_prefix, log_file, quiet):
     dir_ = out_prefix.rsplit("/", 1)[0]
 
     if not os.path.isdir(dir_):
-        message = ("can not find output directory {0} to which output files "
+        message = ("cannot find output directory {0} to which output files "
                    "should be written.".format(dir_))
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
@@ -106,7 +106,7 @@ def check_prodigal_binaries(path_to_prodigal, log_file, quiet):
         message = "Prodigal found: {0}.".format(output)
         shared.give_user_feedback(message, log_file, quiet)
     except OSError:
-        message = ("can not find Prodigal. Please check whether it is "
+        message = ("cannot find Prodigal. Please check whether it is "
                    "installed or the path to the binaries is provided.")
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
@@ -127,7 +127,7 @@ def check_diamond_binaries(path_to_diamond, log_file, quiet):
         message = "DIAMOND found: {0}.".format(output)
         shared.give_user_feedback(message, log_file, quiet)
     except OSError:
-        message = ("can not find DIAMOND. Please check whether it is "
+        message = ("cannot find DIAMOND. Please check whether it is "
                    "installed or the path to the binaries is provided.")
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
@@ -140,7 +140,7 @@ def check_bin_folder(bin_folder, bin_suffix, log_file, quiet):
     error = False
 
     if not os.path.isdir(bin_folder):
-        message = "can not find the bin folder."
+        message = "cannot find the bin folder."
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
@@ -171,14 +171,6 @@ def check_bin_folder(bin_folder, bin_suffix, log_file, quiet):
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
-    elif len(tmp) == 1:
-        message = (
-            "a single bin is found. You can run BAT in single bin mode, with "
-            "\'CAT bin\' as opposed to \'CAT bins\' for a set of bins. Both "
-            "modes will give the same results, but you might find single mode "
-            "more convenient for your workflow."
-        )
-        shared.give_user_feedback(message, log_file, quiet, warning=True)
 
     return error
 
@@ -187,15 +179,6 @@ def check_bin_fasta(bin_fasta, log_file, quiet):
     error = False
 
     if check_fasta(bin_fasta, log_file, quiet):
-        error = True
-
-    if os.path.isdir(bin_fasta):
-        message = (
-            "{0} is a directory. If you want to classify more than 1 bin you "
-            "can run \'CAT bins\' instead of \'CAT bin\'.".format(bin_fasta)
-        )
-        shared.give_user_feedback(message, log_file, quiet, error=True)
-
         error = True
 
     return error
@@ -216,7 +199,7 @@ def check_folders_for_run(
     error = False
 
     if not os.path.isdir(taxonomy_folder):
-        message = "can not find the taxonomy folder."
+        message = "cannot find the taxonomy folder."
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
@@ -229,7 +212,7 @@ def check_folders_for_run(
             error = True
 
     if not os.path.isdir(database_folder):
-        message = "can not find the database folder."
+        message = "cannot find the database folder."
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
@@ -287,7 +270,7 @@ def check_in_and_output_file(input_file, output_file, log_file, quiet):
     error = False
 
     if input_file == output_file:
-        message = "input file and output file can not be the same."
+        message = "input file and output file cannot be the same."
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
@@ -330,17 +313,31 @@ def check_fasta(file_, log_file, quiet):
 
 def check_whether_ORFs_are_based_on_contigs(
         contig_names, contig2ORFs, log_file, quiet):
-    for contig in contig2ORFs:
-        if contig not in contig_names:
-            message = (
-                "found a protein in the predicted proteins fasta file that "
-                "can not be traced back to one of the contigs in the contigs "
-                "fasta file: {0}. Proteins should be named contig_name_#."
-                "".format(contig2ORFs[contig][0])
-            )
-            shared.give_user_feedback(message, log_file, quiet, error=True)
+    overlap = len(contig_names & set(contig2ORFs))
 
-            sys.exit(1)
+    if overlap == 0:
+        message = (
+                "no ORFs found that can be traced back to one of the contigs "
+                "in the contigs fasta file: {0}. ORFs should be named "
+                "contig_name_#.".format(contig2ORFs[contig][0])
+                )
+        shared.give_user_feedback(message, log_file, quiet, error=True)
+
+        sys.exit(1)
+
+    rel_overlap = overlap / len(contig_names)
+    message = "ORFs found on {0:,d} / {1:,d} contigs ({2:.2f}%).".format(
+            overlap, len(contig_names), rel_overlap * 100)
+    shared.give_user_feedback(message, log_file, quiet)
+
+    if rel_overlap < 0.97:
+        message = (
+                "only {0:.2f}% contigs found with ORF predictions. This may "
+                "indicate that some contigs were missing from the protein "
+                "prediction. Please make sure that the protein prediction was "
+                "based on all contigs.".format(rel_overlap * 100)
+                )
+        shared.give_user_feedback(message, log_file, quiet, warning=True)
 
     return
             
