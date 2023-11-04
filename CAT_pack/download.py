@@ -470,9 +470,8 @@ def extract_duplicates(proteins_dir, gid2taxid, acc2taxid_fp, log_file, quiet):
                 seq_counter += 1
 
             if file_counter % 1000 == 0 and file_counter != 0:
-                message = "Parsed {0} sequences from {1} files.".format(
-                    seq_counter, file_counter
-                )
+                message = "Parsed {0:,d} sequences from {1:,d} files.".format(
+                    seq_counter, file_counter)
                 shared.give_user_feedback(message, log_file, quiet)
         # This else is part of the outter for-loop.
         # It executes when the for loop finishes.
@@ -519,12 +518,16 @@ def write_singletons(
                     skipped += 1
                     
             if file_counter % 1000 == 0 and file_counter != 0:
-                message = ("Written {0} sequences from {1} files ({2} skipped)."
-                        "".format(seq_counter, file_counter, skipped))
+                message = ("Written {0} sequences from {1:,d} files "
+                        "({2;,d} skipped).".format(
+                            seq_counter, file_counter, skipped)
+                        )
                 shared.give_user_feedback(message, log_file, quiet)
         else:
-            message = ("Written {0} sequences from {1} files ({2} skipped)."
-                    "".format(seq_counter, file_counter, skipped))
+            message = ("Written {0} sequences from {1:,d} files "
+                    "({2:,d} skipped).".format(
+                        seq_counter, file_counter, skipped)
+                    )
             shared.give_user_feedback(message, log_file, quiet)
             
     return
