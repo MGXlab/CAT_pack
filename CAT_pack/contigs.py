@@ -304,15 +304,16 @@ def run():
     n_classified_contigs = 0
     
     with open(args.contig2classification_output_file, "w") as outf1, open(args.ORF2LCA_output_file, "w") as outf2:
-        outf1.write(
-            "# contig\tclassification\treason\tlineage\tlineage scores\n")
+        outf1.write("# contig\tclassification\treason\tlineage\t"
+                "lineage scores (f: {0})\n".format(args.f))
 
-        outf2.write("# ORF\tnumber of hits\tlineage\ttop bit-score\n")
+        outf2.write("# ORF\tnumber of hits (r: {0})\tlineage\ttop bit-score\n"
+                "".format(args.r))
         
         for contig in sorted(contig_names):
             if contig not in contig2ORFs:
-                outf1.write("{0}\tno taxid assigned\tno ORFs found\n"
-                            "".format(contig))
+                outf1.write("{0}\tno taxid assigned\tno ORFs found\n".format(
+                    contig))
                 
                 continue
 
@@ -320,8 +321,8 @@ def run():
 
             for ORF in contig2ORFs[contig]:
                 if ORF not in ORF2hits:
-                    outf2.write("{0}\tORF has no hit to database\n"
-                                "".format(ORF))
+                    outf2.write("{0}\tORF has no hit to database\n".format(
+                        ORF))
 
                     continue
 
@@ -348,7 +349,7 @@ def run():
                 
             if len(LCAs_ORFs) == 0:
                 outf1.write("{0}\tno taxid assigned\t"
-                            "no hits to database\n".format(contig))
+                        "no hits to database\n".format(contig))
 
                 continue
 
@@ -382,7 +383,7 @@ def run():
                     lineage = tax.star_lineage(
                         lineage, taxids_with_multiple_offspring)
                 scores = ["{0:.2f}".format(score) for
-                          score in lineages_scores[i]]
+                        score in lineages_scores[i]]
                 
                 if len(lineages) == 1:
                     # There is only one classification.
@@ -419,15 +420,20 @@ def run():
 
     message = (
         "\n-----------------\n\n"
-        "{0} CAT is done! {1:,d}/{2:,d} contigs have taxonomy assigned."
-        "".format(shared.timestamp(), n_classified_contigs, len(contig_names))
+        "{0} CAT is done! {1:,d}/{2:,d} contigs ({3:.2f}%) have "
+        "taxonomy assigned.".format(
+            shared.timestamp(),
+            n_classified_contigs,
+            len(contig_names),
+            n_classified_contigs / len(contig_names) * 100
+            )
     )
     shared.give_user_feedback(
         message, args.log_file, args.quiet, show_time=False)
 
     if args.f < 0.5:
         message = ("since f is set to smaller than 0.5, one contig may have "
-                   "multiple classifications.")
+                "multiple classifications.")
         shared.give_user_feedback(
             message, args.log_file, args.quiet, show_time=False, warning=True)
 

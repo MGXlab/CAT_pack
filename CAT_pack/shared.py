@@ -71,26 +71,14 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
             action=PathAction,
             help=help_,
         )
-    elif dest == "bin_fasta":
+    elif dest == "bin_fasta_or_folder":
         if help_ is None:
-            help_ = "Path to bin fasta file."
+            help_ = "Path to bin fasta file or to directory containing bins."
         argument_group.add_argument(
             "-b",
             "--bin_fasta",
-            dest="bin_fasta",
-            metavar="",
-            required=required,
-            type=str,
-            action=PathAction,
-            help=help_,
-        )
-    elif dest == "bin_folder":
-        if help_ is None:
-            help_ = "Path to directory containing bins."
-        argument_group.add_argument(
-            "-b",
             "--bin_folder",
-            dest="bin_folder",
+            dest="bin_fasta_or_folder",
             metavar="",
             required=required,
             type=str,
@@ -522,8 +510,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "index_chunks":
         if help_ is None:
             help_ = (
-                "DIAMOND index-chunks parameter (default: {0}). Set to 4 "
-                "on low memory machines. The parameter has no effect on "
+                "DIAMOND index-chunks parameter (default: {0}). Set to 4 on "
+                "low memory machines. The parameter has no effect on "
                 "temporary disk space usage.".format(default)
             )
         argument_group.add_argument(
@@ -565,8 +553,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
             help_ = (
                 "DIAMOND top parameter [0-100] (default: {0}). Governs hits "
                 "within range of best hit that are written to the alignment "
-                "file. This is not the [-r / --range] parameter! "
-                "See README.md.".format(default)
+                "file. This is not the [-r / --range] parameter! See "
+                "README.md.".format(default)
             )
         argument_group.add_argument(
             "--top",
@@ -674,6 +662,12 @@ def expand_arguments(args):
         )
 
         explore_database_folder(args)
+
+    if "bin_fasta_or_folder" in args:
+        if os.path.isfile(args.bin_fasta_or_folder):
+            setattr(args, "bin_fasta", args.bin_fasta_or_folder)
+        else:
+            setattr(args, "bin_folder", args.bin_fasta_or_folder)
 
     return
 

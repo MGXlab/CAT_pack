@@ -90,7 +90,7 @@ def run():
                     lineage_index = line.index("lineage")
                 else:
                     message = ("{0} is not a supported classification file."
-                               "".format(input_file))
+                               "".format(args.input_file))
                     shared.give_user_feedback(
                         message, args.log_file, args.quiet, error=True)
 
