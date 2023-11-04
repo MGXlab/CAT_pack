@@ -10,7 +10,7 @@ import sys
 import tarfile
 import urllib.request
 import urllib.parse
-
+import os
 import shared
 import check
 
