@@ -246,8 +246,8 @@ def make_fastaid2LCAtaxid_file(
 
     message = (
         "Done! File {0} is created. "
-        "{1:,d} of {2:,d} headers ({3:.1f}%) corrected. "
-        "{4:,d} headers ({5:.1f}%) do not have a taxid assigned.".format(
+        "{1:,d} of {2:,d} headers ({3:.2f}%) corrected. "
+        "{4:,d} headers ({5:.2f}%) do not have a taxid assigned.".format(
             fastaid2LCAtaxid_file,
             corrected,
             total,

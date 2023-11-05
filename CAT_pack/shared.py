@@ -591,6 +591,7 @@ def expand_arguments(args):
     if "r" in args:
         setattr(args, "one_minus_r", (100 - args.r) / 100)
 
+    log_file = None
     if "out_prefix" in args:
         # Check out_prefix as the log file needs to be written to a valid
         # location.
@@ -598,17 +599,16 @@ def expand_arguments(args):
         if error:
             sys.exit(1)
 
-        log_file = "{0}.log".format(args.out_prefix)
+        if not args.no_log:
+            log_file = "{0}.log".format(args.out_prefix)
 
-        with open(log_file, "w") as outf1:
-            pass
+            with open(log_file, "w") as outf1:
+                pass
 
         if not args.tmpdir:
             tmpdir = "{0}/".format(args.out_prefix.rsplit("/", 1)[0])
 
             setattr(args, "tmpdir", tmpdir)
-    else:
-        log_file = None
 
     setattr(args, "log_file", log_file)
 

@@ -26,7 +26,7 @@ def usage():
     
     
 def version():
-    message = ("CAT v{0} ({1}) by {2}.".format(
+    message = ("CAT pack v{0} ({1}) by {2}.".format(
         about.__version__, about.__date__, about.__author__))
 
     sys.stdout.write("{0}\n".format(message))

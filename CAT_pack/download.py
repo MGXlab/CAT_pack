@@ -201,7 +201,8 @@ fastaRecord = namedtuple(
 ## FUNCTIONS.
 def get_gtdb_latest_version():
     """Read the version number from the VERSION file."""
-    version_url = "https://data.gtdb.ecogenomic.org/releases/latest/VERSION.txt"
+    version_url = (
+            "https://data.gtdb.ecogenomic.org/releases/latest/VERSION.txt")
 
     with urllib.request.urlopen(version_url) as f:
         version_data = f.read().decode()
@@ -483,10 +484,10 @@ def extract_duplicates(proteins_dir, gid2taxid, acc2taxid_fp, log_file, quiet):
             redundants = sum(map(len, [v for v in multiplets.values()]))
             
             message = (
-                "    Total files: {0:>12}\n"
-                "{1}Total sequences: {2:>12}\n"
-                "{3}     Multiplets: {4:>12}\n"
-                "{5}of which unique: {6:>12}"
+                "    Total files: {0:>12,d}\n"
+                "{1}Total sequences: {2:>12,d}\n"
+                "{3}     Multiplets: {4:>12,d}\n"
+                "{5}of which unique: {6:>12,d}"
                 "".format(
                     file_counter,
                     padding,
@@ -518,13 +519,13 @@ def write_singletons(
                     skipped += 1
                     
             if file_counter % 1000 == 0 and file_counter != 0:
-                message = ("Written {0} sequences from {1:,d} files "
-                        "({2;,d} skipped).".format(
+                message = ("Written {0:,d} sequences from {1:,d} files "
+                        "({2:,d} skipped).".format(
                             seq_counter, file_counter, skipped)
                         )
                 shared.give_user_feedback(message, log_file, quiet)
         else:
-            message = ("Written {0} sequences from {1:,d} files "
+            message = ("Written {0:,d} sequences from {1:,d} files "
                     "({2:,d} skipped).".format(
                         seq_counter, file_counter, skipped)
                     )
@@ -613,7 +614,8 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
                 
                 return prefix == abs_directory
             
-            def safe_extract(tar, path=".", members=None, *, numeric_owner=False):
+            def safe_extract(
+                    tar, path=".", members=None, *, numeric_owner=False):
                 for member in tar.getmembers():
                     member_path = os.path.join(path, member.name)
                     if not is_within_directory(path, member_path):
