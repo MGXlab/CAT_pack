@@ -520,7 +520,7 @@ def write_singletons(
                     
             if file_counter % 1000 == 0 and file_counter != 0:
                 message = ("Written {0:,d} sequences from {1:,d} files "
-                        "({2;,d} skipped).".format(
+                        "({2:,d} skipped).".format(
                             seq_counter, file_counter, skipped)
                         )
                 shared.give_user_feedback(message, log_file, quiet)
