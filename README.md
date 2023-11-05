@@ -336,7 +336,7 @@ $ CAT add_names -i ./first_CAT_run.contig2classification.txt -o ./first_CAT_run.
 $ CAT summarise -c ./contigs.fasta -i ./first_CAT_run.contig2classification.official_names.txt -o ./CAT_first_run.summary.txt
 ```
 
-Run BAT on the set of MAGs that was binned from these contigs:
+Run BAT on the set of MAGs that was binned from these contigs, reusing the protein predictions and DIAMOND alignment file generated previously during the contig classification:
 
 ```
 $ CAT bins -b ./bins/ -d ./db/ -t ./tax/ -p ./first_CAT_run.predicted_proteins.faa -a ./first_CAT_run.alignment.diamond -o ./first_BAT_run
