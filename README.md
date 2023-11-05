@@ -329,33 +329,33 @@ Run CAT on a contig set with default parameter settings deploying 16 cores for D
 
 ```
 
-$ CAT contigs -c ./contigs.fasta -d ./db/ -t ./tax/ -n 16 --out_prefix ./first_CAT_run
+$ CAT contigs -c contigs.fasta -d db/ -t tax/ -n 16 --out_prefix first_CAT_run
 
-$ CAT add_names -i ./first_CAT_run.contig2classification.txt -o ./first_CAT_run.contig2classification.official_names.txt -t ./tax/ --only_official
+$ CAT add_names -i first_CAT_run.contig2classification.txt -o first_CAT_run.contig2classification.official_names.txt -t tax/ --only_official
 
-$ CAT summarise -c ./contigs.fasta -i ./first_CAT_run.contig2classification.official_names.txt -o ./CAT_first_run.summary.txt
+$ CAT summarise -c contigs.fasta -i first_CAT_run.contig2classification.official_names.txt -o CAT_first_run.summary.txt
 ```
 
 Run BAT on the set of MAGs that was binned from these contigs, reusing the protein predictions and DIAMOND alignment file generated previously during the contig classification:
 
 ```
-$ CAT bins -b ./bins/ -d ./db/ -t ./tax/ -p ./first_CAT_run.predicted_proteins.faa -a ./first_CAT_run.alignment.diamond -o ./first_BAT_run
+$ CAT bins -b bins/ -d db/ -t tax/ -p first_CAT_run.predicted_proteins.faa -a first_CAT_run.alignment.diamond -o first_BAT_run
 ```
 
 Run the contig classification algorithm again with custom parameter settings, and name the output with all names in the lineage, excluding the scores:
 
 ```
-$ CAT contigs --range 5 --fraction 0.1 -c ./contigs.fasta -d ./db/ -t ./tax/ -p ./first_CAT_run.predicted_proteins.faa -a ./first_CAT_run.alignment.diamond -o ./second_CAT_run
+$ CAT contigs --range 5 --fraction 0.1 -c contigs.fasta -d db/ -t tax/ -p first_CAT_run.predicted_proteins.faa -a first_CAT_run.alignment.diamond -o second_CAT_run
 
-$ CAT add_names -i ./second_CAT_run.contig2classification.txt -o ./second_CAT_run.contig2classification.names.txt -t ./tax/ --exclude_scores
+$ CAT add_names -i second_CAT_run.contig2classification.txt -o second_CAT_run.contig2classification.names.txt -t tax/ --exclude_scores
 ```
 
 Run BAT on the set of MAGs with custom parameter settings, suppressing verbosity and not writing a log file. Next, add names to the ORF2LCA output file:
 
 ```
-$ CAT bins -r 3 -f 0.1 -b ./bins/ -s .fa -d ./db/ -t ./tax/ -p ./first_CAT_run.predicted_proteins.faa -a ./first_CAT_run.alignment.diamond --o ./second_BAT_run --quiet --no_log
+$ CAT bins -r 3 -f 0.1 -b bins/ -s .fa -d db/ -t tax/ -p first_CAT_run.predicted_proteins.faa -a first_CAT_run.alignment.diamond --o second_BAT_run --quiet --no_log
 
-$ CAT add_names -i ./second_BAT_run.ORF2LCA.txt -o ./second_BAT_run.ORF2LCA.names.txt -t ./tax/
+$ CAT add_names -i second_BAT_run.ORF2LCA.txt -o second_BAT_run.ORF2LCA.names.txt -t tax/
 ```
 
 ### Identifying contamination/mis-binned contigs within a MAG.
@@ -363,9 +363,9 @@ $ CAT add_names -i ./second_BAT_run.ORF2LCA.txt -o ./second_BAT_run.ORF2LCA.name
 We often use the combination of CAT / BAT to explore possible contamination within a MAG.
 
 ```
-$ CAT contigs -c ../bins/interesting_MAG.fasta -d ./db/ -t ./tax/ -o ./CAT.interesting_MAG
+$ CAT contigs -c ../bins/interesting_MAG.fasta -d db/ -t tax/ -o CAT.interesting_MAG
 
-$ CAT bins -b ../bins/interesting_MAG.fasta -d ./db/ -t ./tax/ -p CAT.interesting_MAG.predicted_proteins.faa -a CAT.interesting_MAG.alignment.diamond -o ./BAT.interesting_MAG
+$ CAT bins -b ../bins/interesting_MAG.fasta -d db/ -t tax/ -p CAT.interesting_MAG.predicted_proteins.faa -a CAT.interesting_MAG.alignment.diamond -o BAT.interesting_MAG
 ```
 
 Contigs that have a different taxonomic signal than the MAG classification are probably contamination.
@@ -373,9 +373,9 @@ Contigs that have a different taxonomic signal than the MAG classification are p
 Alternatively, you can look at contamination from the MAG perspective, by setting the *f* parameter to a low value:
 
 ```
-$ CAT bins -f 0.01 -b ../bins/interesting_MAG.fasta -d ./db/ -t ./tax/ -o ./BAT.interesting_MAG
+$ CAT bins -f 0.01 -b ../bins/interesting_MAG.fasta -d db/ -t tax/ -o BAT.interesting_MAG
 
-$ CAT add_names -i ./BAT.interesting_MAG.bin2classification.txt -o ./BAT.interesting_MAG.bin2classification.names.txt -t ./tax/
+$ CAT add_names -i BAT.interesting_MAG.bin2classification.txt -o BAT.interesting_MAG.bin2classification.names.txt -t tax/
 ```
 
 BAT will output any taxonomic signal with at least 1% support. Low scoring diverging signals are clear signs of contamination!
