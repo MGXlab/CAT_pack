@@ -26,8 +26,16 @@ def usage():
     
     
 def version():
-    message = ("CAT pack v{0} ({1}) by {2}.".format(
-        about.__version__, about.__date__, about.__author__))
+    message = ("CAT pack v{0} ({1})".format(
+        about.__version__, about.__date__))
+    if len(about.__authors__) == 1:
+        message += " by {0}".format(about.__authors__[0])
+    elif len(about.__authors__) == 2:
+        message += " by {0}".format(" and ".join(about.__authors__))
+    elif len(about.__authors__) > 2:
+        message += " by {0}, and {1}".format(
+            ", ".join(about.__authors__[:-1]), about.__authors__[-1])
+    message += "."
 
     sys.stdout.write("{0}\n".format(message))
 
