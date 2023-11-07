@@ -195,7 +195,7 @@ $ CAT prepare -h
 ```
 
 ### Running CAT and BAT.
-The taxonomy folder and database folder created by CAT prepare are needed in subsequent CAT and BAT runs. They only need to be generated/downloaded once or whenever you want to update the database.
+The taxonomy folder and database folder created by `CAT prepare` are needed in subsequent CAT and BAT runs. They only need to be generated/downloaded once or whenever you want to update the database.
 
 To run CAT on a contig set, each header in the contig fasta file (the part after `>` and before the first space) needs to be unique. To run BAT on set of MAGs, each header in the MAGs needs to be unique. If you are unsure if this is the case, you can just run CAT or BAT, as the appropriate error messages are generated if formatting is incorrect.
 

@@ -95,12 +95,12 @@ def run():
                         message, args.log_file, args.quiet, error=True)
 
                     sys.exit(1)
-                    
-                try:
-                    scores_index = line.index("lineage scores")
-                except:
-                    scores_index = None
 
+                scores_index = None
+                for i in range(len(line)):
+                    if line[i].startswith("lineage scores"):
+                        scores_index = i
+                    
                 full_length = len(line)
 
                 break
@@ -141,7 +141,7 @@ def run():
             
             lineage = line[lineage_index].split(";")
 
-            if scores_index is not None and not args.exclude_scores:
+            if scores_index and not args.exclude_scores:
                 scores = line[scores_index].split(";")
             else:
                 scores = None
