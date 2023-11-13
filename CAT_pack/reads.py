@@ -57,7 +57,7 @@ def parse_arguments():
     shared.add_argument(optional, 'bam_file1', False)
     shared.add_argument(optional, 'bam_file2', False)
     shared.add_argument(optional, 'alignment_unmapped', False)
-    shared.add_argument(optional, 'bin_folder', False)
+    shared.add_argument(optional, 'bin_fasta_or_folder', False)
     shared.add_argument(optional, 'bin_suffix', False)
     shared.add_argument(optional, 'contig2classification', False)
     shared.add_argument(optional, 'bin2classification', False)
@@ -65,11 +65,9 @@ def parse_arguments():
     shared.add_argument(optional, 'unmapped2classification', False)
 
     shared.add_argument(optional, 'mapping_quality', False, default=2)
-    shared.add_argument(optional, 'read_classification', False)
     shared.add_argument(optional, 'path_to_bwa', False, default='bwa')
     shared.add_argument(optional, 'path_to_samtools', False, default='samtools')
-    shared.add_argument(optional, 'nproc', False,
-            default=multiprocessing.cpu_count())
+
     shared.add_argument(optional, 'force', False)
     shared.add_argument(optional, 'quiet', False)
     shared.add_argument(optional, 'verbose', False)
@@ -78,6 +76,8 @@ def parse_arguments():
     
     CAT_args = parser.add_argument_group('CAT/BAT-specific arguments')
     shared.add_argument(CAT_args, 'database_folder', False)
+    shared.add_argument(optional, "proteins_fasta", False)
+    shared.add_argument(optional, "alignment_file", False)
     shared.add_argument(CAT_args, 'r', False, default=decimal.Decimal(10))
     shared.add_argument(CAT_args, 'f', False, default=decimal.Decimal(0.5))
     shared.add_argument(CAT_args, 'path_to_prodigal', False,
@@ -87,7 +87,7 @@ def parse_arguments():
     shared.add_argument(CAT_args, 'IkwId', False)
     
     dmnd_args = parser.add_argument_group('DIAMOND specific optional arguments')
-    shared.add_all_diamond_arguments(dmnd_args, add_nproc=False)
+    shared.add_all_diamond_arguments(dmnd_args)
                           
     (args, extra_args) = parser.parse_known_args()
     extra_args = [arg for (i, arg) in enumerate(extra_args) if
@@ -99,21 +99,40 @@ def parse_arguments():
     # Add extra arguments.
     shared.expand_arguments(args)
     
-    if not args.contigs_fasta:
-        sys.exit('error: no contigs_fasta supplied.')
+    if not args.read_file1:
+        sys.exit('error: you have to supply read files!')
     
-    if not args.bam_file1 and not args.read_file1:
-        sys.exit('error: you have to supply either a sorted bam file or '
-                 'two paired-end read files!')
-    if not args.contig2classification and not args.database_folder:
-        sys.exit('error: please provide either a contig2classification file '
-                 'or the path to the CAT database_folder!')
-    if args.bin_folder and not args.bin2classification and not args.database_folder:
-        sys.exit('error: please provide either a bin2classification file or '
-                 'the path to the CAT database_folder for bin classification!')
-    if args.bin2classification and not args.bin_folder:
-        sys.exit('error: bin2classification file but no bin_folder supplied. '
-                 'RAT requires -b/--bin_folder to include bins in annotation!')
+    #check if the mode is correct
+    for c in [m for m in args.mode]:
+        if c not in ['m', 'c', 'r']:
+            sys.exit('Unknown letter "{}" in the mode argument. Allowed letters ' 
+                     'are "m" for MAGs, "c" for contigs and "r" for reads. '
+                     'Exiting.'.format(c))
+    
+    if 'm' in args.mode:
+        if not args.bin_folder:
+            sys.exit('error: "m" was supplied to mode but no bin_folder. If '
+                     'you want to include MAGs in your profile, please submit '
+                     'a bin folder (and suffix if necessary)')
+        if args.bin_folder and not args.bin2classification and not args.database_folder:
+            sys.exit('error: please provide either a bin2classification file or '
+                     'the path to the CAT database_folder for bin classification!')
+        if args.bin2classification and not args.bin_folder:
+            sys.exit('error: bin2classification file but no bin_folder supplied. '
+                     'RAT requires -b/--bin_folder to include bins in annotation!')
+    
+    if 'c' in args.mode:
+        if not args.contigs_fasta:
+            sys.exit('error: no contigs_fasta supplied.')
+    
+
+        if not args.contig2classification and not args.database_folder:
+            sys.exit('error: please provide either a contig2classification file '
+                     'or the path to the CAT database_folder!')
+            
+    if 'r' in args.mode and not 'c' in args.mode and not 'm' in args.mode:
+        sys.exit('error: we do not recommend annotating all reads directly '
+                 'with diamond. Please include c or m in the mode argument.')
     
     
     return args
@@ -164,7 +183,7 @@ def run():
             outf_bwamem='{0}.{1}.bwamem'.format(args.out_prefix+'.'+
                                         os.path.split(args.contigs_fasta)[-1], 
                                         os.path.split(args.read_file1)[-1])
-            print(outf_bwamem)
+            
             errors.append(
                     check.check_output_file(
                         outf_bwamem, args.log_file, args.quiet))
@@ -187,21 +206,23 @@ def run():
             errors.append(
                     check.check_output_file(
                         outf_cat_alignment, args.log_file, args.quiet))
-        if args.bin_folder and not args.bin2classification:
-            outf_bat_protein_faa='{0}.BAT.{1}.predicted_proteins.faa'.format(args.out_prefix,
-                                                                         'concatenated')
-            outf_bat_b2c='{0}.BAT.bin2classification.txt'.format(args.out_prefix)
-            outf_bat_alignment='{0}.BAT.{1}.alignment.diamond'.format(args.out_prefix,
-                                                                         'concatenated')
-            errors.append(
-                    check.check_output_file(
-                        outf_bat_protein_faa, args.log_file, args.quiet))
-            errors.append(
-                    check.check_output_file(
-                        outf_bat_b2c, args.log_file, args.quiet))
-            errors.append(
-                    check.check_output_file(
-                        outf_bat_alignment, args.log_file, args.quiet))
+            
+        if 'm' in args.mode:    
+            if args.bin_folder and not args.bin2classification:
+                outf_bat_protein_faa='{0}.BAT.{1}.predicted_proteins.faa'.format(args.out_prefix,
+                                                                             'concatenated')
+                outf_bat_b2c='{0}.BAT.bin2classification.txt'.format(args.out_prefix)
+                outf_bat_alignment='{0}.BAT.{1}.alignment.diamond'.format(args.out_prefix,
+                                                                             'concatenated')
+                errors.append(
+                        check.check_output_file(
+                            outf_bat_protein_faa, args.log_file, args.quiet))
+                errors.append(
+                        check.check_output_file(
+                            outf_bat_b2c, args.log_file, args.quiet))
+                errors.append(
+                        check.check_output_file(
+                            outf_bat_alignment, args.log_file, args.quiet))
 
         
     errors.append(
@@ -267,73 +288,103 @@ def run():
                                       show_time=False)
 
     
-    # Process bin folder
-    contig2bin={}
-    
-    if args.bin_folder:
-        message = 'Bin folder supplied. Processing bin folder.'
-        shared.give_user_feedback(message, args.log_file, args.quiet,
-                show_time=True)
-
-        bins=process_bin_folder(args.bin_folder, args.bin_suffix)
-        contig2bin=invert_bin_dict(bins)
-
-
-    # Run BAT on folder if bin folder but not BAT_file is supplied
-    # Or process BAT file if it is supplied
-    b2c={}
-    
-    if args.bin_folder and args.bin2classification:
-        message = (
-                'bin2classification file supplied. Processing bin '
-                'classifications.')
-        shared.give_user_feedback(message, args.log_file, args.quiet,
-                show_time=True)
-        b2c=process_CAT_table(args.bin2classification, args.nodes_dmp, 
-                              args.log_file, args.quiet)
-    
-    elif args.bin_folder and not args.bin2classification:
-        message = ('No bin2classification file supplied. Running BAT on bin '
-                   'folder.')
-        shared.give_user_feedback(message, args.log_file, args.quiet,
-                show_time=True)
-
-        shared.run_BAT(args.bin_folder, args.database_folder, args.taxonomy_folder,
-                       args.log_file, args.quiet, args.nproc, args.f, args.r, 
-                       args.path_to_prodigal, args.path_to_diamond, args.out_prefix, 
-                       args.bin_suffix)
-        b2c=process_CAT_table('{0}.BAT.bin2classification.txt'.format(args.out_prefix), 
-                              args.nodes_dmp, args.log_file, args.quiet)
-        
-    elif not args.bin_folder:
-        message = 'No bin folder supplied. No bin classification will be made.'
-        
-        shared.give_user_feedback(message, args.log_file, args.quiet,
-                show_time=False)
-    
-    
     # Run CAT or process CAT output file
-    if args.contig2classification:
-        message = (
-                'contig2classification file supplied. Processing contig '
-                'classifications.')
-        shared.give_user_feedback(message, args.log_file, args.quiet,
-                show_time=True)
-        c2c=process_CAT_table(args.contig2classification, args.nodes_dmp, 
-                              args.log_file, args.quiet)
-    else:
-        message = (
-                'No contig2classification file supplied. Running CAT on '
-                'contigs.')
-        shared.give_user_feedback(message, args.log_file, args.quiet,
-                show_time=True)
-        shared.run_CAT(args.contigs_fasta, args.database_folder, 
-                       args.taxonomy_folder, args.log_file, args.quiet, 
-                       args.nproc, args.f, args.r, args.path_to_prodigal, 
-                       args.path_to_diamond, args.out_prefix)
-        c2c=process_CAT_table('{0}.CAT.contig2classification.txt'
-                              ''.format(args.out_prefix), 
-                              args.nodes_dmp, args.log_file, args.quiet)
+    if 'c' in args.mode:
+        if args.contig2classification:
+            message = (
+                    'contig2classification file supplied. Processing contig '
+                    'classifications.')
+            shared.give_user_feedback(message, args.log_file, args.quiet,
+                    show_time=True)
+            c2c=process_CAT_table(args.contig2classification, args.nodes_dmp, 
+                                  args.log_file, args.quiet)
+        else:
+            message = (
+                    'No contig2classification file supplied. Running CAT on '
+                    'contigs.')
+            shared.give_user_feedback(message, args.log_file, args.quiet,
+                    show_time=True)
+            shared.run_CAT(args, args.contigs_fasta, args.database_folder, 
+                           args.taxonomy_folder, args.log_file, args.quiet, 
+                           args.nproc, args.f, args.r, args.path_to_prodigal, 
+                           args.path_to_diamond, args.out_prefix)
+            c2c=process_CAT_table('{0}.CAT.contig2classification.txt'
+                                  ''.format(args.out_prefix), 
+                                  args.nodes_dmp, args.log_file, args.quiet)
+    
+    
+    contig2bin={}
+    b2c={}
+    # Process bin folder
+
+    
+    if 'm' in args.mode:
+        
+        if args.bin_folder:
+            message = 'Bin folder supplied. Processing bin folder.'
+            shared.give_user_feedback(message, args.log_file, args.quiet,
+                    show_time=True)
+    
+            bins=process_bin_folder(args.bin_folder, args.bin_suffix)
+            if bins=={}:
+                message = ('No files found with suffix {} in folder "{}".' 
+                           'Please check command.'
+                           ''.format(args.bin_suffix, args.bin_folder))
+                shared.give_user_feedback(message, args.log_file, args.quiet,
+                        show_time=True)
+                sys.exit(1)
+            contig2bin=invert_bin_dict(bins)
+    
+    
+        # Run BAT on folder if bin folder but not BAT_file is supplied
+        # Or process BAT file if it is supplied
+        
+        
+        if args.bin_folder and args.bin2classification:
+            message = (
+                    'bin2classification file supplied. Processing bin '
+                    'classifications.')
+            shared.give_user_feedback(message, args.log_file, args.quiet,
+                    show_time=True)
+            b2c=process_CAT_table(args.bin2classification, args.nodes_dmp, 
+                                  args.log_file, args.quiet)
+        
+        elif args.bin_folder and not args.bin2classification:
+            message = ('No bin2classification file supplied. Running BAT on bin '
+                       'folder.')
+            shared.give_user_feedback(message, args.log_file, args.quiet,
+                    show_time=True)
+            
+            # If CAT was not run, run BAT
+            if not 'c' in args.mode:
+                shared.run_BAT(args, args.bin_folder, args.database_folder, args.taxonomy_folder,
+                           args.log_file, args.quiet, args.nproc, args.f, args.r, 
+                           args.path_to_prodigal, args.path_to_diamond, args.out_prefix, 
+                           args.bin_suffix)
+                
+            # If CAT was run, use the CAT output files
+            else:
+                message = ('Calculating bin annotations from previous CAT run.')
+                shared.give_user_feedback(message, args.log_file, args.quiet,
+                    show_time=True)
+                CAT_protein_fasta=('{0}.CAT.predicted_proteins.faa'
+                                   ''.format(args.out_prefix))
+                CAT_diamond_alignment=('{0}.CAT.alignment.diamond'
+                                       ''.format(args.out_prefix))
+                shared.run_BAT(args, args.bin_folder, args.database_folder, args.taxonomy_folder,
+                           args.log_file, args.quiet, args.nproc, args.f, args.r, 
+                           CAT_protein_fasta, CAT_diamond_alignment,
+                           args.path_to_prodigal, args.path_to_diamond, args.out_prefix, 
+                           args.bin_suffix, )
+            b2c=process_CAT_table('{0}.BAT.bin2classification.txt'.format(args.out_prefix), 
+                                  args.nodes_dmp, args.log_file, args.quiet)
+            
+        elif not args.bin_folder:
+            message = 'No bin folder supplied. No bin classification will be made.'
+            
+            shared.give_user_feedback(message, args.log_file, args.quiet,
+                    show_time=False)
+    
     
     
     # Process BAM files and grab unmapped reads
@@ -359,7 +410,7 @@ def run():
     # If direct_mapping is chosen, map unclassified contigs and unmapped reads
     # against NR
     
-    if args.mode=='direct_mapping':
+    if 'r' in args.mode:
         setattr(args,'read2classification',True)
         message = ('Chosen mode: {0}. Classifying unclassified contigs and'
                     ' unmapped reads with diamond if no classification file is'
@@ -455,12 +506,15 @@ def run():
                                   args.log_file, 
                                   args.quiet)
         else:
+            message = ('Loading unmapped2classification...')
+            shared.give_user_feedback(message, args.log_file, args.quiet,
+                show_time=True)
             u2c=process_CAT_table(args.unmapped2classification, 
                                   args.nodes_dmp, 
                                   args.log_file, 
                                   args.quiet)
     else:
-        u2c=None
+        u2c={}
             
     message = 'Writing output tables.'
     shared.give_user_feedback(message, args.log_file, args.quiet,
@@ -477,12 +531,12 @@ def run():
                    args.out_prefix,
                    u2c)
         
-    
-    make_bin_table(contig2bin, 
-                   contigs, 
-                   contig_length_dict, 
-                   sum_of_reads, 
-                   args.out_prefix)
+    if 'm' in args.mode:
+        make_bin_table(contig2bin, 
+                       contigs, 
+                       contig_length_dict, 
+                       sum_of_reads, 
+                       args.out_prefix)
     
        
     
@@ -596,7 +650,7 @@ def write_unmapped2classification(seq2hits,
 
 
 def classify_reads(read_dict, contig2classification, bin2classification, unmapped2classification):
-    worked=0
+    # worked=0
     for read in read_dict:
         # If the read is mapped to a contig:
         if read_dict[read]['contig']!=[]:
@@ -606,24 +660,27 @@ def classify_reads(read_dict, contig2classification, bin2classification, unmappe
                     try:
                         if (read_dict[read]['bin'][r]=='unbinned' or
                             len(bin2classification[read_dict[read]['bin'][r]])<1):
+                            
                             read_dict[read]['taxon_bin'].append('')
-                        
+                           
                         else:
+                            
                             read_dict[read]['taxon_bin'].append(';'.join(bin2classification[read_dict[read]['bin'][r]][0]))
-                        worked+=1
+                        # worked+=1
                     except IndexError:
-                        print(r)
-                        sys.exit('Worked: {}'.format(worked))
+                        
+                        sys.exit(1)
                 
                 # If there is a contig classification, store it
-                contig=read_dict[read]['contig'][r]
-                if (contig2classification[contig]==[] or
-                    len(contig2classification[contig][0])<2 or 
-                    (len(contig2classification[contig][0])==2 and 
-                    contig2classification[contig][0][1]=='131567')):
-                    read_dict[read]['taxon_contig'].append('')
-                else:
-                    read_dict[read]['taxon_contig'].append(';'.join(contig2classification[contig][0]))
+                if contig2classification:
+                    contig=read_dict[read]['contig'][r]
+                    if (contig2classification[contig]==[] or
+                        len(contig2classification[contig][0])<2 or 
+                        (len(contig2classification[contig][0])==2 and 
+                        contig2classification[contig][0][1]=='131567')):
+                        read_dict[read]['taxon_contig'].append('')
+                    else:
+                        read_dict[read]['taxon_contig'].append(';'.join(contig2classification[contig][0]))
                     
                 # If there is no contig classification, but a dm classification, store it
                 if contig in unmapped2classification:
@@ -1083,11 +1140,10 @@ def process_bam_file(BAM_fw_file, BAM_rev_file=False, path_to_samtools='samtools
             if paired:
                 if len(bin(flag))>8 and bin(flag)[-7]=='1':
                     unmapped_reads['fw'].add(read_id)
-                else:
+                elif len(bin(flag))>8 and bin(flag)[-7]=='0':
                     unmapped_reads['rev'].add(read_id)
             else:
                 unmapped_reads['fw'].add(read_id)
-    
     
     # if a reverse alignment file is given, add the contig that the mate maps to
     if BAM_rev_file:
