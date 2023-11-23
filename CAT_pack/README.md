@@ -59,12 +59,22 @@ You can either download preconstructed database files, or generate them yourself
 
 ### Downloading preconstructed database files
 
-To download the database files, find the most recent version on [tbb.bio.uu.nl/bastiaan/CAT\_prepare/](https://tbb.bio.uu.nl/bastiaan/CAT_prepare/), download and extract, and you are ready to go!
+To download the database files, find the most recent version on [tbb.bio.uu.nl/bastiaan/CAT\_prepare/](https://tbb.bio.uu.nl/tina/CAT_prepare/), download and extract, and you are ready to go!
+
+For the nr database:
 
 ```
-$ wget tbb.bio.uu.nl/bastiaan/CAT_prepare/CAT_prepare_20210107.tar.gz
+$ wget tbb.bio.uu.nl/tina/CAT_prepare/20231120_CAT_nr.tar.gz
 
-$ tar -xvzf CAT_prepare_20210107.tar.gz
+$ tar -xvzf 20231120_CAT_nr.tar.gz
+```
+
+For GTDB:
+
+```
+$ wget tbb.bio.uu.nl/tina/CAT_prepare/20231120_CAT_gtdb.tar.gz
+
+$ tar -xvzf 20231120_CAT_gtdb.tar.gz
 ```
 
 ### Creating a fresh nr or GTDB database yourself
