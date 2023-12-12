@@ -110,8 +110,9 @@ def import_bins(bin_folder, bin_suffix, log_file, quiet):
                     if contig in contig2bin:
                         message = (
                             "BAT has encountered {0} twice, in {1} and in "
-                            "{2}. Fasta headers should be unique across bins, "
-                            "please remove or rename duplicates."
+                            "{2}. Fasta headers (the part before the first "
+                            "space in the >line) should be unique across "
+                            "bins, please remove or rename duplicates."
                             "".format(contig, contig2bin[contig], bin_)
                         )
                         shared.give_user_feedback(
