@@ -381,6 +381,7 @@ Run the contig classification algorithm again with custom parameter settings, an
 $ CAT contigs --range 5 --fraction 0.1 -c contigs.fasta -d db/ -t tax/ -p first_CAT_run.predicted_proteins.faa -a first_CAT_run.alignment.diamond -o second_CAT_run
 
 $ CAT add_names -i second_CAT_run.contig2classification.txt -o second_CAT_run.contig2classification.names.txt -t tax/ --exclude_scores
+
 ```
 
 Run BAT on the set of MAGs with custom parameter settings, suppressing verbosity and not writing a log file. Next, add names to the ORF2LCA output file:
