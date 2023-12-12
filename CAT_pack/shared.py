@@ -1315,7 +1315,8 @@ def import_contig_names(fasta_file, log_file, quiet):
 
                 if contig in contig_names:
                     message = (
-                        "your fasta file contains duplicate headers. The "
+                        "your fasta file contains duplicate headers (the part "
+                        "before the first space in the >line). The "
                         "first duplicate encountered is {0}, but there might "
                         "be more...".format(contig)
                     )
