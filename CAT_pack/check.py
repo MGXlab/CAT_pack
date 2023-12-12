@@ -136,6 +136,49 @@ def check_diamond_binaries(path_to_diamond, log_file, quiet):
     return error
 
 
+def check_bwa_binaries(path_to_bwa, log_file, quiet):
+    error = False
+
+    try:
+        p = subprocess.Popen([path_to_bwa],
+                             stderr=subprocess.PIPE)
+        for line in p.stderr:
+            line=line.decode("utf-8")
+            if line.startswith('Version'):
+                output = line.rstrip()
+                message = 'bwa found: {0}.'.format(output)
+                shared.give_user_feedback(message, log_file, quiet)
+    except OSError:
+        message = ('can not find bwa. Please check whether it is '
+                'installed or the path to the binaries is provided.')
+        shared.give_user_feedback(message, log_file, quiet, error=True)
+
+        error = True
+
+    return error
+
+
+def check_samtools_binaries(path_to_samtools, log_file, quiet):
+    error = False
+
+    try:
+        p = subprocess.Popen([path_to_samtools, '--version'],
+                             stdout=subprocess.PIPE)
+        c = p.communicate()
+        output = c[0].decode().split('\n')[0].rstrip()
+
+        message = 'samtools found: {0}.'.format(output)
+        shared.give_user_feedback(message, log_file, quiet)
+    except OSError:
+        message = ('can not find samtools. Please check whether it is '
+                'installed or the path to the binaries is provided.')
+        shared.give_user_feedback(message, log_file, quiet, error=True)
+
+        error = True
+
+    return error
+
+
 def check_bin_folder(bin_folder, bin_suffix, log_file, quiet):
     error = False
 
