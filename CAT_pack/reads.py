@@ -9,7 +9,6 @@ import sys
 import decimal
 import gzip
 from Bio import SeqIO
-from io import StringIO
 import json
 
 import about
