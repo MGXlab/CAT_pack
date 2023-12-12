@@ -4,13 +4,18 @@
 - [Dependencies and where to get them](#dependencies-and-where-to-get-them)
 - [Installation](#installation)
 - [Getting started](#getting-started)
-- [Usage](#usage)
-- [Interpreting the output files](#interpreting-the-output-files)
-- [Marking suggestive taxonomic assignments with an asterisk](#marking-suggestive-taxonomic-assignments-with-an-asterisk)
-- [Optimising running time, RAM, and disk usage](#optimising-running-time-ram-and-disk-usage)
-- [Examples](#examples)
-- [RAT](#rat)
+  - [Downloading preconstructed database files](downloading-preconstructed-database-files)
+  - [Creating a fresh NCBI nr or GTDB database yourself](creating-a-fresh-ncbi-nr-or-gtdb-database-yourself)
+  - [Creating a custom database](creating-a-custom-database)
+  - [Running CAT/BAT/RAT](running-cat/bat/rat)
+  - [Getting help](getting-help)
+- [Taxonomic annotation of contigs or MAGs with CAT and BAT](#taxonomic-annotation-of-contigs-or-mags-with-cat-and-bat)
+  - [Interpreting the output files](#interpreting-the-output-files)
+  - [Marking suggestive taxonomic assignments with an asterisk](#marking-suggestive-taxonomic-assignments-with-an-asterisk)
+  - [Optimising running time, RAM, and disk usage](#optimising-running-time-ram-and-disk-usage)
+  - [Examples](examples)
 - [Estimating the microbial composition with RAT](#estimating-the-microbial-composition-with-rat)
+  - [Output files](output-files)
 
 
 ## Introduction
@@ -20,7 +25,7 @@ A paper describing the algorithm together with extensive benchmarks can be found
 
 * *von Meijenfeldt FAB, Arkhipova K, Cambuy DD, Coutinho FH, Dutilh BE. Robust taxonomic classification of uncharted microbial sequences and bins with CAT and BAT. Genome Biology. 2019;20:217.*
 
-**Read Annotation Tool (RAT)** estimates the taxonomic composition of metagenomes using CAT and BAT output. See [RAT](#rat) below. A manuscript describing RAT with benchmarks can be found at https://doi.org/10.1101/2023.03.22.533753. If you use RAT in your research, it would be great if you could cite:
+**Read Annotation Tool (RAT)** estimates the taxonomic composition of metagenomes using CAT and BAT output. A manuscript describing RAT with benchmarks can be found at https://doi.org/10.1101/2023.03.22.533753. If you use RAT in your research, it would be great if you could cite:
 
 * *von Meijenfeldt FAB, Arkhipova K, Cambuy DD, Coutinho FH, Dutilh BE. Robust taxonomic classification of uncharted microbial sequences and bins with CAT and BAT. Genome Biology. 2019;20:217.*
 * *Hauptfeld E, Pappas N, van Iwaarden S, Snoek BL, Aldas-Vargas A, Dutilh BE, von Meijenfeldt FAB. Integration of taxonomic signals from MAGs and contigs improves read annotation and taxonomic profiling of metagenomes. bioRXiv. 2023*
@@ -238,7 +243,7 @@ $ CAT summarise --help
 If you are unsure about what input files are required, you can just run CAT/BAT/RAT, as the appropriate error messages are generated if formatting is incorrect.
 
 
-## Usage
+## Taxonomic annotation of contigs or MAGs with CAT and BAT
 After you have got the database files on your system, you can run CAT to annotate your contig set:
 
 ```
@@ -284,7 +289,7 @@ $ CAT bins -b {bin folder} -d {database folder} -t {taxonomy folder} -p {predict
 ```
 This is a great way to run both CAT and BAT on a set of MAGs without needing to do protein prediction and alignment twice!
 
-## Interpreting the output files
+### Interpreting the output files
 The ORF2LCA output looks like this:
 
 ORF | number of hits (r: 10) | lineage | bit-score
@@ -332,12 +337,12 @@ $ CAT summarise -i {named BAT classification file} -o {output file}
 
 CAT summarise currently does not support classification files wherein some contigs / MAGs have multiple classifications (as contig\_2 above).
 
-## Marking suggestive taxonomic assignments with an asterisk
+### Marking suggestive taxonomic assignments with an asterisk
 When we want to confidently go down to the lowest taxonomic level possible for a classification, an important assumption is that on that level conflict between classifications could have arisen. Namely, if there were conflicting classifications, the algorithm would have made the classification more conservative by moving up a level. Since it did not, we can trust the low-level classification. However, it is not always possible for conflict to arise, because in some cases no other sequences from the clade are present in the database. This is true for example for the family Dehalococcoidaceae, which in our databases is the sole representative of the order Dehalococcoidales. Thus, here we cannot confidently state that an classification on the family level is more correct than an classification on the order level. For these cases, CAT and BAT mark the lineage with asterisks, starting from the lowest level classification up to the level where conflict could have arisen because the clade contains multiple taxa with database entries. The user is advised to examine starred taxa more carefully, for example by analysing sequence identity between predicted ORFs and hits, or move up the lineage to a confident classification (i.e. the first classification without an asterisk).
 
 If you do not want the asterisks in your output files, you can add the `--no_stars` flag to CAT or BAT.
 
-## Optimising running time, RAM, and disk usage
+### Optimising running time, RAM, and disk usage
 CAT and BAT may take a while to run, and may use quite a lot of RAM and disk space. Depending on what you value most, you can tune CAT and BAT to maximize one and minimize others. The classification algorithm itself is fast and is friendly on memory and disk space. The most expensive step is alignment with DIAMOND, hence tuning alignment parameters will have the highest impact:
 
 - The `-n / --nproc` argument allows you to choose the number of cores to deploy.
@@ -346,7 +351,7 @@ CAT and BAT may take a while to run, and may use quite a lot of RAM and disk spa
 - For high memory machines, it is adviced to set `--index_chunks` to 1 (currently the default). This parameter has no effect on temprary disk space usage.
 - You can specify the location of temporary DIAMOND files with the `--tmpdir` argument.
 
-## Examples
+### Examples
 Getting help for running the prepare utility:
 
 ```
@@ -386,8 +391,7 @@ $ CAT bins -r 3 -f 0.1 -b bins/ -s .fa -d db/ -t tax/ -p first_CAT_run.predicted
 $ CAT add_names -i second_BAT_run.ORF2LCA.txt -o second_BAT_run.ORF2LCA.names.txt -t tax/
 ```
 
-### Identifying contamination/mis-binned contigs within a MAG.
-
+#### Identifying contamination/mis-binned contigs within a MAG
 We often use the combination of CAT / BAT to explore possible contamination within a MAG.
 
 ```
@@ -409,28 +413,14 @@ $ CAT add_names -i BAT.interesting_MAG.bin2classification.txt -o BAT.interesting
 BAT will output any taxonomic signal with at least 1% support. Low scoring diverging signals are clear signs of contamination!
 
 
-
-# RAT
-
-RAT estimates the taxonomic composition of metagenomes by integrating taxonomic signals from MAGs, contigs, and reads. RAT has been added to the CAT pack from CAT version 6.0.
-
-A manuscript describing RAT with benchmarks can be found at https://doi.org/10.1101/2023.03.22.533753. If you use RAT in your research, please cite:
-
-* *von Meijenfeldt FAB, Arkhipova K, Cambuy DD, Coutinho FH, Dutilh BE. Robust taxonomic classification of uncharted microbial sequences and bins with CAT and BAT. Genome Biology. 2019;20:217.*
-and
-* *Hauptfeld E, Pappas N, van Iwaarden S, Snoek BL, Aldas-Vargas A, Dutilh BE, von Meijenfeldt FAB. Integration of taxonomic signals from MAGs and contigs improves read annotation and taxonomic profiling of metagenomes. bioRXiv. 2023*
-
-
 ## Estimating the microbial composition with RAT
-
-
-To use RAT, you need a prepared CAT database (see [Getting started](#getting-started) for more information)
+RAT estimates the taxonomic composition of metagenomes by integrating taxonomic signals from MAGs, contigs, and reads. RAT has been added to the CAT pack from CAT version 6.0.
+To use RAT, you need the CAT database files (see [Getting started](#getting-started) for more information).
 
 RAT makes an integrated profile using MAGs/bins, contigs, and reads. To specify which elements should be integrated, use the `--mode` argument. Possible letters for `--mode` are `m` (for MAGs), `c` (for contigs), and `r` (for reads). All combinations of the three letters are possible, except `r` alone.
 To run RAT's complete workflow, specify the mode, read files, contig files, bin folder, and database files:
 
 ```
-
 $ CAT reads --mode mcr -b bin_folder/ -c contigs.fasta -1 forward_reads.fq.gz -2 reverse_reads.fq.gz -d db/ -t tax/
 ```
 
@@ -470,7 +460,7 @@ Similar to CAT and BAT, the paths to all dependencies can be supplied via an arg
 $ CAT reads --mode mcr -b bin_folder/ -c contigs.fasta -1 forward_reads.fq.gz -2 reverse_reads.fq.gz -d db/ -t tax/ --path_to_samtools /path/to/samtools
 ```
 
-
+### Output files
 The RAT output consists of:
 
 - A log file.
