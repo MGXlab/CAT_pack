@@ -22,7 +22,7 @@ def parse_arguments():
         "input_file",
         True,
         help_=("Path to input file. Can be classification or ORF2LCA output "
-               "file from CAT or BAT."))
+               "file from CAT, BAT or RAT."))
     shared.add_argument(required, "output_file", True)
     shared.add_argument(required, "taxonomy_folder", True)
 
@@ -38,7 +38,7 @@ def parse_arguments():
     extra_args = [arg for (i, arg) in enumerate(extra_args) if
                   (i, arg) != (0, "add_names")]
     if len(extra_args) > 0:
-        sys.exit("error: too much arguments supplied:\n{0}".format(
+        sys.exit("error: too many arguments supplied:\n{0}".format(
             "\n".join(extra_args)))
 
     # Add extra arguments.
@@ -84,7 +84,7 @@ def run():
     with open(args.input_file, "r") as f1:
         for line in f1:
             if line.startswith("#"):
-                line = line.rstrip().split("\t")
+                line = line[2:].rstrip().split("\t")
 
                 if "lineage" in line:
                     lineage_index = line.index("lineage")
@@ -164,5 +164,5 @@ def run():
 
 
 if __name__ == "__main__":
-    sys.exit("Run \'CAT add_names\' to add taxonomic names to CAT or BAT "
-             "output files.")
+    sys.exit("Run \'CAT add_names\' to add taxonomic names to CAT, BAT "
+             "or RAT output files.")

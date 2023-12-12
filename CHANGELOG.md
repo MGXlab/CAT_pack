@@ -1,5 +1,8 @@
 # Changelog
 
+## 6.0
+* We welcome a new member to the CAT pack: Read Annotation Tool! RAT uses CAT and BAT annotations as well as direct read mappings to reconstruct accurate taxonomic profiles of metagenomes! To try RAT, run `CAT reads`.
+ 
 ## 5.3
 * GTDB support.
 * Sequence databases (NCBI nr or GTDB) can be downloaded with `CAT download`, and CAT databases constructed with `CAT prepare`.

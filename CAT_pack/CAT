@@ -6,6 +6,7 @@ import about
 import add_names
 import bins
 import contigs
+import reads
 import download
 import prepare
 import summarise
@@ -14,10 +15,10 @@ import summarise
 def usage():
     message = (
         "usage: CAT (download | prepare | contigs | bins | add_names | "
-        "summarise) [-v / --version] [-h / --help]\n"
+        "reads | summarise) [-v / --version] [-h / --help]\n"
         "CAT: error: one of the arguments "
         "download prepare contigs bins add_names summarise "
-        "is required"
+        "reads is required"
     )
     
     sys.stdout.write("{0}\n".format(message))
@@ -44,10 +45,12 @@ def version():
     
 def help():
     message = (
-        "usage: CAT (prepare | contigs | bin | bins | add_names | summarise) "
+        "usage: CAT (prepare | contigs | bin | bins | add_names | reads | "
+        "summarise) "
         "[-v / --version] [-h / --help]\n\n"
-        "Run Contig Annotation Tool (CAT) or "
-        "Bin Annotation Tool (BAT).\n\n"
+        "Run Contig Annotation Tool (CAT), "
+        "Bin Annotation Tool (BAT), or" 
+        "Read Annotation Tool (RAT).\n\n"
         "Required choice:\n"
         "  download\t\tDownload and preprocess data from NCBI nr or GTDB.\n"
         "  prepare\t\tConstruct database files.\n"
@@ -77,6 +80,8 @@ def main():
         contigs.run()
     elif sys.argv[1] == "bins":
         bins.run()
+    elif sys.argv[1] == 'reads':
+        reads.run()
     elif sys.argv[1] == "add_names":
         add_names.run()
     elif sys.argv[1] == "summarise":
