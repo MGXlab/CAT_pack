@@ -1,10 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Apr 15 11:07:07 2020
-
-@author: tina
-"""
 
 import os
 import subprocess
@@ -23,7 +17,6 @@ import about
 import check
 import shared
 import tax
-
 
 
 def parse_arguments():
