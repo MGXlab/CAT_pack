@@ -4,7 +4,6 @@ import os
 import subprocess
 import argparse
 import datetime
-import multiprocessing
 import sys
 import decimal
 import gzip
