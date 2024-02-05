@@ -311,10 +311,10 @@ def prepare(step_list, args):
         log_fname = "{0}.log".format(args.common_prefix)
         log_path = db_dir / pathlib.Path(log_fname)
 
-        with open(log_path, "w") as outf1:
-            pass
-
         setattr(args, "log_file", log_path)
+
+        with open(args.log_file, "w") as outf1:
+            pass
 
     shared.print_variables(args, step_list)
     memory_bottleneck(args)
