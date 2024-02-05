@@ -80,7 +80,7 @@ def memory_bottleneck(args):
             "construction (e.g. nr). {1}GB is found on your system. You can "
             "try to find a machine with more memory if you run into issues or "
             "download preconstructed database files from "
-            "tbb.bio.uu.nl/bastiaan/CAT_prepare/.".format(
+            "tbb.bio.uu.nl/tina/CAT_prepare/.".format(
                 args.min_mem, total_memory)
         )
         shared.give_user_feedback(
@@ -303,16 +303,21 @@ def write_taxids_with_multiple_offspring_file(
 
 
 def prepare(step_list, args):
-    shared.print_variables(args, step_list)
-    memory_bottleneck(args)
-
     # This is the root dir.
     db_dir = pathlib.Path(args.db_dir).resolve()
     db_dir.mkdir(exist_ok=True)
+
     if not args.no_log:
         log_fname = "{0}.log".format(args.common_prefix)
         log_path = db_dir / pathlib.Path(log_fname)
+
+        with open(log_path, "w") as outf1:
+            pass
+
         setattr(args, "log_file", log_path)
+
+    shared.print_variables(args, step_list)
+    memory_bottleneck(args)
 
     # It should contain...
     # ... 1. a taxonomy folder with names and nodes.
