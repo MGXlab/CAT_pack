@@ -14,11 +14,11 @@ import summarise
 
 def usage():
     message = (
-        "usage: CAT (download | prepare | contigs | bins | add_names | "
-        "reads | summarise) [-v / --version] [-h / --help]\n"
-        "CAT: error: one of the arguments "
-        "download prepare contigs bins add_names summarise "
-        "reads is required"
+        "usage: CAT_pack (download | prepare | contigs | bins | reads "
+        "| add_names | summarise) [-v / --version] [-h / --help]\n"
+        "CAT_pack: error: one of the arguments "
+        "download prepare contigs bins reads add_names summarise "
+        "is required"
     )
     
     sys.stdout.write("{0}\n".format(message))
@@ -27,7 +27,7 @@ def usage():
     
     
 def version():
-    message = ("CAT pack v{0} ({1})".format(
+    message = ("CAT_pack pack v{0} ({1})".format(
         about.__version__, about.__date__))
     if len(about.__authors__) == 1:
         message += " by {0}".format(about.__authors__[0])
@@ -45,18 +45,19 @@ def version():
     
 def help():
     message = (
-        "usage: CAT (prepare | contigs | bin | bins | add_names | reads | "
-        "summarise) "
-        "[-v / --version] [-h / --help]\n\n"
+        "usage: CAT_pack (download | prepare | contigs | bins | reads "
+        "| add_names | summarise) [-v / --version] [-h / --help]\n\n"
         "Run Contig Annotation Tool (CAT), "
-        "Bin Annotation Tool (BAT), or" 
+        "Bin Annotation Tool (BAT), or " 
         "Read Annotation Tool (RAT).\n\n"
         "Required choice:\n"
         "  download\t\tDownload and preprocess data from NCBI nr or GTDB.\n"
         "  prepare\t\tConstruct database files.\n"
         "  contigs\t\tRun CAT.\n"
         "  bins\t\t\tRun BAT.\n"
-        "  add_names\t\tAdd taxonomic names to CAT or BAT output files.\n"
+        "  reads\t\t\tRun RAT.\n"
+        "  add_names\t\tAdd taxonomic names to CAT, BAT, or RAT output files."
+        "\n"
         "  summarise\t\tSummarise a named CAT or BAT classification file."
         "\n\n"
         "Optional arguments:\n"
@@ -80,7 +81,7 @@ def main():
         contigs.run()
     elif sys.argv[1] == "bins":
         bins.run()
-    elif sys.argv[1] == 'reads':
+    elif sys.argv[1] == "reads":
         reads.run()
     elif sys.argv[1] == "add_names":
         add_names.run()

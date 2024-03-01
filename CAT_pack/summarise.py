@@ -10,9 +10,9 @@ import shared
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
-            prog="CAT summarise",
+            prog="CAT_pack summarise",
             description="Summarise a named CAT or BAT classification file.",
-            usage=("CAT summarise -i FILE -o FILE (-c FILE) "
+            usage=("CAT_pack summarise -i FILE -o FILE (-c FILE) "
                    "[options] [-h / --help]"),
             add_help=False)
     
@@ -82,7 +82,7 @@ def import_contig_lengths(contigs_fasta, log_file, quiet):
 
 
 def summarise_contigs(args):
-    message = "# CAT v{0}.".format(about.__version__)
+    message = "# CAT_pack v{0}.".format(about.__version__)
     shared.give_user_feedback(
         message, args.log_file, args.quiet, show_time=False)
 
@@ -142,7 +142,7 @@ def summarise_contigs(args):
                         "official ranks not found in header of {0}. Make sure "
                         "that the CAT classification file is named with "
                         "official ranks with "
-                        "\'CAT add_names --only_official\'."
+                        "\'CAT_pack add_names --only_official\'."
                         "".format(args.input_file)
                     )
                     shared.give_user_feedback(
@@ -227,7 +227,7 @@ def summarise_contigs(args):
 
     if len(doubles) != 0:
         message = (
-            "some contigs have multiple classifications. CAT summarise "
+            "some contigs have multiple classifications. CAT_pack summarise "
             "currently does not allow for this. Contigs with multiple "
             "classifications: {0}.".format(", ".join(list(doubles)))
         )
@@ -300,7 +300,7 @@ def summarise_contigs(args):
     
     
 def summarise_bins(args):
-    message = "# CAT v{0}.".format(about.__version__)
+    message = "# CAT_pack v{0}.".format(about.__version__)
     shared.give_user_feedback(
         message, args.log_file, args.quiet, show_time=False)
     
@@ -357,7 +357,7 @@ def summarise_bins(args):
                         "official ranks not found in header of {0}. Make sure "
                         "that the BAT classification file is named with "
                         "official ranks with "
-                        "\'CAT add_names --only_official\'."
+                        "\'CAT_pack add_names --only_official\'."
                         "".format(args.input_file)
                     )
                     shared.give_user_feedback(
@@ -420,8 +420,9 @@ def summarise_bins(args):
                 
     if len(doubles) != 0:
         message = (
-            "some bins have multiple classifications. CAT summarise currently "
-            "does not allow for this. Bins with multiple classifications: {0}."
+            "some bins have multiple classifications. CAT_pack summarise "
+            "currently does not allow for this. Bins with multiple "
+            "classifications: {0}."
             "".format(", ".join(list(doubles)))
         )
         shared.give_user_feedback(
@@ -464,5 +465,5 @@ def run():
 
 
 if __name__ == "__main__":
-    sys.exit("Run \'CAT summarise\' to summarise a named CAT contig "
-             "classification file or named BAT bin classification file.")
+    sys.exit("Run \'CAT_pack summarise\' to summarise a named CAT contig "
+            "classification file or named BAT bin classification file.")

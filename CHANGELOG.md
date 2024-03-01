@@ -1,7 +1,8 @@
 # Changelog
 
 ## 6.0
-* We welcome a new member to the CAT pack: Read Annotation Tool! RAT uses CAT and BAT annotations as well as direct read mappings to reconstruct accurate taxonomic profiles of metagenomes! To try RAT, run `CAT reads`.
+* Change of entry-point for CAT/BAT/RAT: you can now run `CAT_pack` instead of `CAT`, for example `CAT_pack contigs`.
+* We welcome a new member to the CAT pack: Read Annotation Tool! RAT uses CAT and BAT annotations as well as direct read mappings to reconstruct accurate taxonomic profiles of metagenomes! To try RAT, run `CAT_pack reads`.
  
 ## 5.3
 * GTDB support.

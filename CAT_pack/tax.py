@@ -297,4 +297,4 @@ def convert_to_official_names(lineage, taxid2rank, taxid2name, scores=None):
 
 
 if __name__ == "__main__":
-    sys.exit("Run \'CAT\' to run CAT or BAT.")
+    sys.exit("Run \'CAT_pack\' to run CAT, BAT, or RAT.")
