@@ -14,9 +14,10 @@ import tax
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
-        prog="CAT bins",
+        prog="CAT_pack bins",
         description="Run Bin Annotation Tool (BAT).",
-        usage="CAT bins -b DIR / FILE -d DIR -t DIR [options] [-h / --help]",
+        usage=("CAT_pack bins -b DIR / FILE -d DIR -t DIR [options] "
+            "[-h / --help]"),
         add_help=False
     )
 
@@ -157,7 +158,7 @@ def make_concatenated_fasta(
 def run():
     args = parse_arguments()
 
-    message = "# CAT v{0}.".format(about.__version__)
+    message = "# CAT_pack v{0}.".format(about.__version__)
     shared.give_user_feedback(
         message, args.log_file, args.quiet, show_time=False
     )
@@ -568,4 +569,4 @@ def run():
 
 
 if __name__ == "__main__":
-    sys.exit("Run \'CAT bins\' to run Bin Annotation Tool (BAT).")
+    sys.exit("Run \'CAT_pack bins\' to run Bin Annotation Tool (BAT).")

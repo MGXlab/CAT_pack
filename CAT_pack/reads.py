@@ -18,11 +18,11 @@ import tax
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
-            prog='CAT reads',
+            prog='CAT_pack reads',
             description='Run Read Annotation Tool (RAT).',
             # @Tina: Should the explanation on how to use RAT be in the description? Right now the 'Run Read Annotation Tool' is at a little weird position. Also if you forget one argument (say -c) you'll not only get the help message but also the entire usage which is a little overkill.
             # @Tina: I do like this explanation of complete and partial workflows... Maybe we should add it to the other CAT pack as well?
-            usage='CAT reads -c -t [options] [-h / --help]\n\n'
+            usage='CAT_pack reads -c -t [options] [-h / --help]\n\n'
             'Complete RAT workflow (perform read mapping, run CAT, BAT, and RAT): '
             'Supply contigs, reads, database folder, taxonomy folder, and bin folder.\n\n'
             'Partial workflows:\n'
@@ -106,7 +106,7 @@ def parse_arguments():
                      'a bin folder (and suffix if necessary)')
         if args.bin_folder and not args.bin2classification and not args.database_folder:
             sys.exit('error: please provide either a bin2classification file or '
-                     'the path to the CAT database_folder for bin classification!')
+                     'the path to the CAT_pack database_folder for bin classification!')
         if args.bin2classification and not args.bin_folder:
             sys.exit('error: bin2classification file but no bin_folder supplied. '
                      'RAT requires -b/--bin_folder to include bins in annotation!')
@@ -118,7 +118,7 @@ def parse_arguments():
 
         if not args.contig2classification and not args.database_folder:
             sys.exit('error: please provide either a contig2classification file '
-                     'or the path to the CAT database_folder!')
+                     'or the path to the CAT_pack database_folder!')
             
     if 'r' in args.mode and not 'c' in args.mode and not 'm' in args.mode:
         sys.exit('error: we do not recommend annotating all reads directly '
@@ -134,7 +134,7 @@ def parse_arguments():
 def run():
     args = parse_arguments()
 
-    message = '# CAT v{0}.\n'.format(about.__version__)
+    message = '# CAT_pack v{0}.\n'.format(about.__version__)
     shared.give_user_feedback(message, args.log_file, args.quiet,
         show_time=False)
     message = '# Running command: {0}\n\n'.format(' '.join(sys.argv[1:]))
@@ -1341,4 +1341,4 @@ def invert_bin_dict(bin_dict):
 
 
 if __name__ == '__main__':
-    sys.exit('Run \'CAT\' to run CAT, BAT, or RAT.')
+    sys.exit('Run \'CAT_pack reads\' to run Read Annotation Tool (RAT).')

@@ -386,4 +386,4 @@ def check_whether_ORFs_are_based_on_contigs(
             
             
 if __name__ == "__main__":
-    sys.exit("Run \'CAT\' to run CAT or BAT.")
+    sys.exit("Run \'CAT_pack\' to run CAT, BAT, or RAT.")

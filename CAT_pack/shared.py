@@ -87,7 +87,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
         )
     elif dest == "db_dir":
         if help_ is None:
-            help_ = ("Path to directory where CAT/BAT database files will "
+            help_ = ("Path to directory where CAT/BAT/RAT database files will "
                     "be created.")
         argument_group.add_argument(
             "--db_dir",
@@ -309,7 +309,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "path_to_prodigal":
         if help_ is None:
             help_ = (
-                "Path to Prodigal binaries. Supply if CAT/BAT cannot find "
+                "Path to Prodigal binaries. Supply if CAT/BAT/RAT cannot find "
                 "Prodigal"
             )
         argument_group.add_argument(
@@ -325,7 +325,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "path_to_diamond":
         if help_ is None:
             help_ = (
-                "Path to DIAMOND binaries. Supply if CAT/BAT cannot find "
+                "Path to DIAMOND binaries. Supply if CAT/BAT/RAT cannot find "
                 "DIAMOND."
             )
         argument_group.add_argument(
@@ -1436,4 +1436,4 @@ def optionally_compressed_handle(file_path, mode):
 
 
 if __name__ == "__main__":
-    sys.exit("Run \'CAT\' to run CAT or BAT.")
+    sys.exit("Run \'CAT_pack\' to run CAT, BAT, or RAT.")

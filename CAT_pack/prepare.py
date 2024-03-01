@@ -18,10 +18,10 @@ def parse_arguments():
     date = datetime.datetime.now().strftime("%Y-%m-%d")
 
     parser = argparse.ArgumentParser(
-        prog="CAT prepare",
-        description="Construct CAT/BAT database files.",
+        prog="CAT_pack prepare",
+        description="Construct CAT/BAT/RAT database files.",
         usage=(
-            "CAT prepare --db_fasta FILE "
+            "CAT_pack prepare --db_fasta FILE "
             "--acc2tax FILE "
             "--names FILE "
             "--nodes FILE "
@@ -44,7 +44,7 @@ def parse_arguments():
         optional,
         "common_prefix",
         False,
-        default="{0}_CAT".format(date),
+        default="{0}_CAT_pack".format(date),
         help_="Prefix for all files to be created."
     )
     shared.add_argument(optional, "quiet", False)
@@ -80,7 +80,7 @@ def memory_bottleneck(args):
             "construction (e.g. nr). {1}GB is found on your system. You can "
             "try to find a machine with more memory if you run into issues or "
             "download preconstructed database files from "
-            "tbb.bio.uu.nl/tina/CAT_prepare/.".format(
+            "tbb.bio.uu.nl/tina/CAT_pack_prepare/.".format(
                 args.min_mem, total_memory)
         )
         shared.give_user_feedback(
@@ -415,13 +415,13 @@ def prepare(step_list, args):
             args.quiet
         )
 
-    message = "\n-----------------\n\n{0} CAT prepare is done!".format(
+    message = "\n-----------------\n\n{0} CAT_pack prepare is done!".format(
         shared.timestamp())
     shared.give_user_feedback(
         message, args.log_file, args.quiet, show_time=False)
 
     message = (
-        "\nSupply the following arguments to CAT or BAT if you want to "
+        "\nSupply the following arguments to CAT, BAT, or RAT if you want to "
         "use this database:\n"
         "-d / --database_folder {0}\n"
         "-t / --taxonomy_folder {1}".format(cat_db, tax_db)
@@ -449,7 +449,7 @@ def run():
         message = (
             "Nothing to do here! All files exist. "
             "Please provide a new location or remove one of the files "
-            "created by CAT to launch a build."
+            "created by CAT_pack to launch a build."
         )
         shared.give_user_feedback(
             message, args.log_file, args.quiet, show_time=True)
@@ -460,4 +460,4 @@ def run():
 
 
 if __name__ == "__main__":
-    sys.exit("Run \'CAT prepare\' to construct a CAT/BAT database.")
+    sys.exit("Run \'CAT_pack prepare\' to construct a CAT/BAT/RAT database.")

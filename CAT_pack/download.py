@@ -20,13 +20,14 @@ def parse_arguments():
     date = datetime.datetime.now().strftime("%Y-%m-%d")
 
     parser = argparse.ArgumentParser(
-        prog="CAT download",
+        prog="CAT_pack download",
         description=(
             "Download and preprocess sequence and taxonomy information. "
             "Currently supports the NCBI non-redundant (nr) database "
-            "and GTDB."
+            "and the GTDB database."
         ),
-        usage="CAT download --db (nr | GTDB) -o DIR [options] [-h / --help]",
+        usage=("CAT_pack download --db (nr | GTDB) -o DIR [options] "
+            "[-h / --help]"),
         add_help=False,
     )
 
@@ -163,8 +164,8 @@ def process_nr(output_dir, log_file, quiet, prefix, cleanup):
     message = (
         "\n-----------------\n\n"
         "Done!\n\n"
-        "A CAT database can be build with:\n\n"
-        "CAT prepare \\\n"
+        "A CAT_pack database can be build with:\n\n"
+        "CAT_pack prepare \\\n"
         "--db_fasta {0} \\\n"
         "--names {1} \\\n"
         "--nodes {2} \\\n"
@@ -561,7 +562,7 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
     # This needs to be checked for future versions.
     version = get_gtdb_latest_version()
     
-    message = "CAT will download files from GTDB {0}.".format(version)
+    message = "CAT_pack will download files from GTDB {0}.".format(version)
     shared.give_user_feedback(message, log_file, quiet)
     
     gtdb_urls = [
@@ -718,8 +719,8 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
     message = (
         "\n-----------------\n\n"
         "Done!\n\n"
-        "A CAT database can be build with:\n\n"
-        "CAT prepare \\\n"
+        "A CAT_pack database can be build with:\n\n"
+        "CAT_pack prepare \\\n"
         "--db_fasta {0} \\\n"
         "--names {1} \\\n"
         "--nodes {2} \\\n"
@@ -746,7 +747,7 @@ def run():
     if args.no_log:
         log_file = None
     else:
-        log_fname = "{0}.CAT_download.log".format(args.date)
+        log_fname = "{0}.CAT_pack_download.log".format(args.date)
         log_file = args.output_dir / pathlib.Path(log_fname)
 
     setattr(args, "log_file", log_file)
@@ -766,5 +767,5 @@ def run():
 
 
 if __name__ == "__main__":
-    sys.exit("Run \'CAT download\' to download and preprocess data from "
-             "NCBI nr or GTDB.")
+    sys.exit("Run \'CAT_pack download\' to download and preprocess data from "
+            "NCBI nr or GTDB.")

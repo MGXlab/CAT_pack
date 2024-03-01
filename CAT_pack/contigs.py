@@ -12,9 +12,9 @@ import tax
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
-        prog="CAT contigs",
+        prog="CAT_pack contigs",
         description="Run Contig Annotation Tool (CAT).",
-        usage="CAT contigs -c FILE -d DIR -t DIR [options] [-h / --help]",
+        usage="CAT_pack contigs -c FILE -d DIR -t DIR [options] [-h / --help]",
         add_help=False
     )
     
@@ -77,7 +77,7 @@ def parse_arguments():
 def run():
     args = parse_arguments()
 
-    message = "# CAT v{0}.".format(about.__version__)
+    message = "# CAT_pack v{0}.".format(about.__version__)
     shared.give_user_feedback(
         message, args.log_file, args.quiet, show_time=False)
 
@@ -441,4 +441,4 @@ def run():
 
 
 if __name__ == "__main__":
-    sys.exit("Run \'CAT contigs\' to run Contig Annotation Tool (CAT).")
+    sys.exit("Run \'CAT_pack contigs\' to run Contig Annotation Tool (CAT).")
