@@ -1,0 +1,25 @@
+1	|	root	|		|	scientific name	|
+2	|	superkingdom_1	|		|	scientific name	|
+3	|	superkingdom_2	|		|	scientific name	|
+4	|	phylum_1	|		|	scientific name	|
+5	|	phylum_2	|		|	scientific name	|
+6	|	phylum_3	|		|	scientific name	|
+7	|	class_1	|		|	scientific name	|
+8	|	class_2	|		|	scientific name	|
+9	|	class_3	|		|	scientific name	|
+10	|	order_1	|		|	scientific name	|
+11	|	order_2	|		|	scientific name	|
+12	|	order_3	|		|	scientific name	|
+13	|	order_4	|		|	scientific name	|
+14	|	family_1	|		|	scientific name	|
+15	|	family_2	|		|	scientific name	|
+16	|	family_3	|	a>	|	scientific name	|
+17	|	family_4	|	>	|	scientific name	|
+18	|	genus_1	|	ria>	|	scientific name	|
+19	|	genus_2	|	ria>	|	scientific name	|
+20	|	genus_3	|	ria>	|	scientific name	|
+21	|	genus_4	|	ria>	|	scientific name	|
+22	|	species_1	|	proka	|	scientific name	|
+23	|	species_2	|	proka	|	scientific name	|
+24	|	species_3	|	proka	|	scientific name	|
+25	|	species_4	|	proka	|	scientific name	|

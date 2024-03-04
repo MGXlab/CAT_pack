@@ -829,6 +829,12 @@ def expand_arguments(args):
         else:
             setattr(args, "bin_folder", args.bin_fasta_or_folder)
 
+    if "bin_fasta_or_folder" in args:
+        if os.path.isfile(args.bin_fasta_or_folder):
+            setattr(args, "bin_fasta", args.bin_fasta_or_folder)
+        else:
+            setattr(args, "bin_folder", args.bin_fasta_or_folder)
+
     return
 
 
@@ -1037,8 +1043,7 @@ def run_diamond(args, blast='blastp', prot_fasta='', top=0):
 
     try:
         command = [
-            args.path_to_diamond, 
-            blast,
+            args.path_to_diamond, blast,
             "-d", args.diamond_database,
             "-q", args.proteins_fasta,
             "--top", str(args.top),

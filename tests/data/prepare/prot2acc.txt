@@ -1,0 +1,5 @@
+accession.version	taxid
+KJX92028.1	22
+EFG1759503.1	23
+PYI97175.1	24
+WP_137987990.1	25

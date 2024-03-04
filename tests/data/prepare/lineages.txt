@@ -1,0 +1,4 @@
+KJX92028.1	root;superkingdom_1;phylum_1;class_1;order_1;family_1;genus_1;species_1
+EFG1759503.1	root;superkingdom_1;phylum_2;class_2;order_2;family_2;genus_2;species_2
+PYI97175.1	root;superkingdom_2;phylum_3;class_3;order_3;family_3;genus_3;species_3
+WP_137987990.1	root;superkingdom_2;phylum_3;class_3;order_4;family_4;genus_4;species_4
