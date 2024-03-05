@@ -28,7 +28,7 @@ A paper describing the algorithm together with extensive benchmarks can be found
 **Read Annotation Tool (RAT)** estimates the taxonomic composition of metagenomes using CAT and BAT output. A manuscript describing RAT with benchmarks can be found at https://doi.org/10.1101/2023.03.22.533753. If you use RAT in your research, it would be great if you could cite:
 
 * *von Meijenfeldt FAB, Arkhipova K, Cambuy DD, Coutinho FH, Dutilh BE. Robust taxonomic classification of uncharted microbial sequences and bins with CAT and BAT. Genome Biology. 2019;20:217.*
-* *Hauptfeld E, Pappas N, van Iwaarden S, Snoek BL, Aldas-Vargas A, Dutilh BE, von Meijenfeldt FAB. Integration of taxonomic signals from MAGs and contigs improves read annotation and taxonomic profiling of metagenomes. bioRXiv. 2023*
+* *Hauptfeld E, Pappas N, van Iwaarden S, Snoek BL, Aldas-Vargas A, Dutilh BE, von Meijenfeldt FAB. Integration of taxonomic signals from MAGs and contigs improves read annotation and taxonomic profiling of metagenomes. bioRXiv. 2023.*
 
 
 ## Dependencies and where to get them
