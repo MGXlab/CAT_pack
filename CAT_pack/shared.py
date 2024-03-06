@@ -83,6 +83,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
             required=required,
             type=str,
             action=PathAction,
+            default=default,
             help=help_,
         )
     elif dest == "db_dir":
@@ -1026,7 +1027,8 @@ def run_diamond(args, blast='blastp', prot_fasta='', top=0):
         "\t\t\tblock-size (billions of letters): {6}\n"
         "\t\t\tindex-chunks: {7}\n"
         "\t\t\ttmpdir: {8}\n"
-        "\t\t\tcompress: {9}".format(
+        "\t\t\tcompress: {9}\n"
+        "\t\t\tblast flavour: {10}".format(
             args.proteins_fasta,
             args.diamond_database,
             mode,
@@ -1036,7 +1038,8 @@ def run_diamond(args, blast='blastp', prot_fasta='', top=0):
             args.block_size,
             args.index_chunks,
             args.tmpdir,
-            compression
+            compression,
+            blast
         )
     )
     give_user_feedback(message, args.log_file, args.quiet)
@@ -1045,7 +1048,7 @@ def run_diamond(args, blast='blastp', prot_fasta='', top=0):
         command = [
             args.path_to_diamond, blast,
             "-d", args.diamond_database,
-            "-q", args.proteins_fasta,
+            "-q", prot_fasta,
             "--top", str(args.top),
             "--matrix", "BLOSUM62",
             "--evalue", "0.001",
@@ -1054,7 +1057,8 @@ def run_diamond(args, blast='blastp', prot_fasta='', top=0):
             "--block-size", str(args.block_size),
             "--index-chunks", str(args.index_chunks),
             "--tmpdir", args.tmpdir,
-            "--compress", compression
+            "--compress", compression,
+            
         ]
 
         if not args.verbose:
@@ -1065,7 +1069,9 @@ def run_diamond(args, blast='blastp', prot_fasta='', top=0):
 
         if args.no_self_hits:
             command += ["--no-self-hits"]
-
+        
+        print(' '.join(command))
+        
         subprocess.check_call(command)
     except:
         message = "DIAMOND finished abnormally."
@@ -1092,15 +1098,13 @@ def run_CAT(args,
         nproc,
         fraction,
         CAT_range,
-        path_to_prodigal='prodigal',
-        path_to_diamond='diamond',
-        path_to_output='out.CAT'):
+        path_to_output):
     message = (
             'Running CAT.')
     give_user_feedback(message, log_file, quiet, show_time=True)
 
     try:
-        command = ['CAT', 'contigs',
+        command = ['CAT_pack', 'contigs',
                 '-c', contigs_fasta,
                 '-d', database_folder,
                 '-t', taxonomy_folder,
@@ -1108,9 +1112,13 @@ def run_CAT(args,
                 '-n', str(nproc),
                 '-f', str(fraction),
                 '-r', str(CAT_range),
-                '--path_to_prodigal', path_to_prodigal,
-                '--path_to_diamond', path_to_diamond,
+                              
                 ]
+        if args.path_to_prodigal!='prodigal':
+            command.extend(['--path_to_prodigal', args.path_to_prodigal])
+        if args.path_to_diamond!='diamond':
+            command.extend(['--path_to_diamond', args.path_to_diamond])
+        
         if args.force:
             command.append('--force')
         subprocess.check_call(command)
@@ -1137,8 +1145,6 @@ def run_BAT(args,
         CAT_range,
         CAT_protein_fasta=0,
         CAT_diamond_alignment=0,
-        path_to_prodigal='prodigal',
-        path_to_diamond='diamond',
         path_to_output='out.BAT',
         bin_suffix='.fna'):
     message = (
@@ -1146,7 +1152,7 @@ def run_BAT(args,
     give_user_feedback(message, log_file, quiet, show_time=True)
 
     try:
-        command = ['CAT', 'bins',
+        command = ['CAT_pack', 'bins',
                 '-b', bin_folder,
                 '-d', database_folder,
                 '-t', taxonomy_folder,
@@ -1154,8 +1160,6 @@ def run_BAT(args,
                 '-n', str(n_proc),
                 '-f', str(fraction),
                 '-r', str(CAT_range),
-                '--path_to_prodigal', path_to_prodigal,
-                '--path_to_diamond', path_to_diamond,
                 '-s', bin_suffix]
         if CAT_protein_fasta:
             command.append('-p')
@@ -1163,6 +1167,10 @@ def run_BAT(args,
         if CAT_diamond_alignment:
             command.append('-a')
             command.append(CAT_diamond_alignment)
+        if args.path_to_prodigal!='prodigal':
+            command.extend(['--path_to_prodigal', args.path_to_prodigal])
+        if args.path_to_diamond!='diamond':
+            command.extend(['--path_to_diamond', args.path_to_diamond])
         if args.force:
             command.append('--force')
         subprocess.check_call(command)

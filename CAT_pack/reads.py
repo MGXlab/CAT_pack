@@ -6,8 +6,6 @@ import argparse
 import datetime
 import sys
 import decimal
-import gzip
-from Bio import SeqIO
 
 import about
 
@@ -47,7 +45,7 @@ def parse_arguments():
     shared.add_argument(optional, 'bam_file1', False)
     shared.add_argument(optional, 'bam_file2', False)
     shared.add_argument(optional, 'alignment_unmapped', False)
-    shared.add_argument(optional, 'bin_fasta_or_folder', False)
+    shared.add_argument(optional, 'bin_fasta_or_folder', False, default=False)
     shared.add_argument(optional, 'bin_suffix', False)
     shared.add_argument(optional, 'contig2classification', False)
     shared.add_argument(optional, 'bin2classification', False)
@@ -70,9 +68,8 @@ def parse_arguments():
     shared.add_argument(optional, "alignment_file", False)
     shared.add_argument(CAT_args, 'r', False, default=decimal.Decimal(10))
     shared.add_argument(CAT_args, 'f', False, default=decimal.Decimal(0.5))
-    shared.add_argument(CAT_args, 'path_to_prodigal', False,
-            default='prodigal')
-    shared.add_argument(CAT_args, 'path_to_diamond', False, default='diamond')
+    shared.add_argument(CAT_args, 'path_to_prodigal', False, default="prodigal")
+    shared.add_argument(CAT_args, 'path_to_diamond', False, default="diamond")
     shared.add_argument(CAT_args, 'no_stars', False)
     shared.add_argument(CAT_args, 'IkwId', False)
     
@@ -294,10 +291,12 @@ def run():
                     'contigs.')
             shared.give_user_feedback(message, args.log_file, args.quiet,
                     show_time=True)
+            
+            print(args.path_to_prodigal)
+            
             shared.run_CAT(args, args.contigs_fasta, args.database_folder, 
                            args.taxonomy_folder, args.log_file, args.quiet, 
-                           args.nproc, args.f, args.r, args.path_to_prodigal, 
-                           args.path_to_diamond, args.out_prefix)
+                           args.nproc, args.f, args.r, args.out_prefix)
             c2c=process_CAT_table('{0}.CAT.contig2classification.txt'
                                   ''.format(args.out_prefix), 
                                   args.nodes_dmp, args.log_file, args.quiet)
@@ -349,8 +348,7 @@ def run():
             if not 'c' in args.mode:
                 shared.run_BAT(args, args.bin_folder, args.database_folder, args.taxonomy_folder,
                            args.log_file, args.quiet, args.nproc, args.f, args.r, 
-                           args.path_to_prodigal, args.path_to_diamond, args.out_prefix, 
-                           args.bin_suffix)
+                           args.out_prefix, args.bin_suffix)
                 
             # If CAT was run, use the CAT output files
             else:
@@ -1208,34 +1206,58 @@ def make_contig_dict(read_dict,
     return contig_dict, read_dict, max_primary
 
 
+
+
+
 def make_unclassified_seq_fasta(seq_fasta, unclassified_seq_ids, 
-                                unclassified_seq_fasta, f_format, f_mode,
+                                unclassified_seq_fasta, f_format, f_mode, 
                                 suffix=''):
-    if seq_fasta.endswith('.gz'):
-        fasta_dict={}
-        f1=gzip.open(seq_fasta, 'rt')
-        fasta_dict=SeqIO.to_dict(SeqIO.parse(f1, f_format))
-
+    
+    
+    fasta_dict={}
+    if f_format == 'fasta':
+        with shared.optionally_compressed_handle(seq_fasta, 'r') as f1: 
+            for line in f1:
+                if line.startswith('>'):
+                    header = line.rstrip().split(' ')[0].lstrip('>')
+                    if header in fasta_dict:
+                        sys.exit('Duplicate fasta headers in the file!') # This should be prettified.
+                    fasta_dict.setdefault(header, '')
+                else:
+                    fasta_dict[header] += line.rstrip()
+                    
+                    
+    elif f_format=='fastq':
+        with shared.optionally_compressed_handle(seq_fasta, 'r') as f1: 
+            for n, line in enumerate(f1):
+                if n % 4 == 0:
+                    if not line.startswith('@'):
+                        sys.exit('Unknown seuqence identifier symbol in line {n}!') # This should be prettified.
+                    header = line.rstrip().split(' ')[0].lstrip('@') 
+                    
+                    if header in fasta_dict:
+                        sys.exit('Duplicate fasta headers in the file!')
+                    
+                    fasta_dict.setdefault(header, '')
+                elif n % 4 == 1:
+                    fasta_dict[header] += line.rstrip()
     else:
-        f1=open(seq_fasta)
-        fasta_dict=SeqIO.to_dict(SeqIO.parse(f1, f_format))
-        #print(seq_fasta)
-    with open(unclassified_seq_fasta, f_mode) as outf:
-        # print(unclassified_seq_ids)
+        sys.exit('Unknown read file format!')
+    
+    with open(unclassified_seq_fasta, f_mode) as outf: 
+        # print(unclassified_seq_ids) 
         suffices=['/1', '/2', '_1', '_2']
-        for seq in unclassified_seq_ids:
+        for seq in unclassified_seq_ids: 
             if seq in fasta_dict:
-                seq=seq
+                seq_id=seq
             else:
-
                 for s in suffices:
                     if seq+s in fasta_dict:
-                        seq+=s
-                        # print(seq)
-            outf.write('>{0}{1}\n{2}\n'.format(fasta_dict[seq].id, suffix,
-                                            fasta_dict[seq].seq))
+                        seq_id=seq+s
+        # print(seq)
+            outf.write('>{0}{1}\n{2}\n'.format(seq_id, suffix,
+                                               fasta_dict[seq]))
     
-    return
     
 
 def get_unclassified_contigs(contig2bin, c2c, b2c):
