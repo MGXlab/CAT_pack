@@ -362,8 +362,7 @@ def run():
                 shared.run_BAT(args, args.bin_folder, args.database_folder, args.taxonomy_folder,
                            args.log_file, args.quiet, args.nproc, args.f, args.r, 
                            CAT_protein_fasta, CAT_diamond_alignment,
-                           args.path_to_prodigal, args.path_to_diamond, args.out_prefix, 
-                           args.bin_suffix, )
+                           args.out_prefix, args.bin_suffix)
             b2c=process_CAT_table('{0}.BAT.bin2classification.txt'.format(args.out_prefix), 
                                   args.nodes_dmp, args.log_file, args.quiet)
             
