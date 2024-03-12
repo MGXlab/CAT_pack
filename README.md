@@ -30,6 +30,10 @@ A paper describing the algorithm together with extensive benchmarks can be found
 * *von Meijenfeldt FAB, Arkhipova K, Cambuy DD, Coutinho FH, Dutilh BE. Robust taxonomic classification of uncharted microbial sequences and bins with CAT and BAT. Genome Biology. 2019;20:217.*
 * *Hauptfeld E, Pappas N, van Iwaarden S, Snoek BL, Aldas-Vargas A, Dutilh BE, von Meijenfeldt FAB. Integration of taxonomic signals from MAGs and contigs improves read annotation and taxonomic profiling of metagenomes. bioRXiv. 2023.*
 
+To cite the code itself: 
+
+<a href="https://zenodo.org/doi/10.5281/zenodo.10809238"><img src="https://zenodo.org/badge/67035910.svg" alt="DOI"></a>
+
 
 ## Dependencies and where to get them
 * Python 3, https://www.python.org/.
