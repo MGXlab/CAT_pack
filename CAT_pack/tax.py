@@ -36,7 +36,14 @@ def import_names(names_dmp, log_file, quiet):
         for line in f1:
             line = line.split("\t")
 
-            if line[6] == "scientific name":
+            if len(line) >= 7 and line[6] == "scientific name":
+                # NCBI taxonomy.
+                taxid = line[0]
+                name = line[2]
+
+                taxid2name[taxid] = name
+            elif line[4] == "scientific name":
+                # GTDB taxonomy.
                 taxid = line[0]
                 name = line[2]
 

@@ -325,6 +325,7 @@ def write_nodes_dmp(taxonomies_tsv, nodes_dmp):
 
 
 def write_names_dmp(taxonomies_tsv, names_dmp):
+    """Write the names.dmp from the taxonomy files."""
     seen_taxids = set()
     
     with open(taxonomies_tsv, "r") as f1, open(names_dmp, "w") as outf1:
