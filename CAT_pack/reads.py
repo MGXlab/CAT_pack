@@ -1303,7 +1303,7 @@ def get_contig_lengths(contig_file):
     # for each contig, store contig name and the length of sequence without whitespace
     # for each contig, add its length to the sum of nucleotides in the assembly
     for c in contigs:
-        c_id, c_seq=c.split('\n')[0].strip(), c.split('\n', 1)[1].strip().replace('\n','')
+        c_id, c_seq=c.split('\n')[0].rstrip().split()[0], c.split('\n', 1)[1].strip().replace('\n','')
         contig_length_dict[c_id]=len(c_seq)
         sum_of_nucleotides+=len(c_seq)
     
