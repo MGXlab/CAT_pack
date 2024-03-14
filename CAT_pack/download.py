@@ -283,7 +283,7 @@ def parent_child_pairs(lineage_string):
 
 def write_nodes_dmp(taxonomies_tsv, nodes_dmp):
     """Write the nodes.dmp from the taxonomy files."""
-    seen_taxids = []
+    seen_taxids = set()
     
     with open(taxonomies_tsv, "r") as f1, open(nodes_dmp, "w") as outf1:
         for line in f1:
@@ -302,12 +302,12 @@ def write_nodes_dmp(taxonomies_tsv, nodes_dmp):
                                 "\t|\n",
                             )
                         )
-                        seen_taxids.append("root")
+                        seen_taxids.add("root")
                     else:
-                        seen_taxids.append(parent)
+                        seen_taxids.add(parent)
                         
                 if child not in seen_taxids:
-                    seen_taxids.append(child)
+                    seen_taxids.add(child)
                     outf1.write(
                         "{0}{1}".format(
                             "\t|\t".join(
@@ -325,7 +325,7 @@ def write_nodes_dmp(taxonomies_tsv, nodes_dmp):
 
 
 def write_names_dmp(taxonomies_tsv, names_dmp):
-    seen_taxids = []
+    seen_taxids = set()
     
     with open(taxonomies_tsv, "r") as f1, open(names_dmp, "w") as outf1:
         outf1.write(
@@ -333,17 +333,27 @@ def write_names_dmp(taxonomies_tsv, names_dmp):
                 "\t|\t".join(["root", "root", "scientific name"]), "\t|\n"
             )
         )
+
         for line in f1:
-            taxid = line.split(";")[-1].strip()
-            if taxid not in seen_taxids:
-                outf1.write(
-                    "{0}{1}".format(
-                        "\t|\t".join([taxid, taxid, "scientific name"]),
-                        "\t|\n",
+            fields = [f.strip() for f in line.split("\t")]
+            lineage_string = fields[1]
+
+            for taxid in lineage_string.split(';'):
+                if taxid not in seen_taxids:
+                    outf1.write(
+                        "{0}{1}".format(
+                            "\t|\t".join(
+                                [
+                                    taxid,
+                                    taxid.split('__', 1)[-1],
+                                    "scientific name"
+                                    ]
+                                ),
+                            "\t|\n",
+                        )
                     )
-                )
-                seen_taxids.append(taxid)
-                
+                    seen_taxids.add(taxid)
+
     return
 
 
