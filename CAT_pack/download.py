@@ -331,7 +331,7 @@ def write_names_dmp(taxonomies_tsv, names_dmp):
     with open(taxonomies_tsv, "r") as f1, open(names_dmp, "w") as outf1:
         outf1.write(
             "{0}{1}".format(
-                "\t|\t".join(["root", "root", "scientific name"]), "\t|\n"
+                "\t|\t".join(["root", "root", "", "scientific name"]), "\t|\n"
             )
         )
 
