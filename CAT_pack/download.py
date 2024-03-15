@@ -314,10 +314,10 @@ def write_nodes_dmp(taxonomies_tsv, nodes_dmp):
                                 [
                                     child,
                                     parent,
-                                    prefixes_to_rank_names[child[:3]],
+                                    prefixes_to_rank_names[child[:3]]
                                 ]
                             ),
-                            "\t|\n",
+                            "\t|\n"
                         )
                     )
                     
@@ -347,10 +347,11 @@ def write_names_dmp(taxonomies_tsv, names_dmp):
                                 [
                                     taxid,
                                     taxid.split('__', 1)[-1],
+                                    "",
                                     "scientific name"
                                     ]
                                 ),
-                            "\t|\n",
+                            "\t|\n"
                         )
                     )
                     seen_taxids.add(taxid)
