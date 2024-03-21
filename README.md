@@ -95,7 +95,7 @@ Currently, two databases are supported, NCBI's nr and the Genome Taxonomy Databa
 #### NCBI non-redundant protein database (nr)
 
 ```
-$ CAT download -db nr -o path/to/nr_data_dir
+$ CAT download --db nr -o path/to/nr_data_dir
 ```
 
 Will download the fasta file with the protein sequences, their mapping to a taxid, and the taxonomy information from NCBI's ftp site.
@@ -103,7 +103,7 @@ Will download the fasta file with the protein sequences, their mapping to a taxi
 #### [Genome Taxonomy Database (GTDB)](https://gtdb.ecogenomic.org/) proteins
 
 ```
-$ CAT download -db gtdb -o path/to/gtdb_data_dir
+$ CAT download --db GTDB -o path/to/gtdb_data_dir
 ```
 
 The files required to build a CAT database are provided by the [GTDB downloads page](https://gtdb.ecogenomic.org/downloads).
