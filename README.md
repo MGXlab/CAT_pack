@@ -75,14 +75,14 @@ To download the database files, find the most recent version on [tbb.bio.uu.nl/t
 
 For NCBI nr:
 ```
-$ wget tbb.bio.uu.nl/tina/CAT_pack_prepare/20231120_CAT_nr.tar.gz
+$ wget tbb.bio.uu.nl/tina/CAT_pack_prepare/20240422_CAT_nr.tar.gz
 
-$ tar -xvzf 20231120_CAT_nr.tar.gz
+$ tar -xvzf 20240422_CAT_nr.tar.gz
 ```
 
 For GTDB:
 ```
-$ wget tbb.bio.uu.nl/tina/CAT_pack_prepare/20231120_CAT_gtdb.tar.gz
+$ wget tbb.bio.uu.nl/tina/CAT_pack_prepare/20231120_CAT_gtdb.tar.gz # release 214
 
 $ tar -xvzf 20231120_CAT_gtdb.tar.gz
 ```
