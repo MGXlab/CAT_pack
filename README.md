@@ -82,7 +82,7 @@ $ tar -xvzf 20240422_CAT_nr.tar.gz
 
 For GTDB:
 ```
-$ wget tbb.bio.uu.nl/tina/CAT_pack_prepare/20231120_CAT_gtdb.tar.gz # release 214
+$ wget tbb.bio.uu.nl/tina/CAT_pack_prepare/20231120_CAT_gtdb.tar.gz     # release 214
 
 $ tar -xvzf 20231120_CAT_gtdb.tar.gz
 ```
