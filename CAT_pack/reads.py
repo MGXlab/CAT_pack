@@ -46,7 +46,7 @@ def parse_arguments():
     shared.add_argument(optional, 'bam_file2', False)
     shared.add_argument(optional, 'alignment_unmapped', False)
     shared.add_argument(optional, 'bin_fasta_or_folder', False, default=False)
-    shared.add_argument(optional, 'bin_suffix', False, default=".fasta")
+    shared.add_argument(optional, 'bin_suffix', False, default=".fna")
     shared.add_argument(optional, 'contig2classification', False)
     shared.add_argument(optional, 'bin2classification', False)
     shared.add_argument(optional, 'read2classification', False)
