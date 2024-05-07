@@ -381,11 +381,13 @@ def run():
     # @Tina: we could just supply the first argument as a list, that will save you the conditional.
     if len(bam_files)==2:
         reads, unmapped_reads, sum_of_reads, paired = process_bam_file(bam_files[0], 
-                                                                       bam_files[1], 
-                                                                       mapping_quality=args.mapping_quality)
+                                                                       args.mapping_quality,
+                                                                       args.path_to_samtools,
+                                                                       BAM_rev_file=bam_files[1])
     else:
         reads, unmapped_reads, sum_of_reads, paired = process_bam_file(bam_files[0], 
-                                                                       mapping_quality=args.mapping_quality)
+                                                                       args.mapping_quality,
+                                                                       args.path_to_samtools)
     
     
     # Get lengths of the contigs from contigs file    
@@ -1075,7 +1077,7 @@ def process_CAT_table(CAT_output_table,
 
 
 
-def process_bam_file(BAM_fw_file, BAM_rev_file=False, path_to_samtools='samtools', mapping_quality=2):
+def process_bam_file(BAM_fw_file, mapping_quality, path_to_samtools, BAM_rev_file=False):
     """
     # function that processes the bam file(s) by picking out the primary alignments
     # and storing the contigs that the forward and reverse reads map to. If only
@@ -1134,7 +1136,7 @@ def process_bam_file(BAM_fw_file, BAM_rev_file=False, path_to_samtools='samtools
     
     # if a reverse alignment file is given, add the contig that the mate maps to
     if BAM_rev_file:
-        cmd=[path_to_samtools, 'view', BAM_fw_file]
+        cmd=[path_to_samtools, 'view', BAM_rev_file]
         proc=subprocess.Popen(cmd, stdout=subprocess.PIPE)
 
         for read in proc.stdout:
@@ -1335,8 +1337,14 @@ def process_bin_folder(path_to_folder, bin_suffix):
             contigs=open(path_to_folder+b).read().split('>')[1:]
             
             # add all contig ids to set
+            
             for contig in contigs:
-                bin_dict[bin_id].add(contig.split()[0])
+                try:
+                    bin_dict[bin_id].add(contig.split()[0])
+                except IndexError:
+                    sys.exit(f'The bin {b} is empty or not formatted correctly' 
+                             ' (Look for a ">" sign at the end of the file). '
+                             'Did something go wrong during binning?')
                 
     return bin_dict
 
