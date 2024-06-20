@@ -25,10 +25,10 @@ A paper describing the algorithm together with extensive benchmarks can be found
 
 * *von Meijenfeldt FAB, Arkhipova K, Cambuy DD, Coutinho FH, Dutilh BE. Robust taxonomic classification of uncharted microbial sequences and bins with CAT and BAT. Genome Biology. 2019;20:217.*
 
-**Read Annotation Tool (RAT)** estimates the taxonomic composition of metagenomes using CAT and BAT output. A manuscript describing RAT with benchmarks can be found at https://doi.org/10.1101/2023.03.22.533753. If you use RAT in your research, it would be great if you could cite:
+**Read Annotation Tool (RAT)** estimates the taxonomic composition of metagenomes using CAT and BAT output. A manuscript describing RAT with benchmarks can be found at [https://doi.org/10.1038/s41467-024-47155-1](https://doi.org/10.1038/s41467-024-47155-1). If you use RAT in your research, it would be great if you could cite:
 
-* *von Meijenfeldt FAB, Arkhipova K, Cambuy DD, Coutinho FH, Dutilh BE. Robust taxonomic classification of uncharted microbial sequences and bins with CAT and BAT. Genome Biology. 2019;20:217.*
-* *Hauptfeld E, Pappas N, van Iwaarden S, Snoek BL, Aldas-Vargas A, Dutilh BE, von Meijenfeldt FAB. Integration of taxonomic signals from MAGs and contigs improves read annotation and taxonomic profiling of metagenomes. bioRXiv. 2023.*
+* *von Meijenfeldt F.A.B., Arkhipova K., Cambuy D.D., Coutinho F.H., Dutilh B.E. Robust taxonomic classification of uncharted microbial sequences and bins with CAT and BAT. Genome Biology. 2019;20:217.*
+* *Hauptfeld, E., Pappas, N., van Iwaarden, S., Snoek B.L., Aldas-Vargas A., Dutilh B.E., von Meijenfeldt F.A.B. Integrating taxonomic signals from MAGs and contigs improves read annotation and taxonomic profiling of metagenomes. Nature Communications 15, 3373 (2024).*
 
 To cite the code itself: 
 
