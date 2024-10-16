@@ -221,7 +221,7 @@ def run():
         "Taxonomy folder: {0}\n"
         "Database folder: {1}\n"
         "Parameter r: {2}\n"
-        "Parameter f: {3}\n"
+        "Parameter f: {3:.2f}\n"
         "Log file: {4}\n\n"
         "-----------------\n".format(
             args.taxonomy_folder,
