@@ -305,7 +305,7 @@ def run():
     
     with open(args.contig2classification_output_file, "w") as outf1, open(args.ORF2LCA_output_file, "w") as outf2:
         outf1.write("# contig\tclassification\treason\tlineage\t"
-                "lineage scores (f: {0})\n".format(args.f))
+                "lineage scores (f: {0})\n".format(float(args.f)))
 
         outf2.write("# ORF\tnumber of hits (r: {0})\tlineage\ttop bit-score\n"
                 "".format(args.r))
