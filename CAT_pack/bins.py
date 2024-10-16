@@ -221,7 +221,7 @@ def run():
         "Taxonomy folder: {0}\n"
         "Database folder: {1}\n"
         "Parameter r: {2}\n"
-        "Parameter f: {3:.2f}\n"
+        "Parameter f: {3}\n"
         "Log file: {4}\n\n"
         "-----------------\n".format(
             args.taxonomy_folder,
@@ -428,7 +428,7 @@ def run():
 
     with open(args.bin2classification_output_file, "w") as outf1, open(args.ORF2LCA_output_file, "w") as outf2:
         outf1.write("# bin\tclassification\treason\tlineage\t"
-                "lineage scores (f: {0:.2f})\n".format(args.f))
+                "lineage scores (f: {0})\n".format(float(args.f)))
 
         outf2.write("# ORF\tbin\tnumber of hits (r: {0})\tlineage\t"
                 "top bit-score\n".format(args.r))
