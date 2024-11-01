@@ -585,7 +585,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 help=help_)
     elif dest == 'unmapped2classification':
         if help_ is None:
-            help_ = ('Path to bin2classification file.')
+            help_ = ('Path to unmapped2classification file.')
         argument_group.add_argument(
                 '--u2c',
                 dest='unmapped2classification',
