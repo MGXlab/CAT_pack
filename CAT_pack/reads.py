@@ -73,7 +73,7 @@ def parse_arguments():
     shared.add_argument(CAT_args, 'no_stars', False)
     shared.add_argument(CAT_args, 'IkwId', False)
     
-    dmnd_args = parser.add_argument_group('DIAMOND specific optional arguments')
+    dmnd_args = parser.add_argument_group('DIAMOND/samtools specific optional arguments')
     shared.add_all_diamond_arguments(dmnd_args)
                           
     (args, extra_args) = parser.parse_known_args()
