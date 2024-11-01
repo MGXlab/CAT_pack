@@ -617,7 +617,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 help=help_)
     elif dest == "nproc":
         if help_ is None:
-            help_ = "Number of cores to deploy by DIAMOND and/or samtools (default: maximum)."
+            help_ = "Number of cores to deploy by DIAMOND and (default: maximum)."
         argument_group.add_argument(
             "-n",
             "--nproc",
