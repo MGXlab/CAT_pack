@@ -74,8 +74,8 @@ def parse_arguments():
     shared.add_argument(CAT_args, 'no_stars', False)
     shared.add_argument(CAT_args, 'IkwId', False)
     
-    dmnd_args = parser.add_argument_group('DIAMOND/samtools specific optional arguments')
-    shared.add_argument(dmnd_args, 'nproc', False, default=multiprocessing.cpu_count())
+    dmnd_args = parser.add_argument_group('DIAMOND/Samtools specific optional arguments')
+    shared.add_argument(dmnd_args, 'nproc', 'Number of CPUs used by DIAMOND and/or Samtools', default=multiprocessing.cpu_count())
     shared.add_all_diamond_arguments(dmnd_args)
                           
     (args, extra_args) = parser.parse_known_args()
