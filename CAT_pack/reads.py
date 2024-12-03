@@ -20,7 +20,7 @@ def parse_arguments():
             description='Run Read Annotation Tool (RAT).',
             # @Tina: Should the explanation on how to use RAT be in the description? Right now the 'Run Read Annotation Tool' is at a little weird position. Also if you forget one argument (say -c) you'll not only get the help message but also the entire usage which is a little overkill.
             # @Tina: I do like this explanation of complete and partial workflows... Maybe we should add it to the other CAT pack as well?
-            usage='CAT_pack reads -c -t [options] [-h / --help]\n\n'
+            usage='CAT_pack reads -m [mode] -c [contigs] -t [database] [options] [-h / --help]\n\n'
             'Complete RAT workflow (perform read mapping, run CAT, BAT, and RAT): '
             'Supply contigs, reads, database folder, taxonomy folder, and bin folder.\n\n'
             'Partial workflows:\n'
@@ -39,7 +39,7 @@ def parse_arguments():
     shared.add_argument(required, 'mode', True)
     
     optional = parser.add_argument_group('Optional arguments')
-    shared.add_argument(optional, 'out_prefix', False, default='./out.RAT')
+    shared.add_argument(optional, 'out_prefix', False, default='./out')
     shared.add_argument(optional, 'read_file1', False)
     shared.add_argument(optional, 'read_file2', False)
     shared.add_argument(optional, 'bam_file1', False)
@@ -84,7 +84,7 @@ def parse_arguments():
             '\n'.join(extra_args)))
 
     # Add extra arguments.
-    shared.expand_arguments(args)
+    shared.expand_arguments(args, rat=True)
     
     if not args.read_file1:
         sys.exit('error: you have to supply read files!')
@@ -130,7 +130,8 @@ def parse_arguments():
 
 def run():
     args = parse_arguments()
-
+    path_to_CAT=sys.argv[0]
+    
     message = '# CAT_pack v{0}.\n'.format(about.__version__)
     shared.give_user_feedback(message, args.log_file, args.quiet,
         show_time=False)
@@ -260,7 +261,7 @@ def run():
 
             
             
-        bam_files.append('{0}.{1}.bwamem.sorted'.format(args.out_prefix+'.'
+        bam_files.append('{0}.{1}.bwamem.sorted'.format(args.out_prefix+''
                         ''+os.path.split(args.contigs_fasta)[-1], 
                         os.path.split(args.read_file1)[-1]))
     else:
@@ -292,11 +293,12 @@ def run():
             shared.give_user_feedback(message, args.log_file, args.quiet,
                     show_time=True)
             
-            print(args.path_to_prodigal)
+            print(path_to_CAT)
             
             shared.run_CAT(args, args.contigs_fasta, args.database_folder, 
                            args.taxonomy_folder, args.log_file, args.quiet, 
-                           args.nproc, args.f, args.r, args.out_prefix)
+                           args.nproc, args.f, args.r, args.out_prefix,
+                           path_to_CAT)
             c2c=process_CAT_table('{0}.CAT.contig2classification.txt'
                                   ''.format(args.out_prefix), 
                                   args.nodes_dmp, args.log_file, args.quiet)
@@ -348,7 +350,7 @@ def run():
             if not 'c' in args.mode:
                 shared.run_BAT(args, args.bin_folder, args.database_folder, args.taxonomy_folder,
                            args.log_file, args.quiet, args.nproc, args.f, args.r, 
-                           args.out_prefix, args.bin_suffix)
+                           args.out_prefix, args.bin_suffix, path_to_CAT=path_to_CAT)
                 
             # If CAT was run, use the CAT output files
             else:
@@ -362,7 +364,8 @@ def run():
                 shared.run_BAT(args, args.bin_folder, args.database_folder, args.taxonomy_folder,
                            args.log_file, args.quiet, args.nproc, args.f, args.r, 
                            CAT_protein_fasta, CAT_diamond_alignment,
-                           args.out_prefix, args.bin_suffix)
+                           args.out_prefix, args.bin_suffix, 
+                           path_to_CAT=path_to_CAT)
             b2c=process_CAT_table('{0}.BAT.bin2classification.txt'.format(args.out_prefix), 
                                   args.nodes_dmp, args.log_file, args.quiet)
             
@@ -422,7 +425,7 @@ def run():
                 show_time=True)
             all_unclassified=list()
             
-            uncl_unm_fasta='{0}.unclassified_unmapped.fasta'.format(args.out_prefix)
+            uncl_unm_fasta='{0}.RAT.unclassified_unmapped.fasta'.format(args.out_prefix)
             unclassified_contigs = get_unclassified_contigs(contig2bin,
                                                             c2c, b2c)
             all_unclassified+=list(unclassified_contigs)
@@ -445,7 +448,7 @@ def run():
             # Run diamond on unclassified contigs and unmapped reads
             setattr(args,
                     'alignment_file',
-                    '{0}.unclassified_unmapped.alignment.diamond'.format(args.out_prefix))
+                    '{0}.RAT.unclassified_unmapped.alignment.diamond'.format(args.out_prefix))
             shared.run_diamond(args, blast='blastx', prot_fasta=uncl_unm_fasta,
                                 top=11)
         else:
@@ -490,7 +493,7 @@ def run():
                                           taxid2rank,
                                           taxids_with_multiple_offspring,
                                           args.no_stars)
-            u2c=process_CAT_table('{0}.unmapped2classification.txt'.format(args.out_prefix), 
+            u2c=process_CAT_table('{0}.RAT.unmapped2classification.txt'.format(args.out_prefix), 
                                   args.nodes_dmp, 
                                   args.log_file, 
                                   args.quiet)
@@ -558,7 +561,7 @@ def write_unmapped2classification(seq2hits,
     
     
     
-    with open('{0}.unmapped2classification.txt'.format(out_prefix), 'w') as outf:
+    with open('{0}.RAT.unmapped2classification.txt'.format(out_prefix), 'w') as outf:
         n_classified_contigs = 0
         outf.write(
                 '# sequence\tclassification\treason\tlineage\tlineage scores\n')
@@ -709,7 +712,7 @@ def classify_reads(read_dict, contig2classification, bin2classification, unmappe
 def write_read_table(read_dict, sample_name, max_primary):
     # Takes the read dictionary with bin lineage and contig lineage and writes
     # annotation for each read and each tier of annotation into a file
-    read_table=sample_name + '.read2classification.txt'
+    read_table=sample_name + '.RAT.read2classification.txt'
     
     with open(read_table, 'w') as outf:
         outf.write('## command: {}\n'.format(' '.join(sys.argv)))
@@ -774,7 +777,7 @@ def make_bin_table(contig2bin,
                    out_prefix):
     # Include lineage?
     bin_data={}
-    bin_file='{0}.bin.reads.txt'.format(out_prefix)
+    bin_file='{0}.RAT.bin.reads.txt'.format(out_prefix)
     
     with open(bin_file, 'w') as op:
         op.write('## command: {}\n'.format(' '.join(sys.argv)))
@@ -950,7 +953,7 @@ def make_tax_table(c2c_dict,
     
     
     # write the output tables for contigs:
-    with open('{0}.contig.abundance.txt'.format(sample_name), 'w') as outf_contig:
+    with open('{0}.RAT.contig.abundance.txt'.format(sample_name), 'w') as outf_contig:
         outf_contig.write('## command: {}\n'.format(' '.join(sys.argv)))
         outf_contig.write(RAT_contig_header)
         # @Tina: not to work with decimals instead of floats.
@@ -988,7 +991,7 @@ def make_tax_table(c2c_dict,
     
     
     # write output table for complete lineage
-    with open('{0}.complete.abundance.txt'.format(sample_name), 'w+') as outf_complete:
+    with open('{0}.RAT.complete.abundance.txt'.format(sample_name), 'w+') as outf_complete:
         outf_complete.write('## command: {}\n'.format(' '.join(sys.argv)))
         outf_complete.write(RAT_file_header)
         outf_complete.write(unmapped_line)

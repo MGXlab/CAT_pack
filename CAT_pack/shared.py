@@ -747,7 +747,7 @@ def add_all_diamond_arguments(argument_group):
     return
 
 
-def expand_arguments(args):
+def expand_arguments(args, rat=False):
     if "r" in args:
         setattr(args, "one_minus_r", (100 - args.r) / 100)
 
@@ -758,12 +758,18 @@ def expand_arguments(args):
         error = check.check_out_prefix(args.out_prefix, None, args.quiet)
         if error:
             sys.exit(1)
-
-        if not args.no_log:
-            log_file = "{0}.log".format(args.out_prefix)
-
-            with open(log_file, "w") as outf1:
-                pass
+        
+        if not rat:
+            if not args.no_log:
+                log_file = "{0}.log".format(args.out_prefix)
+                with open(log_file, "w") as outf1:
+                    pass
+        else:
+            if not args.no_log:
+                log_file = "{0}.RAT.log".format(args.out_prefix)
+            
+                with open(log_file, "w") as outf1:
+                    pass
 
         if not args.tmpdir:
             tmpdir = "{0}/".format(args.out_prefix.rsplit("/", 1)[0])
@@ -1098,13 +1104,14 @@ def run_CAT(args,
         nproc,
         fraction,
         CAT_range,
-        path_to_output):
+        path_to_output,
+        path_to_CAT):
     message = (
             'Running CAT.')
     give_user_feedback(message, log_file, quiet, show_time=True)
 
     try:
-        command = ['CAT_pack', 'contigs',
+        command = [path_to_CAT, 'contigs',
                 '-c', contigs_fasta,
                 '-d', database_folder,
                 '-t', taxonomy_folder,
@@ -1146,13 +1153,14 @@ def run_BAT(args,
         CAT_protein_fasta=0,
         CAT_diamond_alignment=0,
         path_to_output='out.BAT',
-        bin_suffix='.fna'):
+        bin_suffix='.fna',
+        path_to_CAT='CAT_pack'):
     message = (
             'Running BAT.')
     give_user_feedback(message, log_file, quiet, show_time=True)
 
     try:
-        command = ['CAT_pack', 'bins',
+        command = [path_to_CAT, 'bins',
                 '-b', bin_folder,
                 '-d', database_folder,
                 '-t', taxonomy_folder,
