@@ -605,7 +605,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 help=help_)
     elif dest == 'alignment_unmapped':
         if help_ is None:
-            help_ = ('Path to alignment file of reads and contigs that could'
+            help_ = ('Path to alignment file of reads and contigs that could '
                      'not be classified by CAT/BAT.')
         argument_group.add_argument(
                 '--alignment_unmapped',
