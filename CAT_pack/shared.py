@@ -1209,7 +1209,7 @@ def run_bwa_mem(
                                         '.'+os.path.split(contigs_fasta)[-1], 
                                         os.path.split(read_file[0])[-1])
     message = (
-            'Running bwa mem for read mapping. File {0}.sorted will be generated.'
+            'Running bwa mem for read mapping. File {0}.sorted will be generated. '
             'Do not forget to cite bwa mem and samtools when using RAT in '
             'your publication!'.format(output_file))
     give_user_feedback(message, log_file, show_time=True)
