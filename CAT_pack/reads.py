@@ -261,7 +261,7 @@ def run():
 
             
             
-        bam_files.append('{0}.{1}.bwamem.sorted'.format(args.out_prefix+''
+        bam_files.append('{0}.{1}.bwamem.sorted'.format(args.out_prefix+'.'
                         ''+os.path.split(args.contigs_fasta)[-1], 
                         os.path.split(args.read_file1)[-1]))
     else:
