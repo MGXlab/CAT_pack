@@ -419,7 +419,7 @@ def run():
         # and then write the input fasta as one document for all reads and 
         # contigs I want to classify
         if not args.alignment_unmapped and not args.unmapped2classification:
-            message = ('No unmapped2classification file supplied .Grabbing '
+            message = ('No unmapped2classification file supplied. Grabbing '
                        'unmapped and unclassified sequences...')
             shared.give_user_feedback(message, args.log_file, args.quiet,
                 show_time=True)
