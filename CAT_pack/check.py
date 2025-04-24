@@ -167,7 +167,7 @@ def check_samtools_binaries(path_to_samtools, log_file, quiet):
         c = p.communicate()
         output = c[0].decode().split('\n')[0].rstrip()
 
-        message = 'samtools found: {0}.'.format(output)
+        message = 'Samtools found: {0}.'.format(output)
         shared.give_user_feedback(message, log_file, quiet)
     except OSError:
         message = ('can not find samtools. Please check whether it is '
