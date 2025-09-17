@@ -439,12 +439,13 @@ def run():
                                         uncl_unm_fasta, 'fastq', 'a','_1')
             all_unclassified+=['{}_1'.format(i) for i in unmapped_reads['fw']]
             
-            message = ('Appending reverse reads...')
-            shared.give_user_feedback(message, args.log_file, args.quiet,
-                show_time=True)
-            make_unclassified_seq_fasta(reads_files[1], unmapped_reads['rev'],
-                                        uncl_unm_fasta, 'fastq', 'a','_2')
-            all_unclassified+=['{}_2'.format(i) for i in unmapped_reads['rev']]
+            if args.read_file2:
+                message = ('Appending reverse reads...')
+                shared.give_user_feedback(message, args.log_file, args.quiet,
+                    show_time=True)
+                make_unclassified_seq_fasta(reads_files[1], unmapped_reads['rev'],
+                                            uncl_unm_fasta, 'fastq', 'a','_2')
+                all_unclassified+=['{}_2'.format(i) for i in unmapped_reads['rev']]
             # Run diamond on unclassified contigs and unmapped reads
             setattr(args,
                     'alignment_file',
@@ -461,7 +462,8 @@ def run():
                                                             c2c, b2c)
             all_unclassified+=list(unclassified_contigs)
             all_unclassified+=['{}_1'.format(i) for i in unmapped_reads['fw']]
-            all_unclassified+=['{}_2'.format(i) for i in unmapped_reads['rev']]
+            if args.read_file2:
+                all_unclassified+=['{}_2'.format(i) for i in unmapped_reads['rev']]
        
             
         # Now, the diamond alignment has to be parsed with a CAT function
