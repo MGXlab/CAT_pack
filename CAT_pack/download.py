@@ -205,7 +205,7 @@ fastaRecord = namedtuple(
 def get_gtdb_latest_version():
     """Read the version number from the VERSION file."""
     version_url = (
-            "https://data.gtdb.ecogenomic.org/releases/latest/VERSION.txt")
+            "https://data.gtdb.aau.ecogenomic.org/releases/latest/VERSION.txt")
 
     with urllib.request.urlopen(version_url) as f:
         version_data = f.read().decode()
@@ -583,15 +583,15 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
     shared.give_user_feedback(message, log_file, quiet)
     
     gtdb_urls = [
-        "https://data.gtdb.ecogenomic.org/releases/latest/VERSION.txt",
-        ("https://data.gtdb.ecogenomic.org/releases/latest/"
+        "https://data.gtdb.aau.ecogenomic.org/releases/latest/VERSION.txt",
+        ("https://data.gtdb.aau.ecogenomic.org/releases/latest/"
             "ar53_taxonomy.tsv.gz"),
         ("https://data.gtdb.ecogenomic.org/releases/latest/"
             "bac120_taxonomy.tsv.gz"),
-        "https://data.gtdb.ecogenomic.org/releases/latest/MD5SUM.txt",
-        "https://data.gtdb.ecogenomic.org/releases/latest/bac120.tree",
-        "https://data.gtdb.ecogenomic.org/releases/latest/ar53.tree",
-        ("https://data.gtdb.ecogenomic.org/releases/latest/"
+        "https://data.gtdb.aau.ecogenomic.org/releases/latest/MD5SUM.txt",
+        "https://data.gtdb.aau.ecogenomic.org/releases/latest/bac120.tree",
+        "https://data.gtdb.aau.ecogenomic.org/releases/latest/ar53.tree",
+        ("https://data.gtdb.aau.ecogenomic.org/releases/latest/"
             "genomic_files_reps/gtdb_proteins_aa_reps.tar.gz")
         ]
 
