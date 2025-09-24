@@ -2,6 +2,7 @@
 
 ## 6.1 [beta20250924]
 * Pyrodigal support enables multi-threading of gene prediction.
+* DIAMOND modes [faster, fast, mid-sensitive, sensitive, more-sensitive, very-sensitive, ultra-sensitive].
 
 ## 6.0.1
 Minor release to register for a Zenodo DOI.
