@@ -46,6 +46,8 @@ def parse_arguments():
             default="{0}_CAT_pack".format(date),
             help_="Prefix for all files to be created."
             )
+    shared.add_argument(
+            optional, "nproc", False, default=multiprocessing.cpu_count())
     shared.add_argument(optional, "quiet", False)
     shared.add_argument(optional, "verbose", False)
     shared.add_argument(optional, "no_log", False)
@@ -53,8 +55,6 @@ def parse_arguments():
 
     specific = parser.add_argument_group("DIAMOND specific optional arguments")
     shared.add_argument(specific, "path_to_diamond", False, default="diamond")
-    shared.add_argument(
-            specific, "nproc", False, default=multiprocessing.cpu_count())
 
     args, extra_args = parser.parse_known_args()
 
