@@ -117,9 +117,9 @@ def find_LCA_for_ORF(hits, fastaid2LCAtaxid, taxid2parent):
         
     if len(list_of_lineages) == 0:
         return (
-            "no taxid found ({0})".format(";".join([i[0] for i in hits])),
-            top_bitscore
-        )
+                "no taxid found ({0})".format(";".join([i[0] for i in hits])),
+                top_bitscore
+                )
 
     overlap = set.intersection(*map(set, list_of_lineages))
 
@@ -149,9 +149,11 @@ def star_lineage(lineage, taxids_with_multiple_offspring):
     questionable_taxids = find_questionable_taxids(
             lineage, taxids_with_multiple_offspring)
 
-    starred_lineage = [taxid if
+    starred_lineage = [
+            taxid if
             taxid not in questionable_taxids else
-            "{0}*".format(taxid) for taxid in lineage]
+            "{0}*".format(taxid) for taxid in lineage
+            ]
 
     return starred_lineage
 
@@ -176,10 +178,10 @@ def find_weighted_LCA(LCAs_ORFs, taxid2parent, f):
 
     if len(list_of_lineages) == 0:
         return (
-            "no ORFs with taxids found.",
-            "no ORFs with taxids found.",
-            "no ORFs with taxids found."
-        )
+                "no ORFs with taxids found.",
+                "no ORFs with taxids found.",
+                "no ORFs with taxids found."
+                )
 
     taxid2bitscore = {}
     for (i, lineage) in enumerate(list_of_lineages):
@@ -198,10 +200,10 @@ def find_weighted_LCA(LCAs_ORFs, taxid2parent, f):
 
     if len(whitelisted_lineages) == 0:
         return (
-            "no lineage whitelisted.",
-            "no lineage whitelisted.",
-            "no lineage whitelisted."
-        )
+                "no lineage whitelisted.",
+                "no lineage whitelisted.",
+                "no lineage whitelisted."
+                )
 
     whitelisted_lineages = sorted(whitelisted_lineages,
             key=lambda x: len(x), reverse=True)

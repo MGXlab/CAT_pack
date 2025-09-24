@@ -10,7 +10,6 @@ import shutil
 import sys
 import tarfile
 import urllib.request
-import urllib.parse
 
 import shared
 import check
@@ -20,16 +19,16 @@ def parse_arguments():
     date = datetime.datetime.now().strftime("%Y-%m-%d")
 
     parser = argparse.ArgumentParser(
-        prog="CAT_pack download",
-        description=(
-            "Download and preprocess sequence and taxonomy information. "
-            "Currently supports the NCBI non-redundant (nr) database "
-            "and the GTDB database."
-        ),
+            prog="CAT_pack download",
+            description=(
+                "Download and preprocess sequence and taxonomy information. "
+                "Currently supports the NCBI non-redundant (nr) database "
+                "and the GTDB database."
+                ),
         usage=("CAT_pack download --db (nr | GTDB) -o DIR [options] "
             "[-h / --help]"),
-        add_help=False,
-    )
+        add_help=False
+        )
 
     required = parser.add_argument_group("Required arguments")
     shared.add_argument(required, "db", True)
@@ -41,19 +40,19 @@ def parse_arguments():
     shared.add_argument(optional, "no_log", False)
     shared.add_argument(optional, "help", False)
 
-    (args, extra_args) = parser.parse_known_args()
+    args, extra_args = parser.parse_known_args()
 
     extra_args = [
-        arg
-        for (i, arg) in enumerate(extra_args)
-        if (i, arg) != (0, "download")
-    ]
+            arg
+            for (i, arg) in enumerate(extra_args)
+            if (i, arg) != (0, "download")
+            ]
     if len(extra_args) > 0:
         sys.exit(
-            "error: too many arguments supplied:\n{0}".format(
-                "\n".join(extra_args)
-            )
-        )
+                "error: too many arguments supplied:\n{0}".format(
+                    "\n".join(extra_args)
+                    )
+                )
 
     setattr(args, "date", date)
     shared.expand_arguments(args)
@@ -88,10 +87,10 @@ def multi_download(url_list, output_dir, log_file, quiet, prefix=None):
         output_path = output_dir / pathlib.Path(output_basename)
         if output_path in existing_files:
             message = (
-                "Skipping download of file {0}. It already exists.".format(
-                    output_path.name
-                )
-            )
+                    "Skipping download of file {0}. It already exists.".format(
+                        output_path.name
+                        )
+                    )
             shared.give_user_feedback(message, log_file, quiet)
         else:
             message = "Downloading {0}.".format(url_leaf)
@@ -103,7 +102,8 @@ def multi_download(url_list, output_dir, log_file, quiet, prefix=None):
 
 
 def check_nr_md5s(data_dir, log_file, quiet):
-    """Check integrity of all files in a dir with their paired .md5 files."""
+    """Check integrity of all files in a dir with their paired .md5 files.
+    """
     md5_files = list([p.resolve() for p in data_dir.glob("*.md5")])
     
     for md5_file in md5_files:
@@ -117,11 +117,13 @@ def process_nr(output_dir, log_file, quiet, prefix, cleanup):
     nr_urls = [
         "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz",
         "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz.md5",
-        "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/prot.accession2taxid.FULL.gz",
-        "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/prot.accession2taxid.FULL.gz.md5",
+        ("ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/"
+            "accession2taxid/prot.accession2taxid.FULL.gz"),
+        ("ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/"
+            "accession2taxid/prot.accession2taxid.FULL.gz.md5"),
         "ftp://ftp.ncbi.nlm.nih.gov/blast/db/FASTA/nr.gz",
         "ftp://ftp.ncbi.nlm.nih.gov/blast/db/FASTA/nr.gz.md5",
-    ]
+        ]
     
     # Fetch files.
     multi_download(nr_urls, output_dir, log_file, quiet, prefix)
@@ -162,21 +164,21 @@ def process_nr(output_dir, log_file, quiet, prefix, cleanup):
     acc2taxid_gz = list(output_dir.glob("*accession2taxid.FULL.gz"))[0]
     
     message = (
-        "\n-----------------\n\n"
-        "Done!\n\n"
-        "A CAT_pack database can be build with:\n\n"
-        "CAT_pack prepare \\\n"
-        "--db_fasta {0} \\\n"
-        "--names {1} \\\n"
-        "--nodes {2} \\\n"
-        "--acc2tax {3} \\\n"
-        "--db_dir path/to/prepare_output\n".format(
-            nr_gz.resolve(),
-            names_dmp.resolve(),
-            nodes_dmp.resolve(),
-            acc2taxid_gz.resolve(),
-        )
-    )
+            "\n-----------------\n\n"
+            "Done!\n\n"
+            "A CAT_pack database can be build with:\n\n"
+            "CAT_pack prepare \\\n"
+            "--db_fasta {0} \\\n"
+            "--names {1} \\\n"
+            "--nodes {2} \\\n"
+            "--acc2tax {3} \\\n"
+            "--db_dir path/to/prepare_output\n".format(
+                nr_gz.resolve(),
+                names_dmp.resolve(),
+                nodes_dmp.resolve(),
+                acc2taxid_gz.resolve(),
+                )
+            )
     shared.give_user_feedback(message, log_file, quiet, show_time=False)
     
     return
@@ -185,19 +187,19 @@ def process_nr(output_dir, log_file, quiet, prefix, cleanup):
 
 ## GENERAL.
 prefixes_to_rank_names = {
-    "d__": "superkingdom",  # Using superkingdom for compatibility with NCBI.
-    "p__": "phylum",
-    "o__": "order",
-    "c__": "class",
-    "f__": "family",
-    "g__": "genus",
-    "s__": "species",
-}
+        "d__": "superkingdom",  # Using superkingdom for compatibility with NCBI.
+        "p__": "phylum",
+        "o__": "order",
+        "c__": "class",
+        "f__": "family",
+        "g__": "genus",
+        "s__": "species",
+        }
 
 fastaRecord = namedtuple(
-    "fastaRecord",
-    ["id", "seq", "uid", "taxid"],
-)
+        "fastaRecord",
+        ["id", "seq", "uid", "taxid"],
+        )
 
 ## FUNCTIONS.
 def get_gtdb_latest_version():
@@ -297,11 +299,11 @@ def write_nodes_dmp(taxonomies_tsv, nodes_dmp):
                 if parent not in seen_taxids:
                     if parent == "root":
                         outf1.write(
-                            "{0}{1}".format(
-                                "\t|\t".join(["root", "root", "no rank"]),
-                                "\t|\n",
-                            )
-                        )
+                                "{0}{1}".format(
+                                    "\t|\t".join(["root", "root", "no rank"]),
+                                    "\t|\n"
+                                    )
+                                )
                         seen_taxids.add("root")
                     else:
                         seen_taxids.add(parent)
@@ -309,17 +311,17 @@ def write_nodes_dmp(taxonomies_tsv, nodes_dmp):
                 if child not in seen_taxids:
                     seen_taxids.add(child)
                     outf1.write(
-                        "{0}{1}".format(
-                            "\t|\t".join(
-                                [
-                                    child,
-                                    parent,
-                                    prefixes_to_rank_names[child[:3]]
-                                ]
-                            ),
-                            "\t|\n"
-                        )
-                    )
+                            "{0}{1}".format(
+                                "\t|\t".join(
+                                    [
+                                        child,
+                                        parent,
+                                        prefixes_to_rank_names[child[:3]]
+                                        ]
+                                    ),
+                                "\t|\n"
+                                )
+                            )
                     
     return
 
@@ -330,37 +332,39 @@ def write_names_dmp(taxonomies_tsv, names_dmp):
     
     with open(taxonomies_tsv, "r") as f1, open(names_dmp, "w") as outf1:
         outf1.write(
-            "{0}{1}".format(
-                "\t|\t".join(["root", "root", "", "scientific name"]), "\t|\n"
-            )
-        )
+                "{0}{1}".format(
+                    "\t|\t".join(["root", "root", "", "scientific name"]),
+                    "\t|\n"
+                    )
+                )
 
         for line in f1:
             fields = [f.strip() for f in line.split("\t")]
             lineage_string = fields[1]
 
-            for taxid in lineage_string.split(';'):
+            for taxid in lineage_string.split(";"):
                 if taxid not in seen_taxids:
                     outf1.write(
-                        "{0}{1}".format(
-                            "\t|\t".join(
-                                [
-                                    taxid,
-                                    taxid.split('__', 1)[-1],
-                                    "",
-                                    "scientific name"
-                                    ]
-                                ),
-                            "\t|\n"
-                        )
-                    )
+                            "{0}{1}".format(
+                                "\t|\t".join(
+                                    [
+                                        taxid,
+                                        taxid.split("__", 1)[-1],
+                                        "",
+                                        "scientific name"
+                                        ]
+                                    ),
+                                "\t|\n"
+                                )
+                            )
                     seen_taxids.add(taxid)
 
     return
 
 
 def genome_id_to_taxid(taxonomy_tsv):
-    """Return a dictionary with GTDB taxid for each genome."""
+    """Return a dictionary with GTDB taxid for each genome.
+    """
     mapping = {}
     
     with open(taxonomy_tsv, "r") as f1:
@@ -415,7 +419,7 @@ def fastaIterator_gz(fasta_in_gz, gid2taxid):
             if line[0] == ">":
                 name = title.split(" ")[0]
                 seq = "".join(
-                    lines).replace(" ", "").replace("\r", "").rstrip("*")
+                        lines).replace(" ", "").replace("\r", "").rstrip("*")
                 length = len(seq)
                 md5sum = hashlib.md5(seq.encode()).hexdigest()
                 uid = "_".join([md5sum, str(length)])
@@ -465,19 +469,20 @@ def extract_duplicates(proteins_dir, gid2taxid, acc2taxid_fp, log_file, quiet):
                 if is_multiplet is True:
                     if record.uid not in multiplets:
                         multiplets[record.uid] = fastaRecord(
-                            "\x01".join([seen_uids[record.uid], record.id]),
-                            record.seq,
-                            None,
-                            None,
-                        )
+                                "\x01".join(
+                                    [seen_uids[record.uid], record.id]),
+                                record.seq,
+                                None,
+                                None,
+                                )
                     else:
                         old_rec = multiplets[record.uid]
                         new_rec = fastaRecord(
-                            "\x01".join([old_rec.id, record.id]),
-                            old_rec.seq,
-                            None,
-                            None,
-                        )
+                                "\x01".join([old_rec.id, record.id]),
+                                old_rec.seq,
+                                None,
+                                None,
+                                )
 
                         multiplets[record.uid] = new_rec
 
@@ -485,7 +490,7 @@ def extract_duplicates(proteins_dir, gid2taxid, acc2taxid_fp, log_file, quiet):
 
             if file_counter % 1000 == 0 and file_counter != 0:
                 message = "Parsed {0:,d} sequences from {1:,d} files.".format(
-                    seq_counter, file_counter)
+                        seq_counter, file_counter)
                 shared.give_user_feedback(message, log_file, quiet)
         # This else is part of the outter for-loop.
         # It executes when the for loop finishes.
@@ -497,20 +502,20 @@ def extract_duplicates(proteins_dir, gid2taxid, acc2taxid_fp, log_file, quiet):
             redundants = sum(map(len, [v for v in multiplets.values()]))
             
             message = (
-                "    Total files: {0:>12,d}\n"
-                "{1}Total sequences: {2:>12,d}\n"
-                "{3}     Multiplets: {4:>12,d}\n"
-                "{5}of which unique: {6:>12,d}"
-                "".format(
-                    file_counter,
-                    padding,
-                    seq_counter,
-                    padding,
-                    redundants,
-                    padding,
-                    len(multiplets),
-                )
-            )
+                    "    Total files: {0:>12,d}\n"
+                    "{1}Total sequences: {2:>12,d}\n"
+                    "{3}     Multiplets: {4:>12,d}\n"
+                    "{5}of which unique: {6:>12,d}"
+                    "".format(
+                        file_counter,
+                        padding,
+                        seq_counter,
+                        padding,
+                        redundants,
+                        padding,
+                        len(multiplets),
+                        )
+                    )
             shared.give_user_feedback(message, log_file, quiet)
             
     return multiplets
@@ -579,13 +584,16 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
     
     gtdb_urls = [
         "https://data.gtdb.ecogenomic.org/releases/latest/VERSION.txt",
-        "https://data.gtdb.ecogenomic.org/releases/latest/ar53_taxonomy.tsv.gz",
-        "https://data.gtdb.ecogenomic.org/releases/latest/bac120_taxonomy.tsv.gz",
+        ("https://data.gtdb.ecogenomic.org/releases/latest/"
+            "ar53_taxonomy.tsv.gz"),
+        ("https://data.gtdb.ecogenomic.org/releases/latest/"
+            "bac120_taxonomy.tsv.gz"),
         "https://data.gtdb.ecogenomic.org/releases/latest/MD5SUM.txt",
         "https://data.gtdb.ecogenomic.org/releases/latest/bac120.tree",
         "https://data.gtdb.ecogenomic.org/releases/latest/ar53.tree",
-        "https://data.gtdb.ecogenomic.org/releases/latest/genomic_files_reps/gtdb_proteins_aa_reps.tar.gz",
-    ]
+        ("https://data.gtdb.ecogenomic.org/releases/latest/"
+            "genomic_files_reps/gtdb_proteins_aa_reps.tar.gz")
+        ]
 
     # Fetch files.
     multi_download(gtdb_urls, output_dir, log_file, quiet, prefix=None)
@@ -601,8 +609,7 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
     all_taxa_tsv = output_dir / pathlib.Path("all_taxonomies.tsv")
     if not all_taxa_tsv.exists():
         concatenate_taxonomies_gz(
-            archaea_tsv_gz, bacteria_tsv_gz, all_taxa_tsv
-        )
+                archaea_tsv_gz, bacteria_tsv_gz, all_taxa_tsv)
 
     # Concatenate newick trees.
     bac_tree_fp = list(output_dir.glob("*bac*.tree"))[0]
@@ -639,8 +646,7 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
             safe_extract(tar, output_dir)
     else:
         message = "Proteins directory {0} already exists.".format(
-            proteins_dir.resolve()
-        )
+                proteins_dir.resolve())
         shared.give_user_feedback(message, log_file, quiet)
 
     # Process files.
@@ -652,15 +658,14 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
         shared.give_user_feedback(message, log_file, quiet)
         write_nodes_dmp(all_taxa_tsv, nodes_dmp)
     else:
-        message = "Nodes file found : {0}.".format(
-                nodes_dmp.resolve())
+        message = "Nodes file found : {0}.".format(nodes_dmp.resolve())
         shared.give_user_feedback(message, log_file, quiet)
 
     # NAMES.
     names_dmp = output_dir / pathlib.Path("names.dmp")
     if not names_dmp.exists():
         message = "Writing names information to {0}.".format(
-            names_dmp.resolve())
+                names_dmp.resolve())
         shared.give_user_feedback(message, log_file, quiet)
         
         write_names_dmp(all_taxa_tsv, names_dmp)
@@ -694,8 +699,13 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
         shared.give_user_feedback(message, log_file, quiet)
         
         write_singletons(
-            proteins_dir, duplicates, gid2taxid, singletons_fp, log_file, quiet
-        )
+                proteins_dir,
+                duplicates,
+                gid2taxid,
+                singletons_fp,
+                log_file,
+                quiet
+                )
 
         message = "Concatenating sequence files."
         shared.give_user_feedback(message, log_file, quiet)
@@ -709,16 +719,16 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
 
     if cleanup is True:
         remove_targets = [
-            proteins_dir,
-            bac_tree_fp,
-            ar_tree_fp,
-            duplicates_fp,
-            singletons_fp,
-            bacteria_tsv_gz,
-            archaea_tsv_gz,
-            all_taxa_tsv,
-            proteins_tar,
-        ]
+                proteins_dir,
+                bac_tree_fp,
+                ar_tree_fp,
+                duplicates_fp,
+                singletons_fp,
+                bacteria_tsv_gz,
+                archaea_tsv_gz,
+                all_taxa_tsv,
+                proteins_tar,
+                ]
         message = "Cleanup specified. Removing unnecessary files and folders."
         shared.give_user_feedback(message, log_file, quiet)
 
@@ -729,21 +739,21 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
                 target.unlink()
                 
     message = (
-        "\n-----------------\n\n"
-        "Done!\n\n"
-        "A CAT_pack database can be build with:\n\n"
-        "CAT_pack prepare \\\n"
-        "--db_fasta {0} \\\n"
-        "--names {1} \\\n"
-        "--nodes {2} \\\n"
-        "--acc2tax {3} \\\n"
-        "--db_dir path/to/prepare_output\n".format(
-            all_seqs_fp.resolve(),
-            names_dmp.resolve(),
-            nodes_dmp.resolve(),
-            acc2taxid_fp.resolve(),
-        )
-    )
+            "\n-----------------\n\n"
+            "Done!\n\n"
+            "A CAT_pack database can be build with:\n\n"
+            "CAT_pack prepare \\\n"
+            "--db_fasta {0} \\\n"
+            "--names {1} \\\n"
+            "--nodes {2} \\\n"
+            "--acc2tax {3} \\\n"
+            "--db_dir path/to/prepare_output\n".format(
+                all_seqs_fp.resolve(),
+                names_dmp.resolve(),
+                nodes_dmp.resolve(),
+                acc2taxid_fp.resolve(),
+                )
+            )
 
     shared.give_user_feedback(message, log_file, quiet, show_time=False)
     
@@ -766,12 +776,12 @@ def run():
     
     if args.db == "nr":
         process_nr(
-            args.output_dir,
-            args.log_file,
-            args.quiet,
-            prefix=args.date,
-            cleanup=args.cleanup,
-        )
+                args.output_dir,
+                args.log_file,
+                args.quiet,
+                prefix=args.date,
+                cleanup=args.cleanup,
+                )
     elif args.db == "GTDB":
         process_gtdb(args.output_dir, args.log_file, args.quiet, args.cleanup)
         

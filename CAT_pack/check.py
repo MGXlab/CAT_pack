@@ -17,7 +17,7 @@ def check_md5_gz(gz_file, md5_file, log_file, quiet):
 
     if md5_exp == "":
         message = ("no MD5 found in {0}. Integrity of {1} cannot be "
-                   "established.".format(md5_file, gz_file))
+                "established.".format(md5_file, gz_file))
         shared.give_user_feedback(message, log_file, quiet, warning=True)
     else:
         md5 = gz_md5(gz_file)
@@ -78,7 +78,7 @@ def check_out_prefix(out_prefix, log_file, quiet):
 
     if os.path.isdir(out_prefix):
         message = ("prefix for output files ({0}) is a directory."
-                   "".format(out_prefix))
+                "".format(out_prefix))
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
@@ -87,27 +87,7 @@ def check_out_prefix(out_prefix, log_file, quiet):
 
     if not os.path.isdir(dir_):
         message = ("cannot find output directory {0} to which output files "
-                   "should be written.".format(dir_))
-        shared.give_user_feedback(message, log_file, quiet, error=True)
-
-        error = True
-
-    return error
-
-
-def check_prodigal_binaries(path_to_prodigal, log_file, quiet):
-    error = False
-
-    try:
-        p = subprocess.Popen([path_to_prodigal, "-v"], stderr=subprocess.PIPE)
-        c = p.communicate()
-        output = c[1].decode().rstrip().lstrip()
-
-        message = "Prodigal found: {0}.".format(output)
-        shared.give_user_feedback(message, log_file, quiet)
-    except OSError:
-        message = ("cannot find Prodigal. Please check whether it is "
-                   "installed or the path to the binaries is provided.")
+                "should be written.".format(dir_))
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
@@ -128,7 +108,7 @@ def check_diamond_binaries(path_to_diamond, log_file, quiet):
         shared.give_user_feedback(message, log_file, quiet)
     except OSError:
         message = ("cannot find DIAMOND. Please check whether it is "
-                   "installed or the path to the binaries is provided.")
+                "installed or the path to the binaries is provided.")
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
@@ -144,13 +124,13 @@ def check_bwa_binaries(path_to_bwa, log_file, quiet):
                              stderr=subprocess.PIPE)
         for line in p.stderr:
             line=line.decode("utf-8")
-            if line.startswith('Version'):
+            if line.startswith("Version"):
                 output = line.rstrip()
-                message = 'bwa found: {0}.'.format(output)
+                message = "bwa found: {0}.".format(output)
                 shared.give_user_feedback(message, log_file, quiet)
     except OSError:
-        message = ('can not find bwa. Please check whether it is '
-                'installed or the path to the binaries is provided.')
+        message = ("cannot find bwa. Please check whether it is "
+                "installed or the path to the binaries is provided.")
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
@@ -162,16 +142,16 @@ def check_samtools_binaries(path_to_samtools, log_file, quiet):
     error = False
 
     try:
-        p = subprocess.Popen([path_to_samtools, '--version'],
+        p = subprocess.Popen([path_to_samtools, "--version"],
                              stdout=subprocess.PIPE)
         c = p.communicate()
-        output = c[0].decode().split('\n')[0].rstrip()
+        output = c[0].decode().split("\n")[0].rstrip()
 
-        message = 'Samtools found: {0}.'.format(output)
+        message = "Samtools found: {0}.".format(output)
         shared.give_user_feedback(message, log_file, quiet)
     except OSError:
-        message = ('can not find samtools. Please check whether it is '
-                'installed or the path to the binaries is provided.')
+        message = ("cannot find samtools. Please check whether it is "
+                "installed or the path to the binaries is provided.")
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
@@ -208,9 +188,10 @@ def check_bin_folder(bin_folder, bin_suffix, log_file, quiet):
 
     if len(tmp) == 0:
         message = (
-            "no bins found with suffix {0} in bin folder. You can set the "
-            "suffix with the [-s / --bin_suffix] argument.".format(bin_suffix)
-        )
+                "no bins found with suffix {0} in bin folder. You can set the "
+                "suffix with the [-s / --bin_suffix] argument.".format(
+                    bin_suffix)
+                )
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
@@ -238,7 +219,7 @@ def check_folders_for_run(
         step_list,
         log_file,
         quiet
-):
+        ):
     error = False
 
     if not os.path.isdir(taxonomy_folder):
@@ -249,7 +230,7 @@ def check_folders_for_run(
     else:
         if not nodes_dmp or not names_dmp:
             message = ("nodes.dmp and / or names.dmp not found in the "
-                       "taxonomy folder.")
+                    "taxonomy folder.")
             shared.give_user_feedback(message, log_file, quiet, error=True)
 
             error = True
@@ -274,7 +255,7 @@ def check_folders_for_run(
 
         if not taxids_with_multiple_offspring_file:
             message = ("file taxids_with_multiple_offspring not found in "
-                       "database folder.")
+                    "database folder.")
             shared.give_user_feedback(message, log_file, quiet, error=True)
 
             error = True
@@ -287,9 +268,10 @@ def check_output_file(output_file, log_file, quiet):
 
     if os.path.isfile(output_file):
         message = (
-            "output file {0} already exists. You can choose to overwrite "
-            "existing files with the [--force] argument.".format(output_file)
-        )
+                "output file {0} already exists. You can choose to overwrite "
+                "existing files with the [--force] argument.".format(
+                    output_file)
+                )
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True

@@ -14,12 +14,12 @@ import summarise
 
 def usage():
     message = (
-        "usage: CAT_pack (download | prepare | contigs | bins | reads "
-        "| add_names | summarise) [-v / --version] [-h / --help]\n"
-        "CAT_pack: error: one of the arguments "
-        "download prepare contigs bins reads add_names summarise "
-        "is required"
-    )
+            "usage: CAT_pack (download | prepare | contigs | bins | reads "
+            "| add_names | summarise) [-v / --version] [-h / --help]\n"
+            "CAT_pack: error: one of the arguments "
+            "download prepare contigs bins reads add_names summarise "
+            "is required"
+            )
     
     sys.stdout.write("{0}\n".format(message))
 
@@ -35,7 +35,7 @@ def version():
         message += " by {0}".format(" and ".join(about.__authors__))
     elif len(about.__authors__) > 2:
         message += " by {0}, and {1}".format(
-            ", ".join(about.__authors__[:-1]), about.__authors__[-1])
+                ", ".join(about.__authors__[:-1]), about.__authors__[-1])
     message += "."
 
     sys.stdout.write("{0}\n".format(message))
@@ -45,25 +45,26 @@ def version():
     
 def help():
     message = (
-        "usage: CAT_pack (download | prepare | contigs | bins | reads "
-        "| add_names | summarise) [-v / --version] [-h / --help]\n\n"
-        "Run Contig Annotation Tool (CAT), "
-        "Bin Annotation Tool (BAT), or " 
-        "Read Annotation Tool (RAT).\n\n"
-        "Required choice:\n"
-        "  download\t\tDownload and preprocess data from NCBI nr or GTDB.\n"
-        "  prepare\t\tConstruct database files.\n"
-        "  contigs\t\tRun CAT.\n"
-        "  bins\t\t\tRun BAT.\n"
-        "  reads\t\t\tRun RAT.\n"
-        "  add_names\t\tAdd taxonomic names to CAT, BAT, or RAT output files."
-        "\n"
-        "  summarise\t\tSummarise a named CAT or BAT classification file."
-        "\n\n"
-        "Optional arguments:\n"
-        "  -v, --version\t\tPrint version information and exit.\n"
-        "  -h, --help\t\tShow this help message and exit."
-    )
+            "usage: CAT_pack (download | prepare | contigs | bins | reads "
+            "| add_names | summarise) [-v / --version] [-h / --help]\n\n"
+            "Run Contig Annotation Tool (CAT), "
+            "Bin Annotation Tool (BAT), or " 
+            "Read Annotation Tool (RAT).\n\n"
+            "Required choice:\n"
+            "  download\t\tDownload and preprocess data from NCBI nr or GTDB."
+            "\n"
+            "  prepare\t\tConstruct database files.\n"
+            "  contigs\t\tRun CAT.\n"
+            "  bins\t\t\tRun BAT.\n"
+            "  reads\t\t\tRun RAT.\n"
+            "  add_names\t\tAdd taxonomic names to CAT, BAT, or RAT output "
+            "files.\n"
+            "  summarise\t\tSummarise a named CAT or BAT classification file."
+            "\n\n"
+            "Optional arguments:\n"
+            "  -v, --version\t\tPrint version information and exit.\n"
+            "  -h, --help\t\tShow this help message and exit."
+            )
 
     sys.stdout.write("{0}\n".format(message))
 

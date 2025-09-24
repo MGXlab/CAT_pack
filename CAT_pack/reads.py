@@ -56,6 +56,8 @@ def parse_arguments():
     shared.add_argument(optional, 'path_to_bwa', False, default='bwa')
     shared.add_argument(optional, 'path_to_samtools', False, default='samtools')
 
+    shared.add_argument(optional, "nproc", False,
+            default=multiprocessing.cpu_count())
     shared.add_argument(optional, 'force', False)
     shared.add_argument(optional, 'quiet', False)
     shared.add_argument(optional, 'verbose', False)
@@ -68,12 +70,10 @@ def parse_arguments():
     shared.add_argument(optional, "alignment_file", False)
     shared.add_argument(CAT_args, 'r', False, default=decimal.Decimal(10))
     shared.add_argument(CAT_args, 'f', False, default=decimal.Decimal(0.5))
-    shared.add_argument(CAT_args, 'path_to_prodigal', False, default="prodigal")
-    shared.add_argument(CAT_args, 'path_to_diamond', False, default="diamond")
     shared.add_argument(CAT_args, 'no_stars', False)
     shared.add_argument(CAT_args, 'IkwId', False)
     
-    dmnd_args = parser.add_argument_group('DIAMOND/Samtools specific optional arguments')
+    dmnd_args = parser.add_argument_group('DIAMOND specific optional arguments')
     shared.add_all_diamond_arguments(dmnd_args)
                           
     (args, extra_args) = parser.parse_known_args()
@@ -222,9 +222,6 @@ def run():
                 args.path_to_bwa, args.log_file, args.quiet))
     if not args.contig2classification or (args.bin_folder and not 
                                           args.bin2classification):
-        errors.append(
-            check.check_prodigal_binaries(
-                args.path_to_prodigal, args.log_file, args.quiet))
         errors.append(
             check.check_diamond_binaries(
                 args.path_to_diamond, args.log_file, args.quiet))

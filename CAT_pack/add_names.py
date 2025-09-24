@@ -11,19 +11,22 @@ import tax
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
-        prog="CAT_pack add_names",
-        description="Add taxonomic names to CAT, BAT, or RAT output files.",
-        usage=("CAT_pack add_names -i FILE -o FILE -t DIR [options] "
-            "[-h / --help]"),
-        add_help=False)
+            prog="CAT_pack add_names",
+            description=(
+                "Add taxonomic names to CAT, BAT, or RAT output files."),
+            usage=("CAT_pack add_names -i FILE -o FILE -t DIR [options] "
+                "[-h / --help]"),
+            add_help=False
+            )
     
     required = parser.add_argument_group("Required arguments")
     shared.add_argument(
-        required,
-        "input_file",
-        True,
-        help_=("Path to input file. Can be classification or ORF2LCA output "
-            "file from CAT, BAT or RAT."))
+            required,
+            "input_file",
+            True,
+            help_=("Path to input file. Can be classification or ORF2LCA "
+                "output file from CAT, BAT or RAT.")
+            )
     shared.add_argument(required, "output_file", True)
     shared.add_argument(required, "taxonomy_folder", True)
 
@@ -34,10 +37,10 @@ def parse_arguments():
     shared.add_argument(optional, "quiet", False)
     shared.add_argument(optional, "help", False)
 
-    (args, extra_args) = parser.parse_known_args()
+    args, extra_args = parser.parse_known_args()
 
     extra_args = [arg for (i, arg) in enumerate(extra_args) if
-                  (i, arg) != (0, "add_names")]
+            (i, arg) != (0, "add_names")]
     if len(extra_args) > 0:
         sys.exit("error: too many arguments supplied:\n{0}".format(
             "\n".join(extra_args)))
@@ -53,30 +56,29 @@ def run():
 
     message = "# CAT_pack v{0}.".format(about.__version__)
     shared.give_user_feedback(
-        message, args.log_file, args.quiet, show_time=False)
+            message, args.log_file, args.quiet, show_time=False)
 
     errors = []
 
     errors.append(
-        check.check_input_file(args.input_file, args.log_file, args.quiet))
+            check.check_input_file(args.input_file, args.log_file, args.quiet))
 
     if not args.force:
         errors.append(
-            check.check_output_file(
-                args.output_file, args.log_file, args.quiet)
-        )
+                check.check_output_file(
+                    args.output_file, args.log_file, args.quiet)
+                )
 
     errors.append(
-        check.check_in_and_output_file(
-            args.input_file, args.output_file, args.log_file, args.quiet)
-    )
+            check.check_in_and_output_file(
+                args.input_file, args.output_file, args.log_file, args.quiet)
+            )
 
     if True in errors:
         sys.exit(1)
 
-    (taxid2parent,
-            taxid2rank) = tax.import_nodes(
-        args.nodes_dmp, args.log_file, args.quiet)
+    taxid2parent, taxid2rank = tax.import_nodes(
+            args.nodes_dmp, args.log_file, args.quiet)
     taxid2name = tax.import_names(args.names_dmp, args.log_file, args.quiet)
 
     message = "Appending names..."
@@ -93,7 +95,7 @@ def run():
                     message = ("{0} is not a supported classification file."
                             "".format(args.input_file))
                     shared.give_user_feedback(
-                        message, args.log_file, args.quiet, error=True)
+                            message, args.log_file, args.quiet, error=True)
 
                     sys.exit(1)
 
@@ -112,7 +114,10 @@ def run():
 
             sys.exit(1)
             
-    with open(args.input_file, "r") as f1, open(args.output_file, "w") as outf1:
+    with (
+            open(args.input_file, "r") as f1,
+            open(args.output_file, "w") as outf1
+            ):
         for line in f1:
             line = line.rstrip()
 
@@ -149,12 +154,10 @@ def run():
 
             if args.only_official:
                 names = tax.convert_to_official_names(
-                    lineage, taxid2rank, taxid2name, scores
-                )
+                        lineage, taxid2rank, taxid2name, scores)
             else:
                 names = tax.convert_to_names(
-                    lineage, taxid2rank, taxid2name, scores
-                )
+                        lineage, taxid2rank, taxid2name, scores)
 
             outf1.write("{0}\t{1}\n".format("\t".join(line), "\t".join(names)))
 
