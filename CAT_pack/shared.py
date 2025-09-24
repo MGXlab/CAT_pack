@@ -931,7 +931,7 @@ def give_user_feedback(
     if show_time:
         message = "{0} {1}".format(timestamp(), message)
 
-    message = "{0}n".format(message)
+    message = "{0}\n".format(message)
 
     if log_file:
         with open(log_file, "a") as outf1:
