@@ -202,10 +202,10 @@ fastaRecord = namedtuple(
         )
 
 ## FUNCTIONS.
-def get_gtdb_latest_version():
-    """Read the version number from the VERSION file."""
-    version_url = (
-            "https://data.gtdb.aau.ecogenomic.org/releases/latest/VERSION.txt")
+def get_gtdb_latest_version(parent_url):
+    """Read the version number from the VERSION file.
+    """
+    version_url = "{0}/VERSION.txt".format(parent_url)
 
     with urllib.request.urlopen(version_url) as f:
         version_data = f.read().decode()
@@ -577,23 +577,24 @@ def concatenate_trees(bac_tree_fp, ar_tree_fp, all_tree_fp):
 def process_gtdb(output_dir, log_file, quiet, cleanup=False):
     # Using "latest" as an entry point.
     # This needs to be checked for future versions.
-    version = get_gtdb_latest_version()
+    # Use the European mirror.
+    parent_url = "https://data.gtdb.aau.ecogenomic.org/releases/latest/"
+
+    version = get_gtdb_latest_version(parent_url)
     
     message = "CAT_pack will download files from GTDB {0}.".format(version)
     shared.give_user_feedback(message, log_file, quiet)
-    
-    gtdb_urls = [
-        "https://data.gtdb.aau.ecogenomic.org/releases/latest/VERSION.txt",
-        ("https://data.gtdb.aau.ecogenomic.org/releases/latest/"
-            "ar53_taxonomy.tsv.gz"),
-        ("https://data.gtdb.ecogenomic.org/releases/latest/"
-            "bac120_taxonomy.tsv.gz"),
-        "https://data.gtdb.aau.ecogenomic.org/releases/latest/MD5SUM.txt",
-        "https://data.gtdb.aau.ecogenomic.org/releases/latest/bac120.tree",
-        "https://data.gtdb.aau.ecogenomic.org/releases/latest/ar53.tree",
-        ("https://data.gtdb.aau.ecogenomic.org/releases/latest/"
-            "genomic_files_reps/gtdb_proteins_aa_reps.tar.gz")
-        ]
+
+    file_list = [
+            "VERSION.txt",
+            "ar53_taxonomy.tsv.gz",
+            "bac120_taxonomy.tsv.gz",
+            "MD5SUM.txt",
+            "bac120.tree",
+            "ar53.tree",
+            "genomic_files_reps/gtdb_proteins_aa_reps.tar.gz"
+            ]
+    gtdb_urls = ['{0}/{1}'.format(parent_url, file_) for file_ in file_list]
 
     # Fetch files.
     multi_download(gtdb_urls, output_dir, log_file, quiet, prefix=None)
