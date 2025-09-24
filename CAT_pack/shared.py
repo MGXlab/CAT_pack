@@ -1395,7 +1395,7 @@ def parse_tabular_alignment(alignment_file, one_minus_r, log_file, quiet):
             # The ORF has already surpassed its minimum allowed bit-score.
             continue
 
-        line = line.rstrip().split("t")
+        line = line.rstrip().split("\t")
 
         if not line[0] == ORF:
             # A new ORF is reached.
