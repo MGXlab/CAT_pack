@@ -617,16 +617,24 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 action=PathAction,
                 help=help_
                 )
-    elif dest == "sensitive":
-        if help_ is None:
-            help_ = "Run DIAMOND in sensitive mode (default: not enabled)."
-        argument_group.add_argument(
-                "--sensitive",
-                dest="sensitive",
-                required=required,
-                action="store_true",
-                help=help_
-                )
+    elif dest == "diamond_mode":
+        if help_ == None:
+            help_ = (
+                    "DIAMOND mode [faster, fast, mid-sensitive, "
+                    "sensitive, more-sensitive, very-sensitive, "
+                    "ultra-sensitive] (default: {0}).".format(default)
+                    )
+            argument_group.add_argument(
+                    "--diamond_mode",
+                    dest="diamond_mode",
+                    metavar="",
+                    required=required,
+                    type=str,
+                    choices=['faster', 'fast', 'mid-sensitive', 'sensitive',
+                        'more-sensitive', 'very-sensitive', 'ultra-sensitive'],
+                    default=default,
+                    help=help_
+                    )
     elif dest == "no_self_hits":
         if help_ is None:
             help_ = ("Do not report identical self hits by DIAMOND (default: "
@@ -719,7 +727,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
 
 def add_all_diamond_arguments(argument_group):
     add_argument(argument_group, "path_to_diamond", False, default="diamond")
-    add_argument(argument_group, "sensitive", False)
+    add_argument(argument_group, "diamond_mode", False, default="fast")
     add_argument(argument_group, "no_self_hits", False)
     add_argument(argument_group, "block_size", False, default=12.0)
     add_argument(argument_group, "index_chunks", False, default=1)
@@ -1007,11 +1015,6 @@ def run_pyrodigal(
 # it with CAT/BAT, it still does the same thing, but I can run it with blastx
 # on a newly created fasta file and with a top 11.
 def run_diamond(args, blast="blastp", prot_fasta="", top=0):
-    if args.sensitive:
-        mode = "sensitive"
-    else:
-        mode = "fast"
-
     if args.compress:
         compression = "1"
     else:
@@ -1023,23 +1026,24 @@ def run_diamond(args, blast="blastp", prot_fasta="", top=0):
         top=args.top
         
     message = (
-            "Homology search with DIAMOND is starting. Please be patient. Do "
-            "not forget to cite DIAMOND when using CAT or BAT in your "
-            "publication.n"
-            "t\t\tquery: {0}\n"
-            "t\t\tdatabase: {1}\n"
-            "t\t\tmode: {2}\n"
-            "t\t\ttop: {3}\n"
-            "t\t\tno-self-hits: {4}\n"
-            "t\t\tnumber of cores: {5}\n"
-            "t\t\tblock-size (billions of letters): {6}\n"
-            "t\t\tindex-chunks: {7}\n"
-            "t\t\ttmpdir: {8}\n"
-            "t\t\tcompress: {9}\n"
-            "t\t\tblast flavour: {10}".format(
+            "Homology search with DIAMOND is starting. Please be patient. "
+            "Do not forget to cite DIAMOND when using CAT or BAT in your "
+            "publication.\n"
+            "\t\t\tblast flavour: {0}\n"
+            "\t\t\tmode: {1}\n"
+            "\t\t\tquery: {2}\n"
+            "\t\t\tdatabase: {3}\n"
+            "\t\t\ttop: {4}\n"
+            "\t\t\tno-self-hits: {5}\n"
+            "\t\t\tnumber of cores: {6}\n"
+            "\t\t\tblock-size (billions of letters): {7}\n"
+            "\t\t\tindex-chunks: {8}\n"
+            "\t\t\ttmpdir: {9}\n"
+            "\t\t\tcompress: {10}".format(
+                blast,
+                args.diamond_mode,
                 args.proteins_fasta,
                 args.diamond_database,
-                mode,
                 args.top,
                 args.no_self_hits,
                 args.nproc,
@@ -1047,7 +1051,6 @@ def run_diamond(args, blast="blastp", prot_fasta="", top=0):
                 args.index_chunks,
                 args.tmpdir,
                 compression,
-                blast
                 )
             )
     give_user_feedback(message, args.log_file, args.quiet)
@@ -1055,8 +1058,9 @@ def run_diamond(args, blast="blastp", prot_fasta="", top=0):
     try:
         command = [
                 args.path_to_diamond, blast,
-                "-d", args.diamond_database,
+                "--{0}".format(args.diamond_mode),
                 "-q", prot_fasta,
+                "-d", args.diamond_database,
                 "--top", str(args.top),
                 "--matrix", "BLOSUM62",
                 "--evalue", "0.001",
@@ -1070,9 +1074,6 @@ def run_diamond(args, blast="blastp", prot_fasta="", top=0):
 
         if not args.verbose:
             command += ["--quiet"]
-
-        if args.sensitive:
-            command += ["--sensitive"]
 
         if args.no_self_hits:
             command += ["--no-self-hits"]
