@@ -278,14 +278,15 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "alignment_file":
         if help_ is None:
             help_ = (
-                    "Path to alignment table. If supplied, the alignment step "
-                    "is skipped and classification is carried out directly. A "
-                    "predicted proteins fasta file should also be supplied "
+                    "Path to alignment table (in BLAST+6 format). If "
+                    "supplied, the alignment step is skipped and "
+                    "classification is carried out directly. A predicted "
+                    "proteins fasta file should also be supplied "
                     "with argument [-p / --proteins]."
                     )
         argument_group.add_argument(
                 "-a",
-                "--diamond_alignment",
+                "--alignment_table",
                 dest="alignment_file",
                 metavar="",
                 required=required,
