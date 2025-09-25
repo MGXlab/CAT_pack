@@ -749,8 +749,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "mmseqs2_sensitivity":
         if help_ is None:
-            help_ = ("MMseqs2 sensitivity parameter [1-7.5] (default: {0}). "
-                    "".format(default))
+            help_ = ("MMseqs2 sensitivity (-s) parameter [1-7.5] (default: "
+                    "{0}). ".format(default))
         argument_group.add_argument(
                 "--sensitivity",
                 dest="mmseqs2_sensitivity",
