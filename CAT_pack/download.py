@@ -594,7 +594,7 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
             "ar53.tree",
             "genomic_files_reps/gtdb_proteins_aa_reps.tar.gz"
             ]
-    gtdb_urls = ['{0}/{1}'.format(parent_url, file_) for file_ in file_list]
+    gtdb_urls = ["{0}/{1}".format(parent_url, file_) for file_ in file_list]
 
     # Fetch files.
     multi_download(gtdb_urls, output_dir, log_file, quiet, prefix=None)
@@ -783,7 +783,7 @@ def run():
                 prefix=args.date,
                 cleanup=args.cleanup,
                 )
-    elif args.db == "GTDB":
+    elif args.db.upper() == "GTDB":
         process_gtdb(args.output_dir, args.log_file, args.quiet, args.cleanup)
         
     return

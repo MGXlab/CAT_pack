@@ -31,9 +31,11 @@ def parse_arguments():
     shared.add_argument(optional, "out_prefix", False, default="./out.CAT")
     shared.add_argument(optional, "proteins_fasta", False)
     shared.add_argument(optional, "alignment_file", False)
+    shared.add_argument(optional, "aligner", False, default="DIAMOND")
     shared.add_argument(optional, "no_stars", False)
     shared.add_argument(
             optional, "nproc", False, default=multiprocessing.cpu_count())
+    shared.add_argument(optional, "compress", False)
     shared.add_argument(optional, "force", False)
     shared.add_argument(optional, "quiet", False)
     shared.add_argument(optional, "verbose", False)
@@ -43,6 +45,9 @@ def parse_arguments():
 
     specific = parser.add_argument_group("DIAMOND specific optional arguments")
     shared.add_all_diamond_arguments(specific)
+
+    specific = parser.add_argument_group("MMseqs2 specific optional arguments")
+    shared.add_all_mmseqs2_arguments(specific)
 
     args, extra_args = parser.parse_known_args()
     
@@ -183,17 +188,31 @@ def run():
                     )
             
     if "align" in step_list:
-        errors.append(
-                check.check_diamond_binaries(
-                    args.path_to_diamond, args.log_file, args.quiet)
-                )
+        if args.aligner.lower() == "diamond":
+            errors.append(
+                    check.check_diamond_binaries(
+                        args.path_to_diamond, args.log_file, args.quiet)
+                    )
 
-        setattr(
-                args,
-                "alignment_file",
-                "{0}.alignment.diamond".format(args.out_prefix)
-                )
-        
+            setattr(
+                    args,
+                    "alignment_file",
+                    "{0}.alignment.diamond".format(args.out_prefix)
+                    )
+        elif args.aligner.lower() == "mmseqs2":
+            errors.append(
+                    check.check_mmseqs2_binaries(
+                        args.path_to_mmseqs2, args.log_file, args.quiet)
+                    )
+            setattr(
+                    args,
+                    "alignment_file",
+                    "{0}.alignment.mmseqs2".format(args.out_prefix)
+                    )
+        else:
+            # For debugging...
+            sys.exit("Something wrong!")
+
         if not args.force:
             errors.append(
                     check.check_output_file(
@@ -206,7 +225,10 @@ def run():
                 args.nodes_dmp,
                 args.names_dmp,
                 args.database_folder,
+                args.aligner,
                 args.diamond_database,
+                args.mmseqs2_database,
+                args.mmseqs2_index,
                 args.fastaid2LCAtaxid_file,
                 args.taxids_with_multiple_offspring_file,
                 step_list,
@@ -246,6 +268,15 @@ def run():
                 )
 
     if "align" in step_list:
+        if not args.force:
+            errors.append(
+                    check.check_output_file(
+                        args.alignment_file,
+                        args.log_file,
+                        args.quiet
+                        )
+                    )
+
         errors.append(
                 check.check_top(args.top, args.r, args.log_file, args.quiet))
 
@@ -280,7 +311,7 @@ def run():
             contig_names, contig2ORFs, args.log_file, args.quiet)
     
     if "align" in step_list:
-        shared.run_diamond(args)
+        shared.run_aligner(args)
 
     ORF2hits, all_hits = shared.parse_tabular_alignment(
             args.alignment_file, args.one_minus_r, args.log_file, args.quiet)

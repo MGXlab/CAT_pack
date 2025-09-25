@@ -100,7 +100,7 @@ def check_diamond_binaries(path_to_diamond, log_file, quiet):
 
     try:
         p = subprocess.Popen([path_to_diamond, "--version"],
-                             stdout=subprocess.PIPE)
+                stdout=subprocess.PIPE)
         c = p.communicate()
         output = c[0].decode().rstrip()
 
@@ -109,6 +109,26 @@ def check_diamond_binaries(path_to_diamond, log_file, quiet):
     except OSError:
         message = ("cannot find DIAMOND. Please check whether it is "
                 "installed or the path to the binaries is provided.")
+        shared.give_user_feedback(message, log_file, quiet, error=True)
+
+        error = True
+
+    return error
+
+
+def check_mmseqs2_binaries(path_do_mmseqs2, log_file, quiet):
+    error = False
+
+    try:
+        p = subprocess.Popen([path_do_mmseqs2, "-h"], stdout=subprocess.PIPE)
+        c = p.communicate()
+        output = c[0].decode().split("\n")[5]
+
+        message = "MMseqs2 found: {0}.".format(output)
+        shared.give_user_feedback(message, log_file, quiet)
+    except OSError:
+        message = ("cannot find MMseqs2. Please check whether it is "
+                "installed.")
         shared.give_user_feedback(message, log_file, quiet, error=True)
 
         error = True
@@ -214,7 +234,10 @@ def check_folders_for_run(
         nodes_dmp,
         names_dmp,
         database_folder,
+        aligner,
         diamond_database,
+        mmseqs2_database,
+        mmseqs2_index,
         fastaid2LCAtaxid_file,
         taxids_with_multiple_offspring_file,
         step_list,
@@ -242,8 +265,31 @@ def check_folders_for_run(
 
         error = True
     else:
-        if not diamond_database and "align" in step_list:
+        if (
+                aligner.lower() == "diamond" and
+                not diamond_database and
+                "align" in step_list
+                ):
             message = "DIAMOND database not found in database folder."
+            shared.give_user_feedback(message, log_file, quiet, error=True)
+
+            error = True
+
+        if (
+                aligner.lower() == "mmseqs2" and
+                not mmseqs2_database and
+                "align" in step_list
+                ):
+            message = "MMseqs2 database not found in database folder."
+            shared.give_user_feedback(message, log_file, quiet, error=True)
+
+            error = True
+        if (
+                aligner.lower() == "mmseqs2" and
+                not mmseqs2_index and
+                "align" in step_list
+                ):
+            message = "MMseqs2 database index not found in database folder."
             shared.give_user_feedback(message, log_file, quiet, error=True)
 
             error = True

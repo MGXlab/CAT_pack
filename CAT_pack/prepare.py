@@ -103,7 +103,7 @@ def make_diamond_database(
             "cores.".format(diamond_database, fasta_file, nproc))
     shared.give_user_feedback(message, log_file, quiet)
 
-    diamond_database_prefix = diamond_database.rsplit('.dmnd', 1)[0]
+    diamond_database_prefix = diamond_database.rsplit(".dmnd", 1)[0]
 
     command = [
             path_to_diamond, "makedb",
@@ -414,14 +414,14 @@ def prepare(step_list, args):
         message = "Database folder {0} exists.".format(cat_db)
         shared.give_user_feedback(
                 message, args.log_file, args.quiet, show_time=True)
-        
-        if any(cat_db.glob("*.dmnd")):
+
+        if "make_diamond_database" not in step_list:
             message = "A DIAMOND database exists. Skipping creation."
             shared.give_user_feedback(
                     message, args.log_file, args.quiet, show_time=True)
 
-        if any(cat_db.glob("*.mmseqs2.index")):
-            message = "A MMseqs2 database exists. Skipping creating."
+        if "make_mmseqs2_database" not in step_list:
+            message = "An MMseqs2 database exists. Skipping creation."
             shared.give_user_feedback(
                     message, args.log_file, args.quiet, show_time=True)
     else:

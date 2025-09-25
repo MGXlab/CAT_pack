@@ -245,7 +245,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 metavar="",
                 required=required,
                 type=str,
-                choices=["nr", "GTDB"],
+                choices=["nr", "GTDB", "gtdb"],
                 default=None,
                 help=help_
                 )
@@ -294,6 +294,19 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 action=PathAction,
                 help=help_
                 )
+    elif dest == "aligner":
+        if help_ is None:
+            help_ = "Protein aligner [DIAMOND, MMseqs2] (default: DIAMOND)."
+        argument_group.add_argument(
+                "--aligner",
+                dest="aligner",
+                metavar="",
+                required=required,
+                type=str,
+                choices=["DIAMOND", "diamond", "MMseqs2", "mmseqs2"],
+                default=default,
+                help=help_
+                )
     elif dest == "common_prefix":
         if help_ is None:
             help_ = "Prefix for all files that will be created"
@@ -313,6 +326,20 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
         argument_group.add_argument(
                 "--path_to_diamond",
                 dest="path_to_diamond",
+                metavar="",
+                required=required,
+                type=str,
+                action=PathAction,
+                default=default,
+                help=help_
+                )
+    elif dest == "path_to_mmseqs2":
+        if help_ is None:
+            help_ = ("Path to MMseqs2 binaries. Supply if CAT/BAT/RAT cannot "
+                    "find MMseqs2.")
+        argument_group.add_argument(
+                "--path_to_mmseqs2",
+                dest="path_to_mmseqs2",
                 metavar="",
                 required=required,
                 type=str,
@@ -368,6 +395,16 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 required=required,
                 type=int,
                 default=default,
+                help=help_
+                )
+    elif dest == "compress":
+        if help_ is None:
+            help_ = "Compress alignment output file (default: not enabled)."
+        argument_group.add_argument(
+                "--compress",
+                dest="compress",
+                required=required,
+                action="store_true",
                 help=help_
                 )
     elif dest == "force":
@@ -692,16 +729,6 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 action=PathAction,
                 help=help_
                 )
-    elif dest == "compress":
-        if help_ is None:
-            help_ = "Compress DIAMOND alignment file (default: not enabled)."
-        argument_group.add_argument(
-                "--compress",
-                dest="compress",
-                required=required,
-                action="store_true",
-                help=help_
-                )
     elif dest == "top":
         if help_ is None:
             help_ = (
@@ -720,6 +747,19 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 default=default,
                 help=help_
                 )
+    elif dest == "mmseqs2_sensitivity":
+        if help_ is None:
+            help_ = ("MMseqs2 sensitivity parameter [1-7.5] (default: {0}). "
+                    "".format(default))
+        argument_group.add_argument(
+                "--sensitivity",
+                dest="mmseqs2_sensitivity",
+                metavar="",
+                required=required,
+                type=float,
+                default=default,
+                help=help_
+                )
     else:
         sys.exit("Unknown parser dest {0}.".format(dest))
 
@@ -733,8 +773,14 @@ def add_all_diamond_arguments(argument_group):
     add_argument(argument_group, "block_size", False, default=12.0)
     add_argument(argument_group, "index_chunks", False, default=1)
     add_argument(argument_group, "tmpdir", False)
-    add_argument(argument_group, "compress", False)
     add_argument(argument_group, "top", False, default=11)
+
+    return
+
+
+def add_all_mmseqs2_arguments(argument_group):
+    add_argument(argument_group, "path_to_mmseqs2", False, default="mmseqs")
+    add_argument(argument_group, "mmseqs2_sensitivity", False, default=5.7)
 
     return
 
@@ -780,7 +826,7 @@ def expand_arguments(args, rat=False):
         mmseqs2_database_name = "{0}.mmseqs2".format(args.common_prefix)
         mmseqs2_database_path = str(
                 database_folder_path / pathlib.Path(mmseqs2_database_name))
-        mmseqs2_index_name = "{0}.mmseqs2.index".format(args.common_prefix)
+        mmseqs2_index_name = "{0}.mmseqs2.tmp".format(args.common_prefix)
         mmseqs2_index_path = str(
                 database_folder_path / pathlib.Path(mmseqs2_index_name))
 
@@ -926,7 +972,7 @@ def explore_database_folder(args):
                         sys.exit("Someting wrong!")
                     mmseqs2_database = "{0}{1}".format(
                             args.database_folder, entry.name)
-                elif entry.is_dir() and entry.name.endswith(".mmseqs2.index"):
+                elif entry.is_dir() and entry.name.endswith(".mmseqs2.tmp"):
                     if mmseqs2_index is not None:
                         sys.exit("Someting wrong!")
                     mmseqs2_index = "{0}{1}".format(
@@ -1100,7 +1146,7 @@ def run_diamond(args, blast="blastp", prot_fasta="", top=0):
             "\t\t\tcompress: {10}".format(
                 blast,
                 args.diamond_mode,
-                args.proteins_fasta,
+                prot_fasta,
                 args.diamond_database,
                 args.top,
                 args.no_self_hits,
@@ -1136,7 +1182,8 @@ def run_diamond(args, blast="blastp", prot_fasta="", top=0):
         if args.no_self_hits:
             command += ["--no-self-hits"]
         
-        print(" ".join(command))
+        messsage = " ".join(command)
+        give_user_feedback(message, args.log_file, args.quiet)
         
         subprocess.check_call(command)
     except:
@@ -1144,6 +1191,70 @@ def run_diamond(args, blast="blastp", prot_fasta="", top=0):
         give_user_feedback(message, args.log_file, args.quiet, error=True)
 
         sys.exit(1)
+
+    return
+
+
+def run_mmseqs2(args):
+    if args.compress:
+        compression = "1"
+    else:
+        compression = "0"
+        
+    message = (
+            "Homology search with MMseqs2 is starting. Please be patient. "
+            "Do not forget to cite MMseqs2 when using CAT or BAT in your "
+            "publication.\n"
+            "\t\t\tquery: {0}\n"
+            "\t\t\tdatabase: {1}\n"
+            "\t\t\tsensitivity: {2}\n"
+            "\t\t\tnumber of cores: {3}\n"
+            "\t\t\tcompress: {4}".format(
+                args.proteins_fasta,
+                args.mmseqs2_database,
+                args.mmseqs2_sensitivity,
+                args.nproc,
+                compression,
+                )
+            )
+    give_user_feedback(message, args.log_file, args.quiet)
+
+    try:
+        command = [
+                args.path_to_mmseqs2, "easy-search",
+                args.proteins_fasta,
+                args.mmseqs2_database,
+                args.alignment_file,
+                args.mmseqs2_index,
+                "-s", "{0}".format(args.mmseqs2_sensitivity),
+                "--threads", args.nproc,
+                "--compressed", compression,
+                ]
+
+        if not args.verbose:
+            command += ["-v", "0"]
+
+        messsage = " ".join(command)
+        give_user_feedback(message, args.log_file, args.quiet)
+        
+        subprocess.check_call(command)
+    except:
+        message = "MMseqs2 finished abnormally."
+        give_user_feedback(message, args.log_file, args.quiet, error=True)
+
+        sys.exit(1)
+
+    return
+
+
+def run_aligner(args):
+    if args.aligner.lower() == "diamond":
+        run_diamond(args)
+    elif args.aligner.lower() == "mmseqs2":
+        run_mmseqs2(args)
+    else:
+        # For debugging...
+        sys.exit("Something wrong!")
 
     if args.compress:
         setattr(args, "alignment_file", "{0}.gz".format(args.alignment_file))
