@@ -630,8 +630,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                     metavar="",
                     required=required,
                     type=str,
-                    choices=['faster', 'fast', 'mid-sensitive', 'sensitive',
-                        'more-sensitive', 'very-sensitive', 'ultra-sensitive'],
+                    choices=["faster", "fast", "mid-sensitive", "sensitive",
+                        "more-sensitive", "very-sensitive", "ultra-sensitive"],
                     default=default,
                     help=help_
                     )
@@ -776,6 +776,13 @@ def expand_arguments(args, rat=False):
         diamond_database_path = str(
                 database_folder_path / pathlib.Path(diamond_database_name))
 
+        mmseqs2_database_name = "{0}.mmseqs2".format(args.common_prefix)
+        mmseqs2_database_path = str(
+                database_folder_path / pathlib.Path(mmseqs2_database_name))
+        mmseqs2_index_name = "{0}.mmseqs2.index".format(args.common_prefix)
+        mmseqs2_index_path = str(
+                database_folder_path / pathlib.Path(mmseqs2_index_name))
+
         taxonomy_folder_path = str(
                 pathlib.Path(args.db_dir) / pathlib.Path("tax"))
         fastaid2LCAtaxid_fname = "{0}.fastaid2LCAtaxid".format(
@@ -798,6 +805,8 @@ def expand_arguments(args, rat=False):
         setattr(args, "database_folder", database_folder_path)
         setattr(args, "taxonomy_folder", taxonomy_folder_path)
         setattr(args, "diamond_database", diamond_database_path)
+        setattr(args, "mmseqs2_database", mmseqs2_database_path)
+        setattr(args, "mmseqs2_index", mmseqs2_index_path)
         setattr(args, "fastaid2LCAtaxid_file", fastaid2LCAtaxid_file)
         setattr(
                 args,
@@ -844,22 +853,35 @@ def explore_taxonomy_folder(args):
     prot_accession2taxid_file = None
 
     if os.path.isdir(args.taxonomy_folder):
-        for file_ in os.listdir(args.taxonomy_folder):
-            if file_ == "nodes.dmp":
-                nodes_dmp = "{0}{1}".format(args.taxonomy_folder, file_)
-            elif file_ == "names.dmp":
-                names_dmp = "{0}{1}".format(args.taxonomy_folder, file_)
-            # No need to check for this.
-            elif file_.endswith("prot.accession2taxid.FULL.gz"):
-                prot_accession2taxid_file = "{0}{1}".format(
-                        args.taxonomy_folder, file_)
-            elif (
-                    file_.endswith("prot.accession2taxid.gz")
-                    and prot_accession2taxid_file is None
-                    ):
-                # Legacy prot_accession2taxid_file.
-                prot_accession2taxid_file = "{0}{1}".format(
-                        args.taxonomy_folder, file_)
+        with os.scandir(args.taxonomy_folder) as it:
+            for entry in it:
+                if entry.is_file() and entry.name == "nodes.dmp":
+                    if nodes_dmp is not None:
+                        sys.exit("Someting wrong!")
+                    nodes_dmp = "{0}{1}".format(
+                            args.taxonomy_folder, entry.name)
+                elif entry.is_file() and entry.name == "names.dmp":
+                    if names_dmp is not None:
+                        sys.exit("Someting wrong!")
+                    names_dmp = "{0}{1}".format(
+                            args.taxonomy_folder, entry.name)
+                # No need to check for this.
+                elif entry.is_file() and entry.name.endswith(
+                        "prot.accession2taxid.FULL.gz"):
+                    if prot_accession2taxid_file is not None:
+                        sys.exit("Something wrong!")
+                    prot_accession2taxid_file = "{0}{1}".format(
+                            args.taxonomy_folder, entry.name)
+                elif (
+                        entry.is_file() and
+                        entry.name.endswith("prot.accession2taxid.gz")
+                        and prot_accession2taxid_file is None
+                        ):
+                    # Legacy prot_accession2taxid_file.
+                    if prot_accession2taxid_file is not None:
+                        sys.exit("Something wrong!")
+                    prot_accession2taxid_file = "{0}{1}".format(
+                            args.taxonomy_folder, entry.name)
 
     setattr(args, "nodes_dmp", nodes_dmp)
     setattr(args, "names_dmp", names_dmp)
@@ -871,25 +893,60 @@ def explore_taxonomy_folder(args):
 def explore_database_folder(args):
     fasta_file = None
     diamond_database = None
+    mmseqs2_database = None
+    mmseqs2_index = None
     fastaid2LCAtaxid_file = None
     taxids_with_multiple_offspring_file = None
 
     if os.path.isdir(args.database_folder):
-        for file_ in os.listdir(args.database_folder):
-            if file_.endswith(
-                    (".fa", ".fasta", ".fna", "fa.gz", "fasta.gz", "fna.gz")):
-                fasta_file = "{0}{1}".format(args.database_folder, file_)
-            elif file_.endswith(".dmnd"):
-                diamond_database = "{0}{1}".format(args.database_folder, file_)
-            elif file_.endswith("fastaid2LCAtaxid"):
-                fastaid2LCAtaxid_file = "{0}{1}".format(
-                        args.database_folder, file_)
-            elif file_.endswith("taxids_with_multiple_offspring"):
-                taxids_with_multiple_offspring_file = "{0}{1}".format(
-                        args.database_folder, file_)
+        with os.scandir(args.database_folder) as it:
+            for entry in it:
+                if entry.is_file() and entry.name.endswith(
+                        (
+                            ".fa",
+                            ".fasta",
+                            ".fna",
+                            "fa.gz",
+                            "fasta.gz",
+                            "fna.gz"
+                            )
+                        ):
+                    if fasta_file is not None:
+                        sys.exit("Someting wrong!")
+                    fasta_file = "{0}{1}".format(
+                            args.database_folder, entry.name)
+                elif entry.is_file() and entry.name.endswith(".dmnd"):
+                    if diamond_database is not None:
+                        sys.exit("Someting wrong!")
+                    diamond_database = "{0}{1}".format(
+                            args.database_folder, entry.name)
+                elif entry.is_file() and entry.name.endsith(".mmseqs2"):
+                    if mmseqs2_database is not None:
+                        sys.exit("Someting wrong!")
+                    mmseqs2_database = "{0}{1}".format(
+                            args.database_folder, entry.name)
+                elif entry.is_dir() and entry.name.endswith(".mmseqs2.index"):
+                    if mmseqs2_index is not None:
+                        sys.exit("Someting wrong!")
+                    mmseqs2_index = "{0}{1}".format(
+                            args.database_folder, entry.name)
+                elif entry.is_file() and entry.name.endswith(
+                        "fastaid2LCAtaxid"):
+                    if fastaid2LCAtaxid_file is not None:
+                        sys.exit("Someting wrong!")
+                    fastaid2LCAtaxid_file = "{0}{1}".format(
+                            args.database_folder, entry.name)
+                elif entry.is_file() and entry.name.endswith(
+                        "taxids_with_multiple_offspring"):
+                    if taxids_with_multiple_offspring_file is not None:
+                        sys.exit("Someting wrong!")
+                    taxids_with_multiple_offspring_file = "{0}{1}".format(
+                            args.database_folder, entry.name)
 
     setattr(args, "db_fasta", fasta_file)
     setattr(args, "diamond_database", diamond_database)
+    setattr(args, "mmseqs2_database", mmseqs2_database)
+    setattr(args, "mmseqs2_index", mmseqs2_index)
     setattr(args, "fastaid2LCAtaxid_file", fastaid2LCAtaxid_file)
     setattr(
             args,
@@ -905,18 +962,18 @@ def print_variables(args, step_list=None):
         arguments = ["{0}: {1}".format(k, v) for k, v in
                 sorted(vars(args).items())]
         message = (
-                "n-----------------\n\n"
-                "Full list of arguments:n"
-                "{0}".format("n".join(arguments))
+                "\n-----------------\n\n"
+                "Full list of arguments:\n"
+                "{0}".format("\n".join(arguments))
                 )
         give_user_feedback(message, args.log_file, args.quiet, show_time=False)
 
         if step_list is not None:
-            message = "nStep list: {0}".format(step_list)
+            message = "\nStep list: {0}".format(step_list)
             give_user_feedback(
                     message, args.log_file, args.quiet, show_time=False)
 
-        message = "n-----------------\n"
+        message = "\n-----------------\n"
         give_user_feedback(message, args.log_file, args.quiet, show_time=False)
 
     return
@@ -1138,7 +1195,7 @@ def run_CAT(
 
         sys.exit(1)
 
-    message = "CAT done!n"
+    message = "CAT done!\n"
     give_user_feedback(message, log_file, quiet, show_time=True)
 
     return
@@ -1194,7 +1251,7 @@ def run_BAT(
 
         sys.exit(1)
 
-    message = "BAT done!n"
+    message = "BAT done!\n"
     give_user_feedback(message, log_file, quiet, show_time=True)
 
     return
@@ -1307,7 +1364,7 @@ def run_bwa_mem(
 
         sys.exit(1)
 
-    message = "Read mapping done!n"
+    message = "Read mapping done!\n"
     give_user_feedback(message, log_file,show_time=True)
 
     return

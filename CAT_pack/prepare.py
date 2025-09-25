@@ -93,29 +93,24 @@ def make_diamond_database(
         path_to_diamond,
         fasta_file,
         db_dir,
-        common_prefix,
+        diamond_database,
         nproc,
         log_file,
         quiet,
         verbose
         ):
-    message = ("Constructing DIAMOND database {0}.dmnd from {1} using {2} "
-            "cores.".format(common_prefix, fasta_file, nproc))
+    message = ("Constructing DIAMOND database {0} from {1} using {2} "
+            "cores.".format(diamond_database, fasta_file, nproc))
     shared.give_user_feedback(message, log_file, quiet)
 
-    diamond_database_prefix = db_dir / pathlib.Path(common_prefix)
+    diamond_database_prefix = diamond_database.rsplit('.dmnd', 1)[0]
 
     command = [
-            path_to_diamond,
-            "makedb",
-            "--in",
-            fasta_file,
-            "-d",
-            diamond_database_prefix,
-            "-p",
-            str(nproc)
+            path_to_diamond, "makedb",
+            "--in", fasta_file,
+            "-d", diamond_database_prefix,
+            "-p", str(nproc)
             ]
-
     if not verbose:
         command += ["--quiet"]
 
@@ -128,6 +123,65 @@ def make_diamond_database(
         sys.exit(1)
 
     message = "DIAMOND database constructed."
+    shared.give_user_feedback(message, log_file, quiet)
+
+    return
+
+
+def make_mmseqs2_database(
+        fasta_file,
+        db_dir,
+        mmseqs2_database,
+        mmseqs2_index,
+        nproc,
+        log_file,
+        quiet,
+        verbose
+        ):
+    message = ("Constructing MMseqs2 database {0} from {1} using {2} cores."
+            "".format(mmseqs2_database, fasta_file, nproc))
+    shared.give_user_feedback(message, log_file, quiet)
+
+    command = [
+            "mmseqs", "createdb",
+            fasta_file,
+            mmseqs2_database,
+            "--threads", str(nproc),
+            ]
+    if not verbose:
+        command += ["-v", "0"]
+
+    try:
+        subprocess.check_call(command)
+    except:
+        message = "MMseqs2 database could not be created."
+        shared.give_user_feedback(message, log_file, quiet, error=True)
+
+        sys.exit(1)
+
+    message = ("Constructing MMseqs2 database index {0} using {1} cores."
+            "".format(mmseqs2_index, nproc))
+    shared.give_user_feedback(message, log_file, quiet)
+
+    command = [
+            "mmseqs", "createindex",
+            mmseqs2_database,
+            mmseqs2_index,
+            "--threads", str(nproc),
+            "--remove-tmp-files", "1"
+            ]
+    if not verbose:
+        command += ["-v", "0"]
+
+    try:
+        subprocess.check_call(command)
+    except:
+        message = "MMseqs2 database index could not be created."
+        shared.give_user_feedback(message, log_file, quiet, error=True)
+
+        sys.exit(1)
+
+    message = "MMseqs2 database and database index constructed."
     shared.give_user_feedback(message, log_file, quiet)
 
     return
@@ -353,7 +407,7 @@ def prepare(step_list, args):
                 message, args.log_file, args.quiet, show_time=True)
         shutil.copyfile(args.names_dmp, names_dmp_fp)
 
-    # ... 2. a dir with the .dmnd and LCA files.
+    # ... 2. a dir with the .dmnd, .mmseqs2, and LCA files.
     cat_db = db_dir / pathlib.Path("db")
 
     if cat_db.is_dir():
@@ -363,6 +417,11 @@ def prepare(step_list, args):
         
         if any(cat_db.glob("*.dmnd")):
             message = "A DIAMOND database exists. Skipping creation."
+            shared.give_user_feedback(
+                    message, args.log_file, args.quiet, show_time=True)
+
+        if any(cat_db.glob("*.mmseqs2.index")):
+            message = "A MMseqs2 database exists. Skipping creating."
             shared.give_user_feedback(
                     message, args.log_file, args.quiet, show_time=True)
     else:
@@ -376,11 +435,23 @@ def prepare(step_list, args):
                 args.path_to_diamond,
                 args.db_fasta,
                 args.database_folder,
-                args.common_prefix,
+                args.diamond_database,
                 args.nproc,
                 args.log_file,
                 args.quiet,
                 args.verbose,
+                )
+
+    if "make_mmseqs2_database" in step_list:
+        make_mmseqs2_database(
+                args.db_fasta,
+                args.database_folder,
+                args.mmseqs2_database,
+                args.mmseqs2_index,
+                args.nproc,
+                args.log_file,
+                args.quiet,
+                args.verbose
                 )
 
     if ("make_fastaid2LCAtaxid_file" in step_list or
@@ -389,10 +460,6 @@ def prepare(step_list, args):
                 args.nodes_dmp, args.log_file, args.quiet)
 
     if "make_fastaid2LCAtaxid_file" in step_list:
-        fname = "{0}.fastaid2LCAtaxid".format(args.common_prefix)
-        fpath = cat_db / pathlib.Path(fname)
-        setattr(args, "fastaid2LCAtaxid_file", fpath)
-
         make_fastaid2LCAtaxid_file(
                 args.fastaid2LCAtaxid_file,
                 args.db_fasta,
@@ -403,10 +470,6 @@ def prepare(step_list, args):
                 )
 
     if "make_taxids_with_multiple_offspring_file" in step_list:
-        fname = "{0}.taxids_with_multiple_offspring".format(args.common_prefix)
-        fpath = cat_db / pathlib.Path(fname)
-        setattr(args, "taxids_with_multiple_offspring_file", fpath)
-
         taxid2offspring = find_offspring(
                 args.fastaid2LCAtaxid_file,
                 taxid2parent,
@@ -444,6 +507,9 @@ def run():
     if not os.path.exists(args.diamond_database):
         step_list.append("make_diamond_database")
 
+    if not os.path.exists(args.mmseqs2_index):
+        step_list.append("make_mmseqs2_database")
+
     if not os.path.exists(args.fastaid2LCAtaxid_file):
         step_list.append("make_fastaid2LCAtaxid_file")
 
@@ -452,9 +518,9 @@ def run():
 
     if len(step_list) == 0:
         message = (
-                "Nothing to do here! All files exist. "
-                "Please provide a new location or remove one of the files "
-                "created by CAT_pack to launch a build."
+                "Nothing to do here! All files exist. Please provide a new "
+                "location or remove one of the files created by CAT_pack to "
+                "force a rebuild."
                 )
         shared.give_user_feedback(
                 message, args.log_file, args.quiet, show_time=True)

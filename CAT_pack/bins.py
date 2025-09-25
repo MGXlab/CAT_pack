@@ -84,46 +84,47 @@ def import_bins(bin_folder, bin_suffix, log_file, quiet):
     bin2contigs = {}
     contig2bin = {}
 
-    for file_ in os.listdir(bin_folder):
-        if file_.startswith("."):
-            # Skip hidden files.
-            continue
+    with os.scandir(bin_folder) as it:
+        for entry in it:
+            if entry.name.startswith("."):
+                # Skip hidden files.
+                continue
 
-        if not file_.endswith(bin_suffix):
-            continue
-        
-        if ".concatenated." in file_:
-            # Skip concatenated contig fasta and predicted protein fasta files
-            # from earlier runs.
-            continue
-        
-        # Keep the suffix in the bin name.
-        bin_ = file_
+            if not entry.name.endswith(bin_suffix):
+                continue
+            
+            if ".concatenated." in entry.name:
+                # Skip concatenated contig fasta and predicted protein fasta
+                # files from earlier runs.
+                continue
+            
+            # Keep the suffix in the bin name.
+            bin_ = entry.name
 
-        bin2contigs[bin_] = []
+            bin2contigs[bin_] = []
 
-        with open("{0}{1}".format(bin_folder, file_), "r") as f1:
-            for line in f1:
-                if line.startswith(">"):
-                    contig = line.split()[0].rstrip().lstrip(">")
+            with open(entry.path, "r") as f1:
+                for line in f1:
+                    if line.startswith(">"):
+                        contig = line.split()[0].rstrip().lstrip(">")
 
-                    if contig in contig2bin:
-                        message = (
-                                "BAT has encountered {0} twice, in {1} and in "
-                                "{2}. Fasta headers (the part before the "
-                                "first space in the >line) should be unique "
-                                "across bins, please remove or rename "
-                                "duplicates.".format(
-                                    contig, contig2bin[contig], bin_)
-                                )
-                        shared.give_user_feedback(
-                                message, log_file, quiet, error=True)
+                        if contig in contig2bin:
+                            message = (
+                                    "BAT has encountered {0} twice, in {1} "
+                                    "and in {2}. Fasta headers (the part "
+                                    "before the first space in the >line) "
+                                    "should be unique across bins, please "
+                                    "remove or rename duplicates.".format(
+                                        contig, contig2bin[contig], bin_)
+                                    )
+                            shared.give_user_feedback(
+                                    message, log_file, quiet, error=True)
 
-                        sys.exit(1)
+                            sys.exit(1)
 
-                    contig2bin.setdefault(contig, bin_)
+                        contig2bin.setdefault(contig, bin_)
 
-                    bin2contigs[bin_].append(contig)
+                        bin2contigs[bin_].append(contig)
                     
     if len(bin2contigs) == 1:
         message = "1 bin found!"

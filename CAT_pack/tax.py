@@ -165,7 +165,7 @@ def find_weighted_LCA(LCAs_ORFs, taxid2parent, f):
 
     for (taxid, top_bitscore) in LCAs_ORFs:
         if taxid.startswith("no taxid found"):
-            # Thus the ORFs that are not classified because they don"t have an
+            # Thus the ORFs that are not classified because they don't have an
             # associated taxid are not taken into account for the
             # classification of the contig.
             continue

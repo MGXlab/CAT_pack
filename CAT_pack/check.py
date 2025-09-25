@@ -50,7 +50,7 @@ def check_memory(Gb):
     error = False
     
     if sys.platform == "linux" or sys.platform == "linux2":
-        # It"s a Linux!
+        # It's a Linux!
         meminfo_file = "/proc/meminfo"
         with open(meminfo_file, "r") as f1:
             for line in f1:
@@ -60,7 +60,7 @@ def check_memory(Gb):
                     # Mem is given in Kb, convert to Gb.
                     total_memory = mem / 2 ** 20
     elif sys.platform == "darwin":
-        # It"s a Mac!
+        # It's a Mac!
         meminfo = subprocess.check_output(["sysctl", "hw.memsize"])
         mem = int(meminfo.decode("utf-8").rstrip().split(" ")[-1])
         
@@ -171,20 +171,21 @@ def check_bin_folder(bin_folder, bin_suffix, log_file, quiet):
         return error
     
     tmp = []
-    for file_ in os.listdir(bin_folder):
-        if file_.startswith("."):
-            # Skip hidden files.
-            continue
+    with os.scandir(bin_folder) as it:
+        for entry in it:
+            if entry.name.startswith("."):
+                # Skip hidden files.
+                continue
 
-        if not file_.endswith(bin_suffix):
-            continue
+            if not entry.name.endswith(bin_suffix):
+                continue
 
-        if ".concatenated." in file_:
-            # Skip concatenated contig fasta and predicted protein fasta files
-            # from earlier runs.
-            continue
-        
-        tmp.append(file_)
+            if ".concatenated." in entry.name:
+                # Skip concatenated contig fasta and predicted protein fasta files
+                # from earlier runs.
+                continue
+            
+            tmp.append(entry.name)
 
     if len(tmp) == 0:
         message = (
