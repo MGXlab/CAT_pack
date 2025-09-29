@@ -967,7 +967,7 @@ def explore_database_folder(args):
                         sys.exit("Someting wrong!")
                     diamond_database = "{0}{1}".format(
                             args.database_folder, entry.name)
-                elif entry.is_file() and entry.name.endsith(".mmseqs2"):
+                elif entry.is_file() and entry.name.endswith(".mmseqs2"):
                     if mmseqs2_database is not None:
                         sys.exit("Someting wrong!")
                     mmseqs2_database = "{0}{1}".format(
