@@ -1227,7 +1227,7 @@ def run_mmseqs2(args):
                 args.alignment_file,
                 args.mmseqs2_index,
                 "-s", "{0}".format(args.mmseqs2_sensitivity),
-                "--threads", args.nproc,
+                "--threads", "{0}".format(args.nproc),
                 "--compressed", compression,
                 ]
 
