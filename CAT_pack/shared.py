@@ -913,12 +913,12 @@ def explore_taxonomy_folder(args):
             for entry in it:
                 if entry.is_file() and entry.name == "nodes.dmp":
                     if nodes_dmp is not None:
-                        sys.exit("Someting wrong!")
+                        sys.exit("Something wrong!")
                     nodes_dmp = "{0}{1}".format(
                             args.taxonomy_folder, entry.name)
                 elif entry.is_file() and entry.name == "names.dmp":
                     if names_dmp is not None:
-                        sys.exit("Someting wrong!")
+                        sys.exit("Something wrong!")
                     names_dmp = "{0}{1}".format(
                             args.taxonomy_folder, entry.name)
                 # No need to check for this.
@@ -967,29 +967,29 @@ def explore_database_folder(args):
                             )
                         ):
                     if fasta_file is not None:
-                        sys.exit("Someting wrong!")
+                        sys.exit("Something wrong!")
                     fasta_file = "{0}{1}".format(
                             args.database_folder, entry.name)
                 elif entry.is_file() and entry.name.endswith(".dmnd"):
                     if diamond_database is not None:
-                        sys.exit("Someting wrong!")
+                        sys.exit("Something wrong!")
                     diamond_database = "{0}{1}".format(
                             args.database_folder, entry.name)
                 elif entry.is_file() and entry.name.endswith(".mmseqs2"):
                     if mmseqs2_database is not None:
-                        sys.exit("Someting wrong!")
+                        sys.exit("Something wrong!")
                     mmseqs2_database = "{0}{1}".format(
                             args.database_folder, entry.name)
                 elif entry.is_file() and entry.name.endswith(
                         "fastaid2LCAtaxid"):
                     if fastaid2LCAtaxid_file is not None:
-                        sys.exit("Someting wrong!")
+                        sys.exit("Something wrong!")
                     fastaid2LCAtaxid_file = "{0}{1}".format(
                             args.database_folder, entry.name)
                 elif entry.is_file() and entry.name.endswith(
                         "taxids_with_multiple_offspring"):
                     if taxids_with_multiple_offspring_file is not None:
-                        sys.exit("Someting wrong!")
+                        sys.exit("Something wrong!")
                     taxids_with_multiple_offspring_file = "{0}{1}".format(
                             args.database_folder, entry.name)
 
