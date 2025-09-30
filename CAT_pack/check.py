@@ -237,7 +237,6 @@ def check_folders_for_run(
         aligner,
         diamond_database,
         mmseqs2_database,
-        mmseqs2_index,
         fastaid2LCAtaxid_file,
         taxids_with_multiple_offspring_file,
         step_list,
@@ -281,15 +280,6 @@ def check_folders_for_run(
                 "align" in step_list
                 ):
             message = "MMseqs2 database not found in database folder."
-            shared.give_user_feedback(message, log_file, quiet, error=True)
-
-            error = True
-        if (
-                aligner.lower() == "mmseqs2" and
-                not mmseqs2_index and
-                "align" in step_list
-                ):
-            message = "MMseqs2 database index not found in database folder."
             shared.give_user_feedback(message, log_file, quiet, error=True)
 
             error = True

@@ -132,7 +132,6 @@ def make_mmseqs2_database(
         fasta_file,
         db_dir,
         mmseqs2_database,
-        mmseqs2_index,
         nproc,
         log_file,
         quiet,
@@ -159,29 +158,7 @@ def make_mmseqs2_database(
 
         sys.exit(1)
 
-    message = ("Constructing MMseqs2 database index {0} using {1} cores."
-            "".format(mmseqs2_index, nproc))
-    shared.give_user_feedback(message, log_file, quiet)
-
-    command = [
-            "mmseqs", "createindex",
-            mmseqs2_database,
-            mmseqs2_index,
-            "--threads", str(nproc),
-            "--remove-tmp-files", "1"
-            ]
-    if not verbose:
-        command += ["-v", "0"]
-
-    try:
-        subprocess.check_call(command)
-    except:
-        message = "MMseqs2 database index could not be created."
-        shared.give_user_feedback(message, log_file, quiet, error=True)
-
-        sys.exit(1)
-
-    message = "MMseqs2 database and database index constructed."
+    message = "MMseqs2 database constructed."
     shared.give_user_feedback(message, log_file, quiet)
 
     return
@@ -447,7 +424,6 @@ def prepare(step_list, args):
                 args.db_fasta,
                 args.database_folder,
                 args.mmseqs2_database,
-                args.mmseqs2_index,
                 args.nproc,
                 args.log_file,
                 args.quiet,
@@ -507,7 +483,7 @@ def run():
     if not os.path.exists(args.diamond_database):
         step_list.append("make_diamond_database")
 
-    if not os.path.exists(args.mmseqs2_index):
+    if not os.path.exists(args.mmseqs2_database):
         step_list.append("make_mmseqs2_database")
 
     if not os.path.exists(args.fastaid2LCAtaxid_file):

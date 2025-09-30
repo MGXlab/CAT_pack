@@ -39,6 +39,7 @@ def parse_arguments():
     shared.add_argument(
             optional, "nproc", False, default=multiprocessing.cpu_count())
     shared.add_argument(optional, "compress", False)
+    shared.add_argument(optional, "tmpdir", False)
     shared.add_argument(optional, "quiet", False)
     shared.add_argument(optional, "verbose", False)
     shared.add_argument(optional, "no_log", False)
@@ -344,7 +345,6 @@ def run():
                 args.aligner,
                 args.diamond_database,
                 args.mmseqs2_database,
-                args.mmseqs2_index,
                 args.fastaid2LCAtaxid_file,
                 args.taxids_with_multiple_offspring_file,
                 step_list,

@@ -4,4 +4,4 @@ __authors__ = [
         "F. A. Bastiaan von Meijenfeldt", "Nikos Pappas", "Ernestina Hauptfeld"
         ]
 __version__ = "6.1beta"
-__date__ = "25 September, 2024"
+__date__ = "30 September, 2025"

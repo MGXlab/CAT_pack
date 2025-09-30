@@ -417,6 +417,19 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 action="store_true",
                 help=help_
                 )
+    elif dest == "tmpdir":
+        if help_ is None:
+            help_ = ("Directory for temporary files (default: directory to "
+                    "which output files are written).")
+        argument_group.add_argument(
+                "--tmpdir",
+                dest="tmpdir",
+                metavar="",
+                required=required,
+                type=str,
+                action=PathAction,
+                help=help_
+                )
     elif dest == "quiet":
         if help_ is None:
             help_ = "Suppress verbosity."
@@ -716,19 +729,6 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 default=default,
                 help=help_
                 )
-    elif dest == "tmpdir":
-        if help_ is None:
-            help_ = ("Directory for temporary DIAMOND files (default: "
-                    "directory to which output files are written).")
-        argument_group.add_argument(
-                "--tmpdir",
-                dest="tmpdir",
-                metavar="",
-                required=required,
-                type=str,
-                action=PathAction,
-                help=help_
-                )
     elif dest == "top":
         if help_ is None:
             help_ = (
@@ -785,7 +785,6 @@ def add_all_diamond_arguments(argument_group):
     add_argument(argument_group, "no_self_hits", False)
     add_argument(argument_group, "block_size", False, default=12.0)
     add_argument(argument_group, "index_chunks", False, default=1)
-    add_argument(argument_group, "tmpdir", False)
     add_argument(argument_group, "top", False, default=11)
 
     return
@@ -840,9 +839,6 @@ def expand_arguments(args, rat=False):
         mmseqs2_database_name = "{0}.mmseqs2".format(args.common_prefix)
         mmseqs2_database_path = str(
                 database_folder_path / pathlib.Path(mmseqs2_database_name))
-        mmseqs2_index_name = "{0}.mmseqs2.tmp".format(args.common_prefix)
-        mmseqs2_index_path = str(
-                database_folder_path / pathlib.Path(mmseqs2_index_name))
 
         taxonomy_folder_path = str(
                 pathlib.Path(args.db_dir) / pathlib.Path("tax"))
@@ -867,7 +863,6 @@ def expand_arguments(args, rat=False):
         setattr(args, "taxonomy_folder", taxonomy_folder_path)
         setattr(args, "diamond_database", diamond_database_path)
         setattr(args, "mmseqs2_database", mmseqs2_database_path)
-        setattr(args, "mmseqs2_index", mmseqs2_index_path)
         setattr(args, "fastaid2LCAtaxid_file", fastaid2LCAtaxid_file)
         setattr(
                 args,
@@ -955,7 +950,6 @@ def explore_database_folder(args):
     fasta_file = None
     diamond_database = None
     mmseqs2_database = None
-    mmseqs2_index = None
     fastaid2LCAtaxid_file = None
     taxids_with_multiple_offspring_file = None
 
@@ -986,11 +980,6 @@ def explore_database_folder(args):
                         sys.exit("Someting wrong!")
                     mmseqs2_database = "{0}{1}".format(
                             args.database_folder, entry.name)
-                elif entry.is_dir() and entry.name.endswith(".mmseqs2.tmp"):
-                    if mmseqs2_index is not None:
-                        sys.exit("Someting wrong!")
-                    mmseqs2_index = "{0}{1}".format(
-                            args.database_folder, entry.name)
                 elif entry.is_file() and entry.name.endswith(
                         "fastaid2LCAtaxid"):
                     if fastaid2LCAtaxid_file is not None:
@@ -1007,7 +996,6 @@ def explore_database_folder(args):
     setattr(args, "db_fasta", fasta_file)
     setattr(args, "diamond_database", diamond_database)
     setattr(args, "mmseqs2_database", mmseqs2_database)
-    setattr(args, "mmseqs2_index", mmseqs2_index)
     setattr(args, "fastaid2LCAtaxid_file", fastaid2LCAtaxid_file)
     setattr(
             args,
@@ -1223,12 +1211,14 @@ def run_mmseqs2(args):
             "\t\t\tdatabase: {1}\n"
             "\t\t\tsensitivity: {2}\n"
             "\t\t\tnumber of cores: {3}\n"
-            "\t\t\tcompress: {4}\n"
-            "\t\t\tsplit memory limit: {5}".format(
+            "\t\t\ttmpdir: {4}\n"
+            "\t\t\tcompress: {5}\n"
+            "\t\t\tsplit memory limit: {6}".format(
                 args.proteins_fasta,
                 args.mmseqs2_database,
                 args.mmseqs2_sensitivity,
                 args.nproc,
+                args.tmpdir,
                 compression,
                 args.split_memory_limit
                 )
@@ -1241,7 +1231,7 @@ def run_mmseqs2(args):
                 args.proteins_fasta,
                 args.mmseqs2_database,
                 args.alignment_file,
-                args.mmseqs2_index,
+                args.tmpdir,
                 "-s", "{0}".format(args.mmseqs2_sensitivity),
                 "--threads", "{0}".format(args.nproc),
                 "--compressed", compression,
