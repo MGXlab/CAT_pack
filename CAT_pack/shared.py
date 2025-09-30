@@ -760,6 +760,19 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 default=default,
                 help=help_
                 )
+    elif dest == "split_memory_limit":
+        if help_ is None:
+            help_ = ("MMseqs2 max memory per split. E.g. 10M, 1G. (default: "
+                    "all available memory).")
+        argument_group.add_argument(
+                "--split_memory_limit",
+                dest="split_memory_limit",
+                metavar="",
+                required=required,
+                type=str,
+                default=default,
+                help=help_
+                )
     else:
         sys.exit("Unknown parser dest {0}.".format(dest))
 
@@ -781,6 +794,7 @@ def add_all_diamond_arguments(argument_group):
 def add_all_mmseqs2_arguments(argument_group):
     add_argument(argument_group, "path_to_mmseqs2", False, default="mmseqs")
     add_argument(argument_group, "mmseqs2_sensitivity", False, default=5.7)
+    add_argument(argument_group, "split_memory_limit", False, default="0")
 
     return
 
@@ -1059,7 +1073,7 @@ def give_user_feedback(
 
 
 def import_contigs(contigs_fasta, log_file, quiet):
-    message = "Parsing contigs fasta {0}".format(contigs_fasta)
+    message = "Parsing contigs fasta {0}.".format(contigs_fasta)
     give_user_feedback(message, log_file, quiet)
 
     header2seq = {}
@@ -1182,7 +1196,7 @@ def run_diamond(args, blast="blastp", prot_fasta="", top=0):
         if args.no_self_hits:
             command += ["--no-self-hits"]
         
-        messsage = " ".join(command)
+        message = "Running command: {0}".format(" ".join(command))
         give_user_feedback(message, args.log_file, args.quiet)
         
         subprocess.check_call(command)
@@ -1209,12 +1223,14 @@ def run_mmseqs2(args):
             "\t\t\tdatabase: {1}\n"
             "\t\t\tsensitivity: {2}\n"
             "\t\t\tnumber of cores: {3}\n"
-            "\t\t\tcompress: {4}".format(
+            "\t\t\tcompress: {4}\n"
+            "\t\t\tsplit memory limit: {5}".format(
                 args.proteins_fasta,
                 args.mmseqs2_database,
                 args.mmseqs2_sensitivity,
                 args.nproc,
                 compression,
+                args.split_memory_limit
                 )
             )
     give_user_feedback(message, args.log_file, args.quiet)
@@ -1229,12 +1245,13 @@ def run_mmseqs2(args):
                 "-s", "{0}".format(args.mmseqs2_sensitivity),
                 "--threads", "{0}".format(args.nproc),
                 "--compressed", compression,
+                "--split-memory-limit", args.split_memory_limit
                 ]
 
         if not args.verbose:
             command += ["-v", "0"]
 
-        messsage = " ".join(command)
+        message = "Running command: {0}".format(" ".join(command))
         give_user_feedback(message, args.log_file, args.quiet)
         
         subprocess.check_call(command)
@@ -1518,7 +1535,7 @@ def import_contig_names(fasta_file, log_file, quiet):
 
 
 def import_ORFs(proteins_fasta, log_file, quiet):
-    message = "Parsing ORF file {0}".format(proteins_fasta)
+    message = "Parsing ORF file {0}.".format(proteins_fasta)
     give_user_feedback(message, log_file, quiet)
 
     contig2ORFs = {}
