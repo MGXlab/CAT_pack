@@ -1202,6 +1202,8 @@ def run_mmseqs2(args):
         compression = "1"
     else:
         compression = "0"
+
+    tmpdir = "{0}tmp".format(args.tmpdir)
         
     message = (
             "Homology search with MMseqs2 is starting. Please be patient. "
@@ -1218,7 +1220,7 @@ def run_mmseqs2(args):
                 args.mmseqs2_database,
                 args.mmseqs2_sensitivity,
                 args.nproc,
-                args.tmpdir,
+                tmpdir,
                 compression,
                 args.split_memory_limit
                 )
@@ -1231,7 +1233,7 @@ def run_mmseqs2(args):
                 args.proteins_fasta,
                 args.mmseqs2_database,
                 args.alignment_file,
-                args.tmpdir,
+                tmpdir,
                 "-s", "{0}".format(args.mmseqs2_sensitivity),
                 "--threads", "{0}".format(args.nproc),
                 "--compressed", compression,

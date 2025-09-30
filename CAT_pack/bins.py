@@ -447,7 +447,7 @@ def run():
             contig_names, contig2ORFs, args.log_file, args.quiet)
     
     if "align" in step_list:
-        args.run_aligner(args)
+        shared.run_aligner(args)
 
     ORF2hits, all_hits = shared.parse_tabular_alignment(
             args.alignment_file, args.one_minus_r, args.log_file, args.quiet)
