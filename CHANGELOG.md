@@ -1,8 +1,8 @@
 # Changelog
 
-## 6.1 [beta20250925]
+## 6.1 [beta20250930]
 * Pyrodigal support enables multi-threading of gene predictions.
-* MMseqs2 support as alternative for DIAMOND.
+* MMseqs2 support as speedier alternative for DIAMOND.
 * DIAMOND modes [faster, fast, mid-sensitive, sensitive, more-sensitive, very-sensitive, ultra-sensitive].
 
 ## 6.0.1
