@@ -146,6 +146,7 @@ def make_mmseqs2_database(
             fasta_file,
             mmseqs2_database,
             "--threads", str(nproc),
+            "--compressed", "1"
             ]
     if not verbose:
         command += ["-v", "0"]

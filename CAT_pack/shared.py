@@ -8,6 +8,7 @@ import multiprocessing.pool
 import os
 import pathlib
 import pyrodigal
+import shutil
 import subprocess
 import sys
 
@@ -420,7 +421,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "tmpdir":
         if help_ is None:
             help_ = ("Directory for temporary files (default: directory to "
-                    "which output files are written).")
+                    "which output files are written/tmp).")
         argument_group.add_argument(
                 "--tmpdir",
                 dest="tmpdir",
@@ -823,7 +824,7 @@ def expand_arguments(args, rat=False):
                     pass
 
         if not args.tmpdir:
-            tmpdir = "{0}/".format(args.out_prefix.rsplit("/", 1)[0])
+            tmpdir = "{0}/tmp".format(args.out_prefix.rsplit("/", 1)[0])
 
             setattr(args, "tmpdir", tmpdir)
 
@@ -1203,8 +1204,6 @@ def run_mmseqs2(args):
     else:
         compression = "0"
 
-    tmpdir = "{0}tmp".format(args.tmpdir)
-        
     message = (
             "Homology search with MMseqs2 is starting. Please be patient. "
             "Do not forget to cite MMseqs2 when using CAT or BAT in your "
@@ -1220,7 +1219,7 @@ def run_mmseqs2(args):
                 args.mmseqs2_database,
                 args.mmseqs2_sensitivity,
                 args.nproc,
-                tmpdir,
+                args.tmpdir,
                 compression,
                 args.split_memory_limit
                 )
@@ -1228,12 +1227,14 @@ def run_mmseqs2(args):
     give_user_feedback(message, args.log_file, args.quiet)
 
     try:
+        # Note that the --compressed flag only compressed the intermediate
+        # output files, not the tabular BLAST+6 output.
         command = [
                 args.path_to_mmseqs2, "easy-search",
                 args.proteins_fasta,
                 args.mmseqs2_database,
                 args.alignment_file,
-                tmpdir,
+                args.tmpdir,
                 "-s", "{0}".format(args.mmseqs2_sensitivity),
                 "--threads", "{0}".format(args.nproc),
                 "--compressed", compression,
@@ -1247,6 +1248,14 @@ def run_mmseqs2(args):
         give_user_feedback(message, args.log_file, args.quiet)
         
         subprocess.check_call(command)
+
+        if args.compress:
+            gzip_file(
+                    args.alignment_file,
+                    k=False,
+                    log_file=args.log_file,
+                    quiet=args.quiet
+                    )
     except:
         message = "MMseqs2 finished abnormally."
         give_user_feedback(message, args.log_file, args.quiet, error=True)
@@ -1601,8 +1610,24 @@ def parse_tabular_alignment(alignment_file, one_minus_r, log_file, quiet):
     return (ORF2hits, all_hits)
 
 
+def gzip_file(file_path, k=False, log_file=None, quiet=False):
+    message = "Gzipping {0}.".format(file_path)
+    give_user_feedback(message, log_file, quiet, show_time=True)
+
+    with (
+            open(file_path, "rb") as f1,
+            gzip.open("{0}.gz".format(file_path), "wb") as outf1
+            ):
+        shutil.copyfileobj(f1, outf1)
+
+    if not k:
+        os.remove(file_path)
+
+    return
+
+
 def is_gz(file_path):
-    """Check if given file_paht is gzipped based on suffix."""
+    """Check if given file_path is gzipped based on suffix."""
     if isinstance(file_path, pathlib.Path):
         file_path = file_path.name
     return file_path.endswith(".gz") or file_path.endswith(".z")
