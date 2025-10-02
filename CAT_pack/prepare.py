@@ -115,6 +115,9 @@ def make_diamond_database(
         command += ["--quiet"]
 
     try:
+        message = "Running command: {0}".format(" ".join(command))
+        give_user_feedback(message, log_file, quiet)
+
         subprocess.check_call(command)
     except:
         message = "DIAMOND database could not be created."
@@ -152,6 +155,9 @@ def make_mmseqs2_database(
         command += ["-v", "0"]
 
     try:
+        message = "Running command: {0}".format(" ".join(command))
+        give_user_feedback(message, log_file, quiet)
+
         subprocess.check_call(command)
     except:
         message = "MMseqs2 database could not be created."
