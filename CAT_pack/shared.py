@@ -1090,15 +1090,15 @@ def run_pyrodigal(
         log_file,
         quiet
         ):
+    header2seq, contig_order = import_contigs(contigs_fasta, log_file, quiet)
+            
     message = (
         "Running Pyrodigal for ORF prediction. Files {0} and {1} will be "
         "generated. Do not forget to cite Pyrodigal and Prodigal when using "
         "CAT or BAT in your publication.".format(proteins_fasta, proteins_gff)
     )
     give_user_feedback(message, log_file, quiet)
-
-    header2seq, contig_order = import_contigs(contigs_fasta, log_file, quiet)
-
+            
     gene_finder = pyrodigal.GeneFinder(meta=True)
     with multiprocessing.pool.ThreadPool(processes=nproc) as pool:
         predictions = pool.map(
