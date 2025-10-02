@@ -72,7 +72,7 @@ def parse_arguments():
         if args.r > 11 and args.alignment_file:
             sys.exit(
                     "error: [-r / --range] can only be set higher than 11 in "
-                    "combination with [-a / --diamond_alignment] with the "
+                    "combination with [-a / --alignment_table] with the "
                     "[--I_know_what_Im_doing] flag. See README.md as to why "
                     "this is the case."
                     )
