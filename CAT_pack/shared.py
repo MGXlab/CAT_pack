@@ -50,7 +50,7 @@ def timestamp():
 def add_argument(argument_group, dest, required, default=None, help_=None):
     if dest == "contigs_fasta":
         if help_ is None:
-            help_ = "Path to contigs fasta file."
+            help_ = "<FILE> Contigs fasta file."
         argument_group.add_argument(
                 "-c",
                 "--contigs_fasta",
@@ -63,7 +63,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "db_fasta":
         if help_ is None:
-            help_ = "Path to fasta file containing all sequences."
+            help_ = "<FILE> Fasta file containing all sequences."
         argument_group.add_argument(
                 "--db_fasta",
                 dest="db_fasta",
@@ -75,7 +75,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "bin_fasta_or_folder":
         if help_ is None:
-            help_ = "Path to bin fasta file or to directory containing bins."
+            help_ = "<FILE|DIR> Bin fasta file or directory containing bins."
         argument_group.add_argument(
                 "-b",
                 "--bin_fasta",
@@ -90,7 +90,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "db_dir":
         if help_ is None:
-            help_ = ("Path to directory where CAT/BAT/RAT database files will "
+            help_ = ("<DIR> Directory where CAT/BAT/RAT database files will "
                     "be created.")
         argument_group.add_argument(
                 "--db_dir",
@@ -103,7 +103,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "database_folder":
         if help_ is None:
-            help_ = "Path to directory that contains database files."
+            help_ = "<DIR> Directory that contains database files."
         argument_group.add_argument(
                 "-d",
                 "--database_folder",
@@ -117,7 +117,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "taxonomy_folder":
         if help_ is None:
-            help_ = "Path to directory that contains taxonomy files."
+            help_ = "<DIR> Directory that contains taxonomy files."
         argument_group.add_argument(
                 "-t",
                 "--taxonomy_folder",
@@ -131,7 +131,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "names_dmp":
         if help_ is None:
-            help_ = "Path to names.dmp"
+            help_ = "<FILE> Names.dmp"
         argument_group.add_argument(
                 "--names",
                 dest="names_dmp",
@@ -144,7 +144,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "nodes_dmp":
         if help_ is None:
-            help_ = "Path to nodes.dmp"
+            help_ = "<FILE> Nodes.dmp"
         argument_group.add_argument(
                 "--nodes",
                 dest="nodes_dmp",
@@ -157,7 +157,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "acc2tax":
         if help_ is None:
-            help_ = "Path to accession2taxid.txt file. Can be gzipped."
+            help_ = "<FILE> Accession2taxid.txt file. Can be gzipped."
         argument_group.add_argument(
                 "--acc2tax",
                 dest="acc2tax",
@@ -171,7 +171,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "cleanup":
         if help_ is None:
             help_ = ("Remove unnecessary files after all data have been "
-                    "processed.")
+                    "processed [off].")
         argument_group.add_argument(
                 "--cleanup",
                 dest="cleanup",
@@ -181,8 +181,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "bin_suffix":
         if help_ is None:
-            help_ = "Suffix of bins in bin directory (default: {0}).".format(
-                    default)
+            help_ = ("<STR> Suffix of bins in bin directory [{0}]."
+                    "".format(default))
         argument_group.add_argument(
                 "-s",
                 "--bin_suffix",
@@ -195,7 +195,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "r":
         if help_ is None:
-            help_ = "r parameter [0-100] (default: {0:.0f}).".format(default)
+            help_ = "<0-100> r parameter [{0:.0f}].".format(default)
         argument_group.add_argument(
                 "-r",
                 "--range",
@@ -210,7 +210,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "f":
         if help_ is None:
-            help_ = "f parameter [0-0.99] (default: {0:.2f}).".format(default)
+            help_ = "<0-0.99> f parameter [{0:.2f}].".format(default)
         argument_group.add_argument(
                 "-f",
                 "--fraction",
@@ -225,7 +225,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "out_prefix":
         if help_ is None:
-            help_ = "Prefix for output files (default: {0}).".format(default)
+            help_ = "<STR> Prefix for output files [{0}].".format(
+                    default)
         argument_group.add_argument(
                 "-o",
                 "--out_prefix",
@@ -239,7 +240,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "db":
         if help_ is None:
-            help_ = "Either nr  or GTDB."
+            help_ = "<nr|GTDB>."
         argument_group.add_argument(
                 "--db",
                 dest="db",
@@ -252,7 +253,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "output_dir":
         if help_ is None:
-            help_ = "Path to directory where data will be stored."
+            help_ = "<DIR> Directory where data will be stored."
         argument_group.add_argument(
                 "-o",
                 "--output_dir",
@@ -264,7 +265,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "proteins_fasta":
         if help_ is None:
-            help_ = ("Path to predicted proteins fasta file. If supplied, the "
+            help_ = ("<FILE> Predicted proteins fasta file. If supplied, the "
                     "protein prediction step is skipped.")
         argument_group.add_argument(
                 "-p",
@@ -279,11 +280,10 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "alignment_file":
         if help_ is None:
             help_ = (
-                    "Path to alignment table (in BLAST+6 format). If "
-                    "supplied, the alignment step is skipped and "
-                    "classification is carried out directly. A predicted "
-                    "proteins fasta file should also be supplied "
-                    "with argument [-p / --proteins]."
+                    "<FILE> Alignment table (in BLAST+6 format). If supplied, "
+                    "the alignment step is skipped and classification is "
+                    "carried out directly. A predicted proteins fasta file "
+                    "should also be supplied with argument --proteins_fasta."
                     )
         argument_group.add_argument(
                 "-a",
@@ -297,7 +297,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "aligner":
         if help_ is None:
-            help_ = "Protein aligner [DIAMOND, MMseqs2] (default: DIAMOND)."
+            help_ = "<DIAMOND|MMseqs2> Protein aligner [DIAMOND]."
         argument_group.add_argument(
                 "--aligner",
                 dest="aligner",
@@ -310,7 +310,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "common_prefix":
         if help_ is None:
-            help_ = "Prefix for all files that will be created"
+            help_ = ("<STR> Prefix for all files that will be created [{0}]."
+                    "".format(default))
         argument_group.add_argument(
                 "--common_prefix",
                 dest="common_prefix",
@@ -322,8 +323,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "path_to_diamond":
         if help_ is None:
-            help_ = ("Path to DIAMOND binaries. Supply if CAT/BAT/RAT cannot "
-                    "find DIAMOND.")
+            help_ = ("<EXC> Path to DIAMOND binaries. Supply if CAT/BAT/RAT "
+                    "cannot find DIAMOND.")
         argument_group.add_argument(
                 "--path_to_diamond",
                 dest="path_to_diamond",
@@ -336,8 +337,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "path_to_mmseqs2":
         if help_ is None:
-            help_ = ("Path to MMseqs2 binaries. Supply if CAT/BAT/RAT cannot "
-                    "find MMseqs2.")
+            help_ = ("<EXC> Path to MMseqs2 binaries. Supply if CAT/BAT/RAT "
+                    "cannot find MMseqs2.")
         argument_group.add_argument(
                 "--path_to_mmseqs2",
                 dest="path_to_mmseqs2",
@@ -350,7 +351,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "path_to_bwa":
         if help_ is None:
-            help_ = "Path to bwa binaries. Supply if RAT cannot find bwa."
+            help_ = ("<EXC> Path to bwa binaries. Supply if RAT cannot find "
+                    "bwa.")
         argument_group.add_argument(
                 "--path_to_bwa",
                 dest="path_to_bwa",
@@ -363,8 +365,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "path_to_samtools":
         if help_ is None:
-            help_ = ("Path to Samtools binaries. Supply if RAT cannot find "
-                    "Samtools.")
+            help_ = ("<EXC> Path to Samtools binaries. Supply if RAT cannot "
+                    "find Samtools.")
         argument_group.add_argument(
                 "--path_to_samtools",
                 dest="path_to_samtools",
@@ -377,7 +379,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "no_stars":
         if help_ is None:
-            help_ = "Suppress marking of suggestive taxonomic assignments."
+            help_ = ("Suppress marking of suggestive taxonomic assignments "
+                    "[off].")
         argument_group.add_argument(
                 "--no_stars",
                 dest="no_stars",
@@ -385,9 +388,26 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 action="store_true",
                 help=help_
                 )
+    elif dest == "top":
+        if help_ is None:
+            help_ = (
+                    "<0-100> Governs hits within range of best hit that are "
+                    "written to the alignment file [{0}]. This is not the "
+                    "--range parameter! See README.md.".format(default)
+                    )
+        argument_group.add_argument(
+                "--top",
+                dest="top",
+                metavar="",
+                required=required,
+                type=float,
+                choices=[i for i in range(101)],
+                default=default,
+                help=help_
+                )
     elif dest == "nproc":
         if help_ is None:
-            help_ = "Number of cores to deploy (default: maximum)."
+            help_ = "<INT> Number of cores to deploy [maximum]."
         argument_group.add_argument(
                 "-n",
                 "--nproc",
@@ -400,7 +420,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "compress":
         if help_ is None:
-            help_ = "Compress alignment output file (default: not enabled)."
+            help_ = "Compress alignment output file [off]."
         argument_group.add_argument(
                 "--compress",
                 dest="compress",
@@ -410,7 +430,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "force":
         if help_ is None:
-            help_ = "Force overwrite existing files."
+            help_ = "Force overwrite existing files [off]."
         argument_group.add_argument(
                 "--force",
                 dest="force",
@@ -420,8 +440,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "tmpdir":
         if help_ is None:
-            help_ = ("Directory for temporary files (default: directory to "
-                    "which output files are written/tmp).")
+            help_ = ("<DIR> Location for temporary files [directory to which "
+                    "output files are written/tmp].")
         argument_group.add_argument(
                 "--tmpdir",
                 dest="tmpdir",
@@ -433,7 +453,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "quiet":
         if help_ is None:
-            help_ = "Suppress verbosity."
+            help_ = "Suppress verbosity [off]."
         argument_group.add_argument(
                 "-q",
                 "--quiet",
@@ -444,7 +464,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "verbose":
         if help_ is None:
-            help_ = "Increase verbosity."
+            help_ = "Increase verbosity [off]."
         argument_group.add_argument(
                 "--verbose",
                 dest="verbose",
@@ -454,7 +474,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "no_log":
         if help_ is None:
-            help_ = "Suppress log file."
+            help_ = "Suppress log file [off]."
         argument_group.add_argument(
                 "--no_log",
                 dest="no_log",
@@ -468,7 +488,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
         argument_group.add_argument("-h", "--help", action="help", help=help_)
     elif dest == "IkwId":
         if help_ is None:
-            help_ = "Flag for experimental features."
+            help_ = "Flag for experimental features [off]."
         argument_group.add_argument(
                 "--I_know_what_Im_doing",
                 dest="IkwId",
@@ -478,7 +498,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "input_file":
         if help_ is None:
-            help_ = "Path to input file."
+            help_ = "<FILE> Input file."
         argument_group.add_argument(
                 "-i",
                 "--input_file",
@@ -491,7 +511,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "output_file":
         if help_ is None:
-            help_ = "Path to output file."
+            help_ = "<FILE> Output file."
         argument_group.add_argument(
                 "-o",
                 "--output_file",
@@ -504,8 +524,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "only_official":
         if help_ is None:
-            help_ = ("Only output official raxonomic ranks (superkingdom, "
-                    "phylum, class, order, family, genus, species).")
+            help_ = ("Only output official taxonomic ranks (superkingdom, "
+                    "phylum, class, order, family, genus, species) [off].")
         argument_group.add_argument(
                 "--only_official",
                 dest="only_official",
@@ -516,7 +536,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "exclude_scores":
         if help_ is None:
             help_ = ("Do not include bit-score support scores in the lineage "
-                    "of a classification output file.")
+                    "of a classification output file [off].")
         argument_group.add_argument(
                 "--exclude_scores",
                 dest="exclude_scores",
@@ -527,7 +547,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "mode":
         if help_ is None:
             help_ = (
-                    "classification mode. 'mcr': integrate annotations from "
+                    "Classification mode. 'mcr': integrate annotations from "
                     "MAGs, contigs, and reads; 'cr': integrate annotations "
                     "from contigs and reads; 'mr': integrate annotations from "
                     "MAGs and reads."
@@ -672,25 +692,23 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "diamond_mode":
         if help_ == None:
             help_ = (
-                    "DIAMOND mode [faster, fast, mid-sensitive, "
-                    "sensitive, more-sensitive, very-sensitive, "
-                    "ultra-sensitive] (default: {0}).".format(default)
+                    "<faster, fast, mid-sensitive, sensitive, more-sensitive, "
+                    "very-sensitive, ultra-sensitive> [{0}].".format(default)
                     )
-            argument_group.add_argument(
-                    "--diamond_mode",
-                    dest="diamond_mode",
-                    metavar="",
-                    required=required,
-                    type=str,
-                    choices=["faster", "fast", "mid-sensitive", "sensitive",
-                        "more-sensitive", "very-sensitive", "ultra-sensitive"],
-                    default=default,
-                    help=help_
-                    )
+        argument_group.add_argument(
+                "--diamond_mode",
+                dest="diamond_mode",
+                metavar="",
+                required=required,
+                type=str,
+                choices=["faster", "fast", "mid-sensitive", "sensitive",
+                    "more-sensitive", "very-sensitive", "ultra-sensitive"],
+                default=default,
+                help=help_
+                )
     elif dest == "no_self_hits":
         if help_ is None:
-            help_ = ("Do not report identical self hits by DIAMOND (default: "
-                    "not enabled).")
+            help_ = "Do not report identical self hits by DIAMOND [off]."
         argument_group.add_argument(
                 "--no_self_hits",
                 dest="no_self_hits",
@@ -701,7 +719,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "block_size":
         if help_ is None:
             help_ = (
-                    "DIAMOND block-size parameter (default: {0}). Lower "
+                    "<FLOAT> DIAMOND block-size parameter [{0}]. Lower "
                     "numbers will decrease memory and temporary disk space "
                     "usage.".format(default)
                     )
@@ -717,8 +735,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "index_chunks":
         if help_ is None:
             help_ = (
-                    "DIAMOND index-chunks parameter (default: {0}). Set to 4 "
-                    "on low memory machines. The parameter has no effect on "
+                    "<INT> DIAMOND index-chunks parameter [{0}]. Set to 4 on "
+                    "low memory machines. The parameter has no effect on "
                     "temporary disk space usage.".format(default)
                     )
         argument_group.add_argument(
@@ -730,28 +748,10 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 default=default,
                 help=help_
                 )
-    elif dest == "top":
-        if help_ is None:
-            help_ = (
-                    "DIAMOND top parameter [0-100] (default: {0}). Governs "
-                    "hits within range of best hit that are written to the "
-                    "alignment file. This is not the [-r / --range] "
-                    "parameter! See README.md.".format(default)
-                    )
-        argument_group.add_argument(
-                "--top",
-                dest="top",
-                metavar="",
-                required=required,
-                type=float,
-                choices=[i for i in range(101)],
-                default=default,
-                help=help_
-                )
     elif dest == "mmseqs2_sensitivity":
         if help_ is None:
-            help_ = ("MMseqs2 sensitivity (-s) parameter [1-7.5] (default: "
-                    "{0}). ".format(default))
+            help_ = ("<1-7.5> MMseqs2 sensitivity (-s) parameter [1-7.5] "
+                    "[{0}].".format(default))
         argument_group.add_argument(
                 "--sensitivity",
                 dest="mmseqs2_sensitivity",
@@ -763,8 +763,8 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 )
     elif dest == "split_memory_limit":
         if help_ is None:
-            help_ = ("MMseqs2 max memory per split. E.g. 10M, 1G. (default: "
-                    "all available memory).")
+            help_ = ("<STR> MMseqs2 max memory per split. E.g. 10M, 1G. [all "
+                    "available memory].")
         argument_group.add_argument(
                 "--split_memory_limit",
                 dest="split_memory_limit",
@@ -786,7 +786,6 @@ def add_all_diamond_arguments(argument_group):
     add_argument(argument_group, "no_self_hits", False)
     add_argument(argument_group, "block_size", False, default=12.0)
     add_argument(argument_group, "index_chunks", False, default=1)
-    add_argument(argument_group, "top", False, default=11)
 
     return
 
@@ -1249,6 +1248,21 @@ def run_mmseqs2(args):
         
         subprocess.check_call(command)
 
+        # Subset the output table to save disk space in line with the DIAMOND
+        # --top parameter behaviour. I rename the files first so that I could
+        # add a flag later to skip this step if it takes too
+        # much time.
+        tmp_alignment_file = "{0}.tmp".format(args.alignment_file)
+        os.rename(args.alignment_file, tmp_alignment_file)
+        top_tabular_alignment(
+                tmp_alignment_file,
+                args.alignment_file,
+                args.top,
+                args.log_file,
+                args.quiet
+                )
+        os.remove(tmp_alignment_file)
+
         if args.compress:
             gzip_file(
                     args.alignment_file,
@@ -1555,6 +1569,31 @@ def import_ORFs(proteins_fasta, log_file, quiet):
                 contig2ORFs[contig].append(ORF)
 
     return contig2ORFs
+
+
+def top_tabular_alignment(alignment_file, out_file, top, log_file, quiet):
+    """This code manually does what DIAMOND does with the --top parameter.
+    Currently, it is used for MMseqs2 alignment output.
+    """
+    message = "Subsetting alignment table based on --top {0}.".format(top)
+    give_user_feedback(message, log_file, quiet)
+
+    with (
+            optionally_compressed_handle(alignment_file, "r") as f,
+            open(out_file, "w") as outf
+            ):
+        q, top_bitscore = None, None
+        for line in f:
+            line = line.rstrip().split("\t")
+            if line[0] != q:
+                q = line[0]
+                top_bitscore = decimal.Decimal(line[11])
+            bitscore = decimal.Decimal(line[11])
+
+            if bitscore >= (100 - top) / 100 * top_bitscore:
+                outf.write("\t".join(line))
+
+    return
 
 
 def parse_tabular_alignment(alignment_file, one_minus_r, log_file, quiet):

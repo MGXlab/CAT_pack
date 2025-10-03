@@ -25,7 +25,7 @@ def parse_arguments():
                 "Currently supports the NCBI non-redundant (nr) database "
                 "and the GTDB database."
                 ),
-        usage=("CAT_pack download --db (nr | GTDB) -o DIR [options] "
+        usage=("CAT_pack download --db <nr|GTDB> -o <DIR> [options] "
             "[-h / --help]"),
         add_help=False
         )

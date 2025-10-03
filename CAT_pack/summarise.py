@@ -12,7 +12,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser(
             prog="CAT_pack summarise",
             description="Summarise a named CAT or BAT classification file.",
-            usage=("CAT_pack summarise -i FILE -o FILE (-c FILE) "
+            usage=("CAT_pack summarise -i <FILE> -o <FILE> (-c <FILE>) "
                 "[options] [-h / --help]"),
             add_help=False
             )
@@ -38,7 +38,7 @@ def parse_arguments():
             optional,
             "contigs_fasta",
             False,
-            help_=("Path to contigs fasta file. Required if you want to "
+            help_=("<FILE> Contigs fasta file. Required if you want to "
                 "summarise a contig classification file.")
             )
     shared.add_argument(optional, "force", False)

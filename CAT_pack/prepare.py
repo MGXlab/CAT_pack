@@ -21,11 +21,11 @@ def parse_arguments():
             prog="CAT_pack prepare",
             description="Construct CAT/BAT/RAT database files.",
             usage=(
-                "CAT_pack prepare --db_fasta FILE "
-                "--acc2tax FILE "
-                "--names FILE "
-                "--nodes FILE "
-                "--db_dir DIR "
+                "CAT_pack prepare --db_fasta <FILE> "
+                "--acc2tax <FILE> "
+                "--names <FILE> "
+                "--nodes <FILE> "
+                "--db_dir <DIR> "
                 "[options] [-h / --help]"
                 ),
             add_help=False
@@ -44,7 +44,6 @@ def parse_arguments():
             "common_prefix",
             False,
             default="{0}_CAT_pack".format(date),
-            help_="Prefix for all files to be created."
             )
     shared.add_argument(
             optional, "nproc", False, default=multiprocessing.cpu_count())

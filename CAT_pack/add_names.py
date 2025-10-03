@@ -14,7 +14,7 @@ def parse_arguments():
             prog="CAT_pack add_names",
             description=(
                 "Add taxonomic names to CAT, BAT, or RAT output files."),
-            usage=("CAT_pack add_names -i FILE -o FILE -t DIR [options] "
+            usage=("CAT_pack add_names -i <FILE> -o <FILE> -t <DIR> [options] "
                 "[-h / --help]"),
             add_help=False
             )
@@ -24,8 +24,8 @@ def parse_arguments():
             required,
             "input_file",
             True,
-            help_=("Path to input file. Can be classification or ORF2LCA "
-                "output file from CAT, BAT or RAT.")
+            help_=("<FILE> Can be classification or ORF2LCA output file from "
+                "CAT, BAT or RAT.")
             )
     shared.add_argument(required, "output_file", True)
     shared.add_argument(required, "taxonomy_folder", True)

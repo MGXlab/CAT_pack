@@ -16,7 +16,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser(
             prog="CAT_pack bins",
             description="Run Bin Annotation Tool (BAT).",
-            usage=("CAT_pack bins -b DIR / FILE -d DIR -t DIR [options] "
+            usage=("CAT_pack bins -b <DIR|FILE> -d <DIR> -t <DIR> [options] "
                 "[-h / --help]"),
             add_help=False
             )
@@ -36,6 +36,7 @@ def parse_arguments():
     shared.add_argument(optional, "alignment_file", False)
     shared.add_argument(optional, "no_stars", False)
     shared.add_argument(optional, "force", False)
+    shared.add_argument(optional, "top", False, default=11)
     shared.add_argument(
             optional, "nproc", False, default=multiprocessing.cpu_count())
     shared.add_argument(optional, "compress", False)
@@ -64,16 +65,16 @@ def parse_arguments():
     if not args.IkwId:
         if args.top < 11:
             sys.exit(
-                    "error: [--top] can only be set lower than 11 with the "
-                    "[--I_know_what_Im_doing] flag. See README.md as to why "
+                    "error: --top can only be set lower than 11 with the "
+                    "--I_know_what_Im_doing flag. See README.md as to why "
                     "this is the case."
                     )
             
         if args.r > 11 and args.alignment_file:
             sys.exit(
-                    "error: [-r / --range] can only be set higher than 11 in "
-                    "combination with [-a / --alignment_table] with the "
-                    "[--I_know_what_Im_doing] flag. See README.md as to why "
+                    "error: --range can only be set higher than 11 in "
+                    "combination with --alignment_table with the "
+                    "--I_know_what_Im_doing flag. See README.md as to why "
                     "this is the case."
                     )
             
@@ -206,7 +207,7 @@ def run():
         message = (
                 "if you want BAT to directly do the classification, you "
                 "should not only supply an alignment table but also a "
-                "predicted protein fasta file with argument [-p / --proteins]."
+                "predicted protein fasta file with argument --proteins_fasta."
                 )
         shared.give_user_feedback(
                 message, args.log_file, args.quiet, error=True)
