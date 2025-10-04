@@ -7,7 +7,10 @@ import gzip
 import multiprocessing.pool
 import os
 import pathlib
-import pyrodigal
+try:
+    import pyrodigal
+except ImportError:
+    pyrodigal = None
 import shutil
 import subprocess
 import sys

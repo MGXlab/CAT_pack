@@ -5,6 +5,7 @@ import sys
 import about
 import add_names
 import bins
+import check
 import contigs
 import reads
 import download
@@ -15,7 +16,8 @@ import summarise
 def usage():
     message = (
             "usage: CAT_pack (download | prepare | contigs | bins | reads "
-            "| add_names | summarise) [-v / --version] [-h / --help]\n"
+            "| add_names | summarise) [--check_dependencies] [-v / --version] "
+            "[-h / --help]\n"
             "CAT_pack: error: one of the arguments "
             "download prepare contigs bins reads add_names summarise "
             "is required"
@@ -24,8 +26,24 @@ def usage():
     sys.stdout.write("{0}\n".format(message))
 
     return
-    
-    
+
+
+def check_dependencies():
+    errors = []
+    errors.append(check.check_pyrodigal_install(
+        None, False, show_time=False))
+    errors.append(check.check_diamond_binaries(
+        "diamond", None, False, show_time=False))
+    errors.append(check.check_mmseqs2_binaries(
+        "mmseqs", None, False, show_time=False))
+    errors.append(check.check_bwa_binaries(
+        "bwa", None, False, show_time=False))
+    errors.append(check.check_samtools_binaries(
+        "samtools", None, False, show_time=False))
+
+    return
+
+
 def version():
     message = ("CAT_pack pack v{0} ({1})".format(
         about.__version__, about.__date__))
@@ -46,7 +64,8 @@ def version():
 def help():
     message = (
             "usage: CAT_pack (download | prepare | contigs | bins | reads "
-            "| add_names | summarise) [-v / --version] [-h / --help]\n\n"
+            "| add_names | summarise) [--check_dependencies] [-v / --version] "
+            "[-h / --help]\n\n"
             "Run Contig Annotation Tool (CAT), "
             "Bin Annotation Tool (BAT), or " 
             "Read Annotation Tool (RAT).\n\n"
@@ -88,6 +107,8 @@ def main():
         add_names.run()
     elif sys.argv[1] == "summarise":
         summarise.run()
+    elif sys.argv[1] == "--check_dependencies":
+        check_dependencies()
     elif sys.argv[1] == "-v" or sys.argv[1] == "--version":
         version()
     elif sys.argv[1] == "-h" or sys.argv[1] == "--help":

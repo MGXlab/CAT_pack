@@ -270,6 +270,11 @@ def run():
             check.check_out_prefix(args.out_prefix, args.log_file, args.quiet))
     
     if "predict_proteins" in step_list:
+        errors.append(
+                check.check_pyrodigal_install(
+                    args.log_file, args.quiet)
+                )
+
         setattr(
                 args,
                 "concatenated_fasta",

@@ -2,6 +2,10 @@
 
 import hashlib
 import os
+try:
+    import pyrodigal
+except ImportError:
+    pyrodigal = None
 import subprocess
 import sys
 
@@ -95,7 +99,27 @@ def check_out_prefix(out_prefix, log_file, quiet):
     return error
 
 
-def check_diamond_binaries(path_to_diamond, log_file, quiet):
+def check_pyrodigal_install(log_file, quiet, show_time=True):
+    error = False
+
+    try:
+        version = pyrodigal.__version__
+
+        message = "Pyrodigal found: pyrodigal v{0}.".format(version)
+        shared.give_user_feedback(
+                message, log_file, quiet, show_time=show_time)
+    except AttributeError:
+        message = ("cannot find Pyrodigal. Please check whether it is "
+                "installed.")
+        shared.give_user_feedback(
+                message, log_file, quiet, show_time=show_time, error=True)
+
+        error = True
+
+    return error
+
+
+def check_diamond_binaries(path_to_diamond, log_file, quiet, show_time=True):
     error = False
 
     try:
@@ -105,18 +129,20 @@ def check_diamond_binaries(path_to_diamond, log_file, quiet):
         output = c[0].decode().rstrip()
 
         message = "DIAMOND found: {0}.".format(output)
-        shared.give_user_feedback(message, log_file, quiet)
+        shared.give_user_feedback(
+                message, log_file, quiet, show_time=show_time)
     except OSError:
         message = ("cannot find DIAMOND. Please check whether it is "
                 "installed or the path to the binaries is provided.")
-        shared.give_user_feedback(message, log_file, quiet, error=True)
+        shared.give_user_feedback(
+                message, log_file, quiet, show_time=show_time, error=True)
 
         error = True
 
     return error
 
 
-def check_mmseqs2_binaries(path_do_mmseqs2, log_file, quiet):
+def check_mmseqs2_binaries(path_do_mmseqs2, log_file, quiet, show_time=True):
     error = False
 
     try:
@@ -125,18 +151,20 @@ def check_mmseqs2_binaries(path_do_mmseqs2, log_file, quiet):
         output = c[0].decode().split("\n")[5]
 
         message = "MMseqs2 found: {0}.".format(output)
-        shared.give_user_feedback(message, log_file, quiet)
+        shared.give_user_feedback(
+                message, log_file, quiet, show_time=show_time)
     except OSError:
         message = ("cannot find MMseqs2. Please check whether it is "
                 "installed.")
-        shared.give_user_feedback(message, log_file, quiet, error=True)
+        shared.give_user_feedback(
+                message, log_file, quiet, show_time=show_time, error=True)
 
         error = True
 
     return error
 
 
-def check_bwa_binaries(path_to_bwa, log_file, quiet):
+def check_bwa_binaries(path_to_bwa, log_file, quiet, show_time=True):
     error = False
 
     try:
@@ -147,18 +175,20 @@ def check_bwa_binaries(path_to_bwa, log_file, quiet):
             if line.startswith("Version"):
                 output = line.rstrip()
                 message = "bwa found: {0}.".format(output)
-                shared.give_user_feedback(message, log_file, quiet)
+                shared.give_user_feedback(
+                        message, log_file, quiet, show_time=show_time)
     except OSError:
         message = ("cannot find bwa. Please check whether it is "
                 "installed or the path to the binaries is provided.")
-        shared.give_user_feedback(message, log_file, quiet, error=True)
+        shared.give_user_feedback(
+                message, log_file, quiet, show_time=show_time, error=True)
 
         error = True
 
     return error
 
 
-def check_samtools_binaries(path_to_samtools, log_file, quiet):
+def check_samtools_binaries(path_to_samtools, log_file, quiet, show_time=True):
     error = False
 
     try:
@@ -168,11 +198,13 @@ def check_samtools_binaries(path_to_samtools, log_file, quiet):
         output = c[0].decode().split("\n")[0].rstrip()
 
         message = "Samtools found: {0}.".format(output)
-        shared.give_user_feedback(message, log_file, quiet)
+        shared.give_user_feedback(
+                message, log_file, quiet, show_time=show_time)
     except OSError:
         message = ("cannot find samtools. Please check whether it is "
                 "installed or the path to the binaries is provided.")
-        shared.give_user_feedback(message, log_file, quiet, error=True)
+        shared.give_user_feedback(
+                message, log_file, quiet, show_time=show_time, error=True)
 
         error = True
 
