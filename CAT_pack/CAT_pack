@@ -81,6 +81,8 @@ def help():
             "  summarise\t\tSummarise a named CAT or BAT classification file."
             "\n\n"
             "Optional arguments:\n"
+            "  --check_dependencies\tCheck whether all dependencies are "
+            "installed.\n"
             "  -v, --version\t\tPrint version information and exit.\n"
             "  -h, --help\t\tShow this help message and exit."
             )
