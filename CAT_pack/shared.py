@@ -1582,6 +1582,7 @@ def top_tabular_alignment(alignment_file, out_file, top, log_file, quiet):
             optionally_compressed_handle(alignment_file, "r") as f,
             open(out_file, "w") as outf
             ):
+        cutoff_f = decimal.Decimal((100 - top) / 100)
         q, top_bitscore = None, None
         for line in f:
             line = line.rstrip().split("\t")
@@ -1590,7 +1591,7 @@ def top_tabular_alignment(alignment_file, out_file, top, log_file, quiet):
                 top_bitscore = decimal.Decimal(line[11])
             bitscore = decimal.Decimal(line[11])
 
-            if bitscore >= (100 - top) / 100 * top_bitscore:
+            if bitscore >= cutoff_f * top_bitscore:
                 outf.write("\t".join(line))
 
     return
