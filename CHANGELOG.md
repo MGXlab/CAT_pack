@@ -1,9 +1,11 @@
 # Changelog
 
-## 6.1 [beta20251004]
+## 6.1 [beta20251005]
 * Pyrodigal support enables multi-threading of gene predictions.
 * MMseqs2 support as speedier? alternative for DIAMOND.
 * DIAMOND modes [faster, fast, mid-sensitive, sensitive, more-sensitive, very-sensitive, ultra-sensitive].
+* Parser clean-up.
+* Error messages in red.
 
 ## 6.0.1
 Minor release to register for a Zenodo DOI.
