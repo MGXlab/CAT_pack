@@ -1596,7 +1596,7 @@ def top_tabular_alignment(alignment_file, out_file, top, log_file, quiet):
             bitscore = decimal.Decimal(line[11])
 
             if bitscore >= cutoff_f * top_bitscore:
-                outf.write("\t".join(line))
+                outf.write("{0}\n".format("\t".join(line)))
 
     return
 
