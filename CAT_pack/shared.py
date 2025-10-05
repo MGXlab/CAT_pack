@@ -1058,6 +1058,7 @@ def give_user_feedback(
         sys.stdout.write(message)
 
     if not quiet and error:
+        message = "\033[31m" + message + "\033[0m"
         sys.stderr.write(message)
 
     return
