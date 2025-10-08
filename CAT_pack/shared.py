@@ -1621,14 +1621,14 @@ def parse_tabular_alignment(alignment_file, one_minus_r, log_file, quiet):
     for line in f1:
         if compressed:
             line = line.decode("utf-8")
-
-        if line.startswith(ORF) and ORF_done == True:
+            
+        line = line.rstrip().split("\t")
+        
+        if line[0] == ORF and ORF_done == True:
             # The ORF has already surpassed its minimum allowed bit-score.
             continue
-
-        line = line.rstrip().split("\t")
-
-        if not line[0] == ORF:
+            
+        if line[0] != ORF:
             # A new ORF is reached.
             ORF = line[0]
             top_bitscore = decimal.Decimal(line[11])
