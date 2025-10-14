@@ -1165,6 +1165,9 @@ def run_diamond(args, blast="blastp", prot_fasta="", top=0):
             )
     give_user_feedback(message, args.log_file, args.quiet)
 
+    if not os.path.isdir(args.tmpdir):
+        os.mkdir(args.tmpdir)
+
     try:
         command = [
                 args.path_to_diamond, blast,
