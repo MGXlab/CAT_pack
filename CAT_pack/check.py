@@ -119,8 +119,26 @@ def check_pyrodigal_install(log_file, quiet, show_time=True):
     return error
 
 
+def compare_versions(current_version, min_version):
+    def version_to_tuple(version_str, n_elements):
+        version_list = list(map(int, version_str.split(".")))
+        return tuple(version_list + [0] * (n_elements - len(version_list)))
+
+    n_elements = max(
+            len(current_version.split(".")),
+            len(min_version.split("."))
+            )
+    if (version_to_tuple(current_version, n_elements) >=
+            version_to_tuple(min_version, n_elements)):
+        return True
+    else:
+        return False
+
+
 def check_diamond_binaries(path_to_diamond, log_file, quiet, show_time=True):
     error = False
+
+    min_version = "2.1.0"
 
     try:
         p = subprocess.Popen([path_to_diamond, "--version"],
@@ -128,9 +146,18 @@ def check_diamond_binaries(path_to_diamond, log_file, quiet, show_time=True):
         c = p.communicate()
         output = c[0].decode().rstrip()
 
-        message = "DIAMOND found: {0}.".format(output)
-        shared.give_user_feedback(
-                message, log_file, quiet, show_time=show_time)
+        current_version = output.split(' ')[-1]
+        if compare_versions(current_version, min_version):
+            message = "DIAMOND found: {0}.".format(output)
+            shared.give_user_feedback(
+                    message, log_file, quiet, show_time=show_time)
+        else:
+            message = "DIAMOND should be >= {0}. DIAMOND found: {1}.".format(
+                    min_version, current_version)
+            shared.give_user_feedback(
+                    message, log_file, quiet, show_time=show_time, error=True)
+
+            error = True
     except OSError:
         message = ("cannot find DIAMOND. Please check whether it is "
                 "installed or the path to the binaries is provided.")

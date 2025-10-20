@@ -695,8 +695,9 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
     elif dest == "diamond_mode":
         if help_ == None:
             help_ = (
-                    "<faster, fast, mid-sensitive, sensitive, more-sensitive, "
-                    "very-sensitive, ultra-sensitive> [{0}].".format(default)
+                    "<default, faster, fast, mid-sensitive, sensitive, "
+                    "more-sensitive, very-sensitive, ultra-sensitive> [{0}]."
+                    "".format(default)
                     )
         argument_group.add_argument(
                 "--diamond_mode",
@@ -704,8 +705,10 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 metavar="",
                 required=required,
                 type=str,
-                choices=["faster", "fast", "mid-sensitive", "sensitive",
-                    "more-sensitive", "very-sensitive", "ultra-sensitive"],
+                choices=[
+                    "default", "faster", "fast", "mid-sensitive", "sensitive",
+                    "more-sensitive", "very-sensitive" "ultra-sensitive"
+                    ],
                 default=default,
                 help=help_
                 )
@@ -785,7 +788,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
 
 def add_all_diamond_arguments(argument_group):
     add_argument(argument_group, "path_to_diamond", False, default="diamond")
-    add_argument(argument_group, "diamond_mode", False, default="fast")
+    add_argument(argument_group, "diamond_mode", False, default="default")
     add_argument(argument_group, "no_self_hits", False)
     add_argument(argument_group, "block_size", False, default=12.0)
     add_argument(argument_group, "index_chunks", False, default=1)
@@ -1171,7 +1174,6 @@ def run_diamond(args, blast="blastp", prot_fasta="", top=0):
     try:
         command = [
                 args.path_to_diamond, blast,
-                "--{0}".format(args.diamond_mode),
                 "-q", prot_fasta,
                 "-d", args.diamond_database,
                 "--top", str(args.top),
@@ -1184,6 +1186,9 @@ def run_diamond(args, blast="blastp", prot_fasta="", top=0):
                 "--tmpdir", args.tmpdir,
                 "--compress", compression
                 ]
+
+        if args.diamond_mode != 'default':
+            command += ["--{0}".format(args.diamond_mode)]
 
         if not args.verbose:
             command += ["--quiet"]
