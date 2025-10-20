@@ -155,7 +155,7 @@ def make_mmseqs2_database(
 
     try:
         message = "Running command: {0}".format(" ".join(command))
-        give_user_feedback(message, log_file, quiet)
+        shared.give_user_feedback(message, log_file, quiet)
 
         subprocess.check_call(command)
     except:
