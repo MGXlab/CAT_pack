@@ -76,6 +76,18 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
                 action=PathAction,
                 help=help_
                 )
+    elif dest == "search_tool":
+            if help_ is None:
+                help_ = "Search tool (mmseqs|diamond|all) you want to use."
+            argument_group.add_argument(
+                    "--search_tool",
+                    dest="search_tool",
+                    metavar="",
+                    required=required,
+                    type=str,
+                    action=PathAction,
+                    help=help_
+                    )
     elif dest == "bin_fasta_or_folder":
         if help_ is None:
             help_ = "<FILE|DIR> Bin fasta file or directory containing bins."

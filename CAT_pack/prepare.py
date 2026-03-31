@@ -37,6 +37,7 @@ def parse_arguments():
     shared.add_argument(required, "nodes_dmp", True)
     shared.add_argument(required, "acc2tax", True)
     shared.add_argument(required, "db_dir", True)
+    shared.add_argument(required, "search_tool", True)
 
     optional = parser.add_argument_group("Optional arguments")
     shared.add_argument(
@@ -62,7 +63,10 @@ def parse_arguments():
     if len(extra_args) > 0:
         sys.exit("error: too much arguments supplied:\n{0}".format(
             "\n".join(extra_args)))
-
+    
+    if args.search_tool not in ('mmseqs', 'diamond', 'all'):
+        sys.exit("error: unknown search tool:{0}".format(args.search_tool))
+    
     # Add extra arguments.
     setattr(args, "date", date)
     setattr(args, "min_mem", 200)
@@ -155,7 +159,7 @@ def make_mmseqs2_database(
 
     try:
         message = "Running command: {0}".format(" ".join(command))
-        give_user_feedback(message, log_file, quiet)
+        shared.give_user_feedback(message, log_file, quiet)
 
         subprocess.check_call(command)
     except:
@@ -486,11 +490,15 @@ def run():
     args = parse_arguments()
 
     step_list = []
-    if not os.path.exists(args.diamond_database):
-        step_list.append("make_diamond_database")
-
-    if not os.path.exists(args.mmseqs2_database):
-        step_list.append("make_mmseqs2_database")
+    
+    if args.search_tool in ('diamond', 'all'):
+    
+        if not os.path.exists(args.diamond_database):
+            step_list.append("make_diamond_database")
+    
+    if args.search_tool in ('mmseqs', 'all' ):
+        if not os.path.exists(args.mmseqs2_database):
+            step_list.append("make_mmseqs2_database")
 
     if not os.path.exists(args.fastaid2LCAtaxid_file):
         step_list.append("make_fastaid2LCAtaxid_file")
