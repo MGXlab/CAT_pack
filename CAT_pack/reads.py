@@ -6,6 +6,7 @@ import argparse
 import datetime
 import sys
 import decimal
+import multiprocessing
 
 import about
 
@@ -117,7 +118,7 @@ def parse_arguments():
             sys.exit('error: please provide either a contig2classification file '
                      'or the path to the CAT_pack database_folder!')
             
-    if 'r' in args.mode and not 'c' in args.mode and not 'm' in args.mode:
+    if 'r' in args.mode and 'c' not in args.mode and 'm' not in args.mode:
         sys.exit('error: we do not recommend annotating all reads directly '
                  'with diamond. Please include c or m in the mode argument.')
     
@@ -344,7 +345,7 @@ def run():
                     show_time=True)
             
             # If CAT was not run, run BAT
-            if not 'c' in args.mode:
+            if 'c' not in args.mode:
                 shared.run_BAT(args, args.bin_folder, args.database_folder, args.taxonomy_folder,
                            args.log_file, args.quiet, args.nproc, args.f, args.r, 
                            args.out_prefix, args.bin_suffix, path_to_CAT=path_to_CAT)
@@ -787,7 +788,7 @@ def make_bin_table(contig2bin,
                 bin_id=contig2bin[contig]
             else:
                 bin_id='unbinned'
-            if not bin_id in bin_data:
+            if bin_id not in bin_data:
                 bin_data[bin_id]={
                     'n_reads': 0,
                     'n_nucleotides': 0
@@ -1196,7 +1197,7 @@ def make_contig_dict(read_dict,
         else:
             contig_dict['*']+=max_primary-len(read_dict[read]['contig'])
             for contig in read_dict[read]['contig']:
-                if not contig in contig_dict:
+                if contig not in contig_dict:
                     contig_dict[contig]=0
                     
                 contig_dict[contig]+=1
