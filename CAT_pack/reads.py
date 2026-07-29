@@ -57,8 +57,9 @@ def parse_arguments():
     shared.add_argument(optional, 'path_to_bwa', False, default='bwa')
     shared.add_argument(optional, 'path_to_samtools', False, default='samtools')
 
-    shared.add_argument(optional, "nproc", False,
+    shared.add_argument(optional, 'nproc', False,
             default=multiprocessing.cpu_count())
+    shared.add_argument(optional, 'tmpdir', False)
     shared.add_argument(optional, 'force', False)
     shared.add_argument(optional, 'quiet', False)
     shared.add_argument(optional, 'verbose', False)
