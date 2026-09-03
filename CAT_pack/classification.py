@@ -114,6 +114,18 @@ class ClassificationEngine:
             lineage=tuple(lineage)
         )
 
+    def classify_ORFgroup(self, *, entity_id: str, orf_ids: Sequence[str], orf2hits: Mapping[str, Sequence[tuple[str, Decimal]]]):
+        """
+        Classificaion of one contig or bin from ORFs
+        """
+        if not orf_ids: return ClassificationResult(
+            entity_id=entity_id,
+            status=ClassificationStatus.NO_ORFS,
+            assignments=() # dont like this
+        )
+        pass
+
+
 
 
 
