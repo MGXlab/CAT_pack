@@ -12,7 +12,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum, auto
-from typing import Mapping
+from typing import Mapping, Sequence
+import tax
 
 class ORFStatus(Enum):
     """Classification status of a single predicted ORF
@@ -80,8 +81,42 @@ class ClassificationEngine:
         self.fastaid2taxid = fastaid2taxid
         self.fraction = fraction
 
-    def classify_orf(self):
-        pass
+    def classify_orf(self, orf_id: str, hits: Sequence[tuple[str, Decimal]] | None):
+        if not hits:
+            return ORFClassification(
+                orf_id=orf_id,
+                status=ORFStatus.NO_HIT
+            )
+        taxid, top_bitscore = tax.find_LCA_for_ORF(
+            hits, self.fastaid2LCAtaxid, self.taxid2parent)
+
+        if taxid.startswith("no taxid found"):
+            return ORFClassification(
+                orf_id=orf_id,
+                status=ORFStatus.NO_TAXID,
+                n_hits=len(hits),
+                top_bitscore=top_bitscore,
+                taxid=taxid # TODO: this will give back no taxid found to taxid what will be turned into
+                # a int down the line will need to introduce a message system into this class
+            )
+
+        lineage = tax.find_lineage(taxid, self.taxid2parent)
+
+        # TODO implement lineage starring, implementation here is not usefull for testing and will need to be
+        # removed due to taxid becoming int in the future within this method
+
+        return ORFClassification(
+            orf_id=orf_id,
+            status=ORFStatus.ASSIGNED,
+            n_hits=len(hits),
+            taxid=taxid,
+            top_bitscore=top_bitscore,
+            lineage=tuple(lineage)
+        )
+
+
+
+
 
     def classify_group(self):
         pass
