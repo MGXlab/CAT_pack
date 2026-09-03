@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum, auto
-
+from typing import Mapping
 
 class ORFStatus(Enum):
     """Classification status of a single predicted ORF
@@ -67,6 +67,22 @@ class ClassificationResult:
     taxonomy_namespace: TaxonomyNamespace #Support for more then one taxid system
     assignments: tuple[TaxonomicAssignment, ...]
 
+class ClassificationEngine:
+    """
+    Shared ORF and WG  classifier for CAT and BAT
 
+    NOTE: Not planning on implementing algorythm changes/optimizations here yet.
+    First changing architecture to Object oriented and after that is done and
+    results are identical the optimization can be done.
+    """
+    def __init__(self,*,taxid2parent:Mapping[str,str], fastaid2taxid: Mapping[str, str], fraction:Decimal) -> None:
+        self.taxid2parent = taxid2parent
+        self.fastaid2taxid = fastaid2taxid
+        self.fraction = fraction
 
+    def classify_orf(self):
+        pass
+
+    def classify_group(self):
+        pass
 
