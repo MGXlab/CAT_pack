@@ -26,6 +26,12 @@ class ORFStatus(Enum):
     NO_TAXID = auto()
     ASSIGNED = auto()
 
+class ClassificationStatus(Enum):
+    ASSINGED = auto()
+    NO_ORFS = auto()
+    NO_HITS = auto()
+    NO_TAXIDS = auto()
+    NO_LINEAGE_SUPPORT = auto()
 
 
 @dataclass(slots=True)
@@ -37,4 +43,30 @@ class ORFClassification:
     taxid: str | None = None # TODO: replace with int down the line
     top_bitscore: Decimal | None = None
     lineage: tuple[str, ...] = () # TODO: update on lineage internal change
+
+@dataclass(frozen=True, slots=True)
+class TaxonomicAssignment:
+    """
+    One taxonomic assignment supported for an entity
+    if f < 0.5 can cause multiple classifications in one contig.
+    """
+    taxid: int
+    support: float
+
+
+class TaxonomyNamespace:
+    pass
+
+
+@dataclass(slots=True)
+class ClassificationResult:
+    entity_id: int
+    #entity_type: EntityType #TODO: for later addition (other types like viral)
+    status: ClassificationStatus
+    #sequence_type: SequenceType #TODO: For later addition
+    taxonomy_namespace: TaxonomyNamespace #Support for more then one taxid system
+    assignments: tuple[TaxonomicAssignment, ...]
+
+
+
 
