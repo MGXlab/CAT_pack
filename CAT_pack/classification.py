@@ -56,8 +56,8 @@ class TaxonomicAssignment:
     lineage_scores: tuple
 
 
-@dataclass(slots=True)
-class TaxonomyNamespace:
+
+class TaxonomyNamespace(Enum):
     NCBI = auto()
 
 
@@ -86,7 +86,7 @@ class ClassificationEngine:
         self.fastaid2taxid = fastaid2taxid
         self.fraction = fraction
 
-    def classify_orf(self, orf_id: str, hits: Sequence[tuple[str, Decimal]] | None):
+    def classify_orf(self, orf_id: str, hits: Sequence[tuple[str, Decimal]] | None) -> ORFClassification:
         if not hits:
             return ORFClassification(
                 orf_id=orf_id,
@@ -119,7 +119,7 @@ class ClassificationEngine:
             lineage=tuple(lineage)
         )
 
-    def classify_group(self, *, entity_id: str, orf_ids: Sequence[str], orf2hits: Mapping[str, Sequence[tuple[str, Decimal]]]):
+    def classify_group(self, *, entity_id: str, orf_ids: Sequence[str], orf2hits: Mapping[str, Sequence[tuple[str, Decimal]]]) -> ClassificationResult:
         """
         Classificaion of one contig or bin from ORFs
         """
