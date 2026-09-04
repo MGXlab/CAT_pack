@@ -9,6 +9,7 @@ import about
 import check
 import shared
 import tax
+import classification
 
 
 def parse_arguments():
@@ -332,9 +333,17 @@ def run():
             args.quiet
             )
 
+
+
     message = "CAT is spinning! Files {0} and {1} are created.".format(
             args.contig2classification_output_file, args.ORF2LCA_output_file)
     shared.give_user_feedback(message, args.log_file, args.quiet)
+
+    cat_engine = classification.ClassificationEngine(
+        taxid2parent=taxid2parent,
+        fastaid2taxid=fastaid2LCAtaxid,
+        fraction=args.f,
+    )
 
     n_classified_contigs = 0
     
@@ -349,109 +358,108 @@ def run():
                 "".format(args.r))
         
         for contig in sorted(contig_names):
-            if contig not in contig2ORFs:
-                outf1.write("{0}\tno taxid assigned\tno ORFs found\n".format(
-                    contig))
-                
-                continue
+            # if contig not in contig2ORFs:
+            #     outf1.write("{0}\tno taxid assigned\tno ORFs found\n".format(
+            #         contig))
+            #
+            #     continue
+
+            result = cat_engine.classify_group(entity_id=contig,orf_ids=contig2ORFs[contig], orf2hits=ORF2hits)
 
             LCAs_ORFs = []
 
-            for ORF in contig2ORFs[contig]:
-                if ORF not in ORF2hits:
+            for orf_result in result.orf_results:
+                if orf_result.status == classification.ORFStuatus.NO_HIT:
                     outf2.write("{0}\tORF has no hit to database\n".format(
-                        ORF))
+                        orf_result.orf_id))
 
                     continue
 
-                n_hits = len(ORF2hits[ORF])
-                
-                taxid, top_bitscore = tax.find_LCA_for_ORF(
-                        ORF2hits[ORF], fastaid2LCAtaxid, taxid2parent)
-                 
-                if taxid.startswith("no taxid found"):
+                if orf_result.status == classification.ORFStuatus.NO_TAXID:
                     outf2.write("{0}\t{1}\t{2}\t{3}\n".format(
-                        ORF, n_hits, taxid, top_bitscore))
-                else:
-                    lineage = tax.find_lineage(taxid, taxid2parent)
+                        orf_result.orf_id, orf_result.n_hits, orf_result.taxid, orf_result.top_bitscore))
+                    continue
 
-                    if not args.no_stars:
-                        lineage = tax.star_lineage(
-                            lineage, taxids_with_multiple_offspring)
+                lineage = list(orf_result.lineage)
+
+                if not args.no_stars:
+                    lineage = tax.star_lineage(
+                        lineage, taxids_with_multiple_offspring)
                     
-                    outf2.write("{0}\t{1}\t{2}\t{3}\n".format(
-                        ORF, n_hits, ";".join(lineage[::-1]), top_bitscore))
-                                   
-                LCAs_ORFs.append((taxid, top_bitscore),)
-                
-            if len(LCAs_ORFs) == 0:
-                outf1.write("{0}\tno taxid assigned\t"
-                        "no hits to database\n".format(contig))
+                outf2.write("{0}\t{1}\t{2}\t{3}\n".format(
+                    orf_result.orf_id, orf_result.n_hits, ";".join(lineage[::-1]), orf_result.top_bitscore))
 
+            if result.status == classification.ClassificationStatus.NO_ORFS:
+                outf1.write(
+                    "{0}\tno taxid assigned\tno ORFs found\n".format(contig)
+                )
                 continue
 
-            lineages, lineages_scores, based_on_n_ORFs = tax.find_weighted_LCA(
-                    LCAs_ORFs, taxid2parent, args.f)
-             
-            if lineages == "no ORFs with taxids found.":
+            if result.status == classification.ClassificationStatus.NO_HITS:
                 outf1.write(
-                        "{0}\tno taxid assigned\t"
-                        "hits not found in taxonomy files\n".format(contig)
-                        )
-
+                    "{0}\tno taxid assigned\t"
+                    "no hits to database\n".format(contig)
+                )
                 continue
-            
-            if lineages == "no lineage whitelisted.":
-                outf1.write(
-                        "{0}\tno taxid assigned\t"
-                        "no lineage reached minimum bit-score support\n"
-                        "".format(contig)
-                        )
 
+            if result.status == classification.ClassificationStatus.NO_TAXIDS:
+                outf1.write(
+                    "{0}\tno taxid assigned\t"
+                    "hits not found in taxonomy files\n".format(contig)
+                )
+                continue
+
+            if result.status == classification.ClassificationStatus.NO_LINEAGE_SUPPORT:
+                outf1.write(
+                    "{0}\tno taxid assigned\t"
+                    "no lineage reached minimum bit-score support\n".format(contig)
+                )
                 continue
 
             # The contig has a valid classification.
             n_classified_contigs += 1
 
-            for (i, lineage) in enumerate(lineages):
+            for i, assignment in enumerate(result.assignments):
+                lineage = list(assignment.lineage)
                 if not args.no_stars:
-                    lineage = tax.star_lineage(
-                            lineage, taxids_with_multiple_offspring)
-                scores = ["{0:.2f}".format(score) for score
-                        in lineages_scores[i]]
-                
-                if len(lineages) == 1:
-                    # There is only one classification.
+                    lineage = tax.star_lineage(lineage,taxids_with_multiple_offspring)
+
+                scores = [
+                    "{0:.2f}".format(score)
+                    for score in assignment.lineage_scores
+                ]
+
+                if len(result.assignments) == 1:
                     outf1.write(
-                            "{0}\t"
-                            "taxid assigned\t"
-                            "based on {1}/{2} ORFs\t"
-                            "{3}\t"
-                            "{4}\n".format(
-                                contig,
-                                based_on_n_ORFs,
-                                len(contig2ORFs[contig]),
-                                ";".join(lineage[::-1]),
-                                ";".join(scores[::-1])
-                                )
-                            )
+                        "{0}\t"
+                        "taxid assigned\t"
+                        "based on {1}/{2} ORFs\t"
+                        "{3}\t"
+                        "{4}\n".format(
+                            contig,
+                            result.based_on_n_ORFs,
+                            result.total_n_ORFs,
+                            ";".join(lineage[::-1]),
+                            ";".join(scores[::-1]),
+                        )
+                    )
+
                 else:
-                    # There are multiple classifications.
                     outf1.write(
-                            "{0}\t"
-                            "taxid assigned ({1}/{2})\t"
-                            "based on {3}/{4} ORFs\t"
-                            "{5}\t"
-                            "{6}\n".format(
-                                contig,
-                                i + 1,
-                                len(lineages),
-                                based_on_n_ORFs,
-                                len(contig2ORFs[contig]),
-                                ";".join(lineage[::-1]),
-                                ";".join(scores[::-1])
-                                )
-                            )
+                        "{0}\t"
+                        "taxid assigned ({1}/{2})\t"
+                        "based on {3}/{4} ORFs\t"
+                        "{5}\t"
+                        "{6}\n".format(
+                            contig,
+                            i + 1,
+                            len(result.assignments),
+                            result.based_on_n_ORFs,
+                            result.total_n_ORFs,
+                            ";".join(lineage[::-1]),
+                            ";".join(scores[::-1]),
+                        )
+                    )
 
     message = (
             "\n-----------------\n\n"
