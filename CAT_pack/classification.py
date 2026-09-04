@@ -51,8 +51,10 @@ class TaxonomicAssignment:
     One taxonomic assignment supported for an entity
     if f < 0.5 can cause multiple classifications in one contig.
     """
-    taxid: int
-    support: float
+    taxid: str
+    lineage: tuple[str, ...]
+    lineage_scores: tuple
+
 
 
 class TaxonomyNamespace:
@@ -152,6 +154,53 @@ class ClassificationEngine:
                 based_on_n_ORFs=0,
                 orf_results=tuple(orf_results)
             )
+
+        lineages, lineages_scores, based_on_n_orfs = tax.find_weighted_LCA(
+            lca_ORFs,
+            self.taxid2parent,
+            self.fraction
+        )
+
+        if lineages == "no ORFs with taxids found.":
+            return ClassificationResult(
+                entity_id=entity_id,
+                status=ClassificationStatus.NO_TAXIDS,
+                assignments=(),
+                total_n_ORFs=len(orf_ids),
+                based_on_n_ORFs=0,
+                orf_results=tuple(orf_results)
+            )
+
+        if lineages == "no lineage whitelisted.":
+            return ClassificationResult(
+                entity_id=entity_id,
+                status=ClassificationStatus.NO_LINEAGE_SUPPORT,
+                assignments=(),
+                total_n_ORFs=len(orf_ids),
+                based_on_n_ORFs=0,
+                orf_results=tuple(orf_results)
+            )
+
+        assignments: list [TaxonomicAssignment] = []
+
+        assignments = []
+
+        for i, lineage in enumerate(lineages):
+            assignments.append(
+                TaxonomicAssignment(
+                    taxid=lineage[0],
+                    lineage=tuple(lineage),
+                    lineage_scores=tuple(lineages_scores[i]),
+                )
+            )
+        return ClassificationResult(
+            entity_id=entity_id,
+            status=ClassificationStatus.ASSIGNED,
+            assignments=tuple(assignments),
+            total_n_ORFs=len(orf_ids),
+            based_on_n_ORFs=based_on_n_orfs,
+            orf_results=tuple(orf_results),
+        )
 
 
 
