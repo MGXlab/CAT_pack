@@ -351,33 +351,26 @@ def run():
             open(args.contig2classification_output_file, "w") as outf1,
             open(args.ORF2LCA_output_file, "w") as outf2
             ):
-        outf1.write("# contig\tclassification\treason\tlineage\t"
-                "lineage scores (f: {0})\n".format(float(args.f)))
+        outf1.write(f"# contig\tclassification\treason\tlineage\t"
+                f"lineage scores (f: {float(args.f)})\n")
 
-        outf2.write("# ORF\tnumber of hits (r: {0})\tlineage\ttop bit-score\n"
-                "".format(args.r))
+        outf2.write(f"# ORF\tnumber of hits (r: {args.r})\tlineage\ttop bit-score\n")
         
         for contig in sorted(contig_names):
-            # if contig not in contig2ORFs:
-            #     outf1.write("{0}\tno taxid assigned\tno ORFs found\n".format(
-            #         contig))
-            #
-            #     continue
 
             result = cat_engine.classify_group(entity_id=contig,orf_ids=contig2ORFs[contig], orf2hits=ORF2hits)
 
-            LCAs_ORFs = []
-
             for orf_result in result.orf_results:
                 if orf_result.status == classification.ORFStatus.NO_HIT:
-                    outf2.write("{0}\tORF has no hit to database\n".format(
-                        orf_result.orf_id))
+                    outf2.write(f"{orf_result.orf_id}\tORF has no hit to database\n")
 
                     continue
 
                 if orf_result.status == classification.ORFStatus.NO_TAXID:
-                    outf2.write("{0}\t{1}\t{2}\t{3}\n".format(
-                        orf_result.orf_id, orf_result.n_hits, orf_result.taxid, orf_result.top_bitscore))
+                    outf2.write(
+                        f"{orf_result.orf_id}\t{orf_result.n_hits}\t"
+                        f"{orf_result.taxid}\t{orf_result.top_bitscore}\n"
+                    )
                     continue
 
                 lineage = list(orf_result.lineage)
@@ -386,34 +379,24 @@ def run():
                     lineage = tax.star_lineage(
                         lineage, taxids_with_multiple_offspring)
                     
-                outf2.write("{0}\t{1}\t{2}\t{3}\n".format(
-                    orf_result.orf_id, orf_result.n_hits, ";".join(lineage[::-1]), orf_result.top_bitscore))
+                outf2.write(f"{orf_result.orf_id}\t{orf_result.n_hits}\t"
+                            f"{';'.join(lineage[::-1])}\t{orf_result.top_bitscore}\n")
 
             if result.status == classification.ClassificationStatus.NO_ORFS:
-                outf1.write(
-                    "{0}\tno taxid assigned\tno ORFs found\n".format(contig)
-                )
+                outf1.write(f"{contig}\tno taxid assigned\tno ORFs found\n")
                 continue
 
             if result.status == classification.ClassificationStatus.NO_HITS:
-                outf1.write(
-                    "{0}\tno taxid assigned\t"
-                    "no hits to database\n".format(contig)
-                )
+                outf1.write(f"{contig}\tno taxid assigned\tno hits to database\n")
                 continue
 
             if result.status == classification.ClassificationStatus.NO_TAXIDS:
-                outf1.write(
-                    "{0}\tno taxid assigned\t"
-                    "hits not found in taxonomy files\n".format(contig)
-                )
+                outf1.write(f"{contig}\tno taxid assigned\thits not found in taxonomy files\n")
                 continue
 
             if result.status == classification.ClassificationStatus.NO_LINEAGE_SUPPORT:
-                outf1.write(
-                    "{0}\tno taxid assigned\t"
-                    "no lineage reached minimum bit-score support\n".format(contig)
-                )
+                outf1.write(f"{contig}\tno taxid assigned\t"
+                            f"no lineage reached minimum bit-score support\n")
                 continue
 
             # The contig has a valid classification.
@@ -425,40 +408,26 @@ def run():
                     lineage = tax.star_lineage(lineage,taxids_with_multiple_offspring)
 
                 scores = [
-                    "{0:.2f}".format(score)
+                    f"{score:.2f}"
                     for score in assignment.lineage_scores
                 ]
 
                 if len(result.assignments) == 1:
                     outf1.write(
-                        "{0}\t"
-                        "taxid assigned\t"
-                        "based on {1}/{2} ORFs\t"
-                        "{3}\t"
-                        "{4}\n".format(
-                            contig,
-                            result.based_on_n_ORFs,
-                            result.total_n_ORFs,
-                            ";".join(lineage[::-1]),
-                            ";".join(scores[::-1]),
-                        )
+                        f"{contig}\t"
+                        f"taxid assigned\t"
+                        f"based on {result.based_on_n_ORFs}/{result.total_n_ORFs} ORFs\t"
+                        f"{';'.join(lineage[::-1])}\t"
+                        f"{';'.join(scores[::-1])}\n"
                     )
 
                 else:
                     outf1.write(
-                        "{0}\t"
-                        "taxid assigned ({1}/{2})\t"
-                        "based on {3}/{4} ORFs\t"
-                        "{5}\t"
-                        "{6}\n".format(
-                            contig,
-                            i + 1,
-                            len(result.assignments),
-                            result.based_on_n_ORFs,
-                            result.total_n_ORFs,
-                            ";".join(lineage[::-1]),
-                            ";".join(scores[::-1]),
-                        )
+                        f"{contig}\t"
+                        f"taxid assigned ({i + 1}/{len(result.assignments)})\t"
+                        f"based on {result.based_on_n_ORFs}/{result.total_n_ORFs} ORFs\t"
+                        f"{';'.join(lineage[::-1])}\t"
+                        f"{';'.join(scores[::-1])}\n"
                     )
 
     message = (
