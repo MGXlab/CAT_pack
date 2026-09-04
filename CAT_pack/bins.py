@@ -8,6 +8,7 @@ import sys
 
 import about
 import check
+import classification
 import shared
 import tax
 
@@ -161,6 +162,19 @@ def make_concatenated_fasta(
                         outf1.write(line)
 
     return
+
+
+def extract_bin_orfs(bin_contigs, contig2ORFs):
+    """
+    Extract all the ORFs that belong to the contigs in a bin.
+
+    """
+    orf_ids = []
+    for contig in sorted(bin_contigs):
+        if contig not in contig2ORFs:
+            continue
+        orf_ids.extend(contig2ORFs[contig])
+    return orf_ids
                         
                         
 def run():
@@ -472,6 +486,10 @@ def run():
             args.bin2classification_output_file, args.ORF2LCA_output_file)
     shared.give_user_feedback(message, args.log_file, args.quiet)
 
+    bat_engine = classification.ClassificationEngine(taxid2parent=taxid2parent,
+                                                     fastaid2taxid=fastaid2LCAtaxid,
+                                                     fraction=args.f)
+
     n_classified_bins = 0
     with (
             open(args.bin2classification_output_file, "w") as outf1,
@@ -484,18 +502,34 @@ def run():
                 "top bit-score\n".format(args.r))
 
         for bin_ in sorted(bin2contigs):
-            LCAs_ORFs = []
+
+            orf_ids = extract_bin_orfs(bin2contigs[bin_], contig2ORFs)
+
+            result = bat_engine.classify_group(
+                entity_id=bin_,
+                orf_ids=orf_ids,
+                orf2hits=ORF2hits,
+            )
+
+            # processing the results
+            for orf_result in result.orf_results:
+
+                if orf_result.status == classification.ORFStatus.NO_HIT:
+                    outf2.write("{0}\t{1}\tORF has no hit to database\n"
+                                "".format(ORF, bin_))
+                    continue
+
 
             for contig in sorted(bin2contigs[bin_]):
                 if contig not in contig2ORFs:
                     continue
 
                 for ORF in contig2ORFs[contig]:
-                    if ORF not in ORF2hits:
-                        outf2.write("{0}\t{1}\tORF has no hit to database\n"
-                                "".format(ORF, bin_))
-
-                        continue
+                    # if ORF not in ORF2hits:
+                    #     outf2.write("{0}\t{1}\tORF has no hit to database\n"
+                    #             "".format(ORF, bin_))
+                    #
+                    #     continue
 
                     n_hits = len(ORF2hits[ORF])
 
