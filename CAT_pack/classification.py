@@ -28,7 +28,7 @@ class ORFStatus(Enum):
     ASSIGNED = auto()
 
 class ClassificationStatus(Enum):
-    ASSINGED = auto()
+    ASSIGNED = auto()
     NO_ORFS = auto()
     NO_HITS = auto()
     NO_TAXIDS = auto()
@@ -56,22 +56,22 @@ class TaxonomicAssignment:
     lineage_scores: tuple
 
 
-
+@dataclass(slots=True)
 class TaxonomyNamespace:
-    pass
+    NCBI = auto()
 
 
 @dataclass(slots=True)
 class ClassificationResult:
-    entity_id: int
+    entity_id: str
     #entity_type: EntityType #TODO: for later addition (other types like viral)
     status: ClassificationStatus
     #sequence_type: SequenceType #TODO: For later addition
-    taxonomy_namespace: TaxonomyNamespace #Support for more then one taxid system
-    assignments: tuple[TaxonomicAssignment, ...]
-    total_n_ORFs: int
-    based_on_n_ORFs: int
-    orf_results: tuple[ORFClassification, ...]
+    taxonomy_namespace: TaxonomyNamespace = TaxonomyNamespace.NCBI #Support for more then one taxid system
+    assignments: tuple[TaxonomicAssignment, ...] = ()
+    total_n_ORFs: int = 0
+    based_on_n_ORFs: int = 0
+    orf_results: tuple[ORFClassification, ...] = ()
 
 class ClassificationEngine:
     """
@@ -93,7 +93,7 @@ class ClassificationEngine:
                 status=ORFStatus.NO_HIT
             )
         taxid, top_bitscore = tax.find_LCA_for_ORF(
-            hits, self.fastaid2LCAtaxid, self.taxid2parent)
+            hits, self.fastaid2taxid, self.taxid2parent)
 
         if taxid.startswith("no taxid found"):
             return ORFClassification(
@@ -119,14 +119,13 @@ class ClassificationEngine:
             lineage=tuple(lineage)
         )
 
-    def classify_ORFgroup(self, *, entity_id: str, orf_ids: Sequence[str], orf2hits: Mapping[str, Sequence[tuple[str, Decimal]]]):
+    def classify_group(self, *, entity_id: str, orf_ids: Sequence[str], orf2hits: Mapping[str, Sequence[tuple[str, Decimal]]]):
         """
         Classificaion of one contig or bin from ORFs
         """
         if not orf_ids: return ClassificationResult(
             entity_id=entity_id,
             status=ClassificationStatus.NO_ORFS,
-            assignments=() # dont like this
         )
         orf_results= []
         lca_ORFs = []
@@ -203,12 +202,4 @@ class ClassificationEngine:
         )
 
 
-
-
-
-
-
-
-    def classify_group(self):
-        pass
 
