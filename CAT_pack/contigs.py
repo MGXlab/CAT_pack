@@ -369,7 +369,7 @@ def run():
                 if orf_result.status == classification.ORFStatus.NO_TAXID:
                     outf2.write(
                         f"{orf_result.orf_id}\t{orf_result.n_hits}\t"
-                        f"{orf_result.taxid}\t{orf_result.top_bitscore}\n"
+                        f"{orf_result.message}\t{orf_result.top_bitscore}\n"
                     )
                     continue
 

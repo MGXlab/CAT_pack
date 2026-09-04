@@ -42,6 +42,7 @@ class ORFClassification:
 
     n_hits: int = 0
     taxid: str | None = None # TODO: replace with int down the line
+    message: str | None = None
     top_bitscore: Decimal | None = None
     lineage: tuple[str, ...] = () # TODO: update on lineage internal change
 
@@ -101,8 +102,7 @@ class ClassificationEngine:
                 status=ORFStatus.NO_TAXID,
                 n_hits=len(hits),
                 top_bitscore=top_bitscore,
-                taxid=taxid # TODO: this will give back no taxid found to taxid what will be turned into
-                # a int down the line will need to introduce a message system into this class
+                message=taxid
             )
 
         lineage = tax.find_lineage(taxid, self.taxid2parent)
@@ -139,7 +139,7 @@ class ClassificationEngine:
                 continue
 
             if result.status == ORFStatus.NO_TAXID:
-                lca_ORFs.append((result.taxid, result.top_bitscore)) # TODO: add message to ORFclassification instead of misusing taxid
+                lca_ORFs.append((result.message, result.top_bitscore))
                 continue
 
             lca_ORFs.append((result.taxid, result.top_bitscore))
