@@ -524,7 +524,7 @@ def run():
 
                 if orf_result.status == ORFStatus.NO_TAXID:
                     outf2.write("{0}\t{1}\t{2}\t{3}\t{4}\n".format(
-                        orf_result.orf_id, bin_, orf_result.n_hits, orf_result.taxid, orf_result.top_bitscore
+                        orf_result.orf_id, bin_, orf_result.n_hits, orf_result.message, orf_result.top_bitscore
                         )
                     )
                     continue
