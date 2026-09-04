@@ -570,7 +570,7 @@ def run():
                             lineage, taxids_with_multiple_offspring)
                 
                 scores = ["{0:.2f}".format(score) for score
-                        in assignment.lineages_scores[i]]
+                        in assignment.lineage_scores[i]]
                 
                 if len(result.assignments) == 1:
                     # There is only one classification.
