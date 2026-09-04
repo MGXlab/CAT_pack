@@ -9,7 +9,8 @@ import sys
 import about
 import check
 import classification
-from classification import ClassificationStatus as Status
+from classification import ORFStatus, ClassificationStatus as ClassStatus
+
 import shared
 import tax
 
@@ -515,20 +516,20 @@ def run():
             # processing the results
             for orf_result in result.orf_results:
 
-                if orf_result.status == classification.ORFStatus.NO_HIT:
+                if orf_result.status == ORFStatus.NO_HIT:
                     outf2.write("{0}\t{1}\tORF has no hit to database\n"
                                 "".format(orf_result.orf_id, bin_)) # bin_ could be replaced with result.entity_id
                                                                         # but not sure about the readability
                     continue
 
-                if orf_result.status == classification.ORFStatus.NO_TAXID:
+                if orf_result.status == ORFStatus.NO_TAXID:
                     outf2.write("{0}\t{1}\t{2}\t{3}\t{4}\n".format(
                         orf_result.orf_id, bin_, orf_result.n_hits, orf_result.taxid, orf_result.top_bitscore
                         )
                     )
                     continue
 
-                lineage = tax.find_lineage(taxid, taxid2parent)
+                lineage = list(orf_result.lineage)
 
                 if not args.no_stars:
                     lineage = tax.star_lineage(
@@ -539,48 +540,39 @@ def run():
                                 ";".join(lineage[::-1]), orf_result.top_bitscore)
                 )
 
-                    
-            if len(LCAs_ORFs) == 0:
+            if result.status in (ClassStatus.NO_HITS,ClassStatus.NO_ORFS):
                 outf1.write("{0}\tno taxid assigned\tno hits to database\n"
-                        "".format(bin_))
-
+                            "".format(bin_))
                 continue
 
-            lineages, lineages_scores, based_on_n_ORFs = tax.find_weighted_LCA(
-                    LCAs_ORFs, taxid2parent, args.f)
-
-            if lineages == "no ORFs with taxids found.":
+            if result.status == ClassStatus.NO_TAXIDS:
                 outf1.write("{0}\tno taxid assigned\t"
                         "hits not found in taxonomy files\n".format(bin_))
-
                 continue
 
-            if lineages == "no lineage whitelisted.":
+            if result.status == ClassStatus.NO_LINEAGE_SUPPORT:
                 outf1.write(
                         "{0}\tno taxid assigned\t"
                         "no lineage reached minimum bit-score support\n"
                         "".format(bin_)
                         )
-
                 continue
             
             # The bin has a valid classification.
             n_classified_bins += 1
-
-            total_n_ORFs = sum(
-                    [len(contig2ORFs[contig]) for
-                        contig in bin2contigs[bin_] if contig in contig2ORFs]
-                    )
             
-            for (i, lineage) in enumerate(lineages):
+            for (i, assignment) in enumerate(result.assignments):
+
+                lineage = list(assignment.lineage)
+
                 if not args.no_stars:
                     lineage = tax.star_lineage(
                             lineage, taxids_with_multiple_offspring)
                 
                 scores = ["{0:.2f}".format(score) for score
-                        in lineages_scores[i]]
+                        in assignment.lineages_scores[i]]
                 
-                if len(lineages) == 1:
+                if len(result.assignments) == 1:
                     # There is only one classification.
                     outf1.write(
                             "{0}\t"
@@ -589,8 +581,8 @@ def run():
                             "{3}\t"
                             "{4}\n".format(
                                 bin_,
-                                based_on_n_ORFs,
-                                total_n_ORFs,
+                                result.based_on_n_ORFs,
+                                result.total_n_ORFs,
                                 ";".join(lineage[::-1]),
                                 ";".join(scores[::-1])
                                 )
@@ -605,9 +597,9 @@ def run():
                             "{6}\n".format(
                                 bin_,
                                 i + 1,
-                                len(lineages),
-                                based_on_n_ORFs,
-                                total_n_ORFs,
+                                len(result.assignments),
+                                result.based_on_n_ORFs,
+                                result.total_n_ORFs,
                                 ";".join(lineage[::-1]),
                                 ";".join(scores[::-1])
                                 )
