@@ -369,13 +369,13 @@ def run():
             LCAs_ORFs = []
 
             for orf_result in result.orf_results:
-                if orf_result.status == classification.ORFStuatus.NO_HIT:
+                if orf_result.status == classification.ORFStatus.NO_HIT:
                     outf2.write("{0}\tORF has no hit to database\n".format(
                         orf_result.orf_id))
 
                     continue
 
-                if orf_result.status == classification.ORFStuatus.NO_TAXID:
+                if orf_result.status == classification.ORFStatus.NO_TAXID:
                     outf2.write("{0}\t{1}\t{2}\t{3}\n".format(
                         orf_result.orf_id, orf_result.n_hits, orf_result.taxid, orf_result.top_bitscore))
                     continue
