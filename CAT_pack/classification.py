@@ -182,8 +182,6 @@ class ClassificationEngine:
 
         assignments: list [TaxonomicAssignment] = []
 
-        assignments = []
-
         for i, lineage in enumerate(lineages):
             assignments.append(
                 TaxonomicAssignment(
