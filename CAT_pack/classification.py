@@ -67,6 +67,9 @@ class ClassificationResult:
     #sequence_type: SequenceType #TODO: For later addition
     taxonomy_namespace: TaxonomyNamespace #Support for more then one taxid system
     assignments: tuple[TaxonomicAssignment, ...]
+    total_n_ORFs: int
+    based_on_n_ORFs: int
+    orf_results: tuple[ORFClassification, ...]
 
 class ClassificationEngine:
     """
@@ -123,7 +126,34 @@ class ClassificationEngine:
             status=ClassificationStatus.NO_ORFS,
             assignments=() # dont like this
         )
-        pass
+        orf_results= []
+        lca_ORFs = []
+
+        for orf_id in orf_ids:
+            # get a ORF classification for one ORF and append it
+            result = self.classify_orf(orf_id, orf2hits.get(orf_id))
+            orf_results.append(result)
+
+            if result.status == ORFStatus.NO_HIT:
+                continue
+
+            if result.status == ORFStatus.NO_TAXID:
+                lca_ORFs.append((result.taxid, result.top_bitscore)) # TODO: add message to ORFclassification instead of misusing taxid
+                continue
+
+            lca_ORFs.append((result.taxid, result.top_bitscore))
+
+        if not lca_ORFs:
+            return ClassificationResult(
+                entity_id=entity_id,
+                status=ClassificationStatus.NO_HITS,
+                assignments=(),
+                total_n_ORFs=len(orf_ids),
+                based_on_n_ORFs=0,
+                orf_results=tuple(orf_results)
+            )
+
+
 
 
 
