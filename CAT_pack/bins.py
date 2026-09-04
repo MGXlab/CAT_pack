@@ -9,6 +9,7 @@ import sys
 import about
 import check
 import classification
+from classification import ClassificationStatus as Status
 import shared
 import tax
 
@@ -516,45 +517,28 @@ def run():
 
                 if orf_result.status == classification.ORFStatus.NO_HIT:
                     outf2.write("{0}\t{1}\tORF has no hit to database\n"
-                                "".format(ORF, bin_))
+                                "".format(orf_result.orf_id, bin_)) # bin_ could be replaced with result.entity_id
+                                                                        # but not sure about the readability
                     continue
 
-
-            for contig in sorted(bin2contigs[bin_]):
-                if contig not in contig2ORFs:
+                if orf_result.status == classification.ORFStatus.NO_TAXID:
+                    outf2.write("{0}\t{1}\t{2}\t{3}\t{4}\n".format(
+                        orf_result.orf_id, bin_, orf_result.n_hits, orf_result.taxid, orf_result.top_bitscore
+                        )
+                    )
                     continue
 
-                for ORF in contig2ORFs[contig]:
-                    # if ORF not in ORF2hits:
-                    #     outf2.write("{0}\t{1}\tORF has no hit to database\n"
-                    #             "".format(ORF, bin_))
-                    #
-                    #     continue
+                lineage = tax.find_lineage(taxid, taxid2parent)
 
-                    n_hits = len(ORF2hits[ORF])
+                if not args.no_stars:
+                    lineage = tax.star_lineage(
+                            lineage, taxids_with_multiple_offspring)
 
-                    taxid, top_bitscore = tax.find_LCA_for_ORF(
-                            ORF2hits[ORF], fastaid2LCAtaxid, taxid2parent)
-                     
-                    if taxid.startswith("no taxid found"):
-                        outf2.write("{0}\t{1}\t{2}\t{3}\t{4}\n".format(
-                            ORF, bin_, n_hits, taxid, top_bitscore))
-                    else:
-                        lineage = tax.find_lineage(taxid, taxid2parent)
+                outf2.write("{0}\t{1}\t{2}\t{3}\t{4}\n".format(
+                            orf_result.orf_id, bin_, orf_result.n_hits,
+                                ";".join(lineage[::-1]), orf_result.top_bitscore)
+                )
 
-                        if not args.no_stars:
-                            lineage = tax.star_lineage(
-                                    lineage, taxids_with_multiple_offspring)
-
-                        outf2.write("{0}\t{1}\t{2}\t{3}\t{4}\n".format(
-                            ORF,
-                            bin_,
-                            n_hits,
-                            ";".join(lineage[::-1]),
-                            top_bitscore
-                            ))
-                                       
-                    LCAs_ORFs.append((taxid, top_bitscore),)
                     
             if len(LCAs_ORFs) == 0:
                 outf1.write("{0}\tno taxid assigned\tno hits to database\n"
