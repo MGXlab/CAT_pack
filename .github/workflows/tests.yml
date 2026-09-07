@@ -18,7 +18,7 @@ jobs:
         python-version: ["3.10", "3.13"]
         suite:
           - name: Classification
-            module: tests.test_classification
+            module: tests.test_classificationEngine
 
     steps:
       - name: Check out repository
