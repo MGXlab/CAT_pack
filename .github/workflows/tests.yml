@@ -20,7 +20,7 @@ jobs:
           - name: Classification
             module: tests.test_classificationEngine
           - name: Core_io
-            module: teste.test_io
+            module: test.test_io
 
     steps:
       - name: Check out repository
