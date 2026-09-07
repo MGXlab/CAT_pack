@@ -4,11 +4,14 @@ import sys
 import tempfile
 import unittest
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "CAT_pack"))
 
 import shared
+
+
+def alignment_row(query, hit, bitscore):
+    return "\t".join([query, hit] + ["0"] * 9 + [str(bitscore)])
 
 class SharedFileTests(unittest.TestCase):
     def test_import_orfs_groups_headers_by_their_contig_prefix(self):
