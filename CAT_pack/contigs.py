@@ -358,7 +358,7 @@ def run():
         
         for contig in sorted(contig_names):
 
-            result = cat_engine.classify_group(entity_id=contig,orf_ids=contig2ORFs[contig], orf2hits=ORF2hits)
+            result = cat_engine.classify_group(entity_id=contig,orf_ids=contig2ORFs.get(contig, ()), orf2hits=ORF2hits)
 
             for orf_result in result.orf_results:
                 if orf_result.status == classification.ORFStatus.NO_HIT:
