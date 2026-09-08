@@ -173,11 +173,10 @@ def extract_bin_orfs(bin_contigs, contig2ORFs):
     """
     orf_ids = []
     for contig in sorted(bin_contigs):
-        if contig not in contig2ORFs:
-            continue
-        orf_ids.extend(contig2ORFs[contig])
+        orf_ids.extend(contig2ORFs.get(contig, ()))
+
     return orf_ids
-                        
+
                         
 def run():
     args = parse_arguments()
