@@ -3,7 +3,7 @@
 """
 Shared taxonomic classification engine for CAT and BAT.
 
-It makes the logic that is currently duplicated between CAT and BAT centrally Accesable.
+It makes the logic that is currently duplicated between CAT and BAT centrally accesable.
 
 """
 
@@ -39,7 +39,6 @@ class ClassificationStatus(Enum):
 class ORFClassification:
     orf_id: str
     status: ORFStatus
-
     n_hits: int = 0
     taxid: str | None = None # TODO: replace with int down the line
     message: str | None = None
@@ -54,21 +53,27 @@ class TaxonomicAssignment:
     """
     taxid: str
     lineage: tuple[str, ...]
-    lineage_scores: tuple
+    lineage_scores: tuple[Decimal, ...]
 
 
 
 class TaxonomyNamespace(Enum):
+    """
+    Support for multiple taxonomy namespaces in the future
+    """
     NCBI = auto()
 
 
 @dataclass(slots=True)
 class ClassificationResult:
+    """
+    A unified classification result for CAT and BAT
+    """
     entity_id: str
     #entity_type: EntityType #TODO: for later addition (other types like viral)
     status: ClassificationStatus
     #sequence_type: SequenceType #TODO: For later addition
-    taxonomy_namespace: TaxonomyNamespace = TaxonomyNamespace.NCBI #Support for more then one taxid system
+    taxonomy_namespace: TaxonomyNamespace = TaxonomyNamespace.NCBI
     assignments: tuple[TaxonomicAssignment, ...] = ()
     total_n_ORFs: int = 0
     based_on_n_ORFs: int = 0
