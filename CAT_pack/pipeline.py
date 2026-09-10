@@ -1,9 +1,18 @@
-import sys
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
+from utils.errors import ExternalToolError, InputError
+from typing import Protocol
 
-from shared import run_CAT
+
+class Report(Protocol):
+    def __call__(
+        self,
+        stage: str,
+        status: str,
+        completed: int,
+        total: int | None,
+    ) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -17,23 +26,15 @@ class CatArgs:
     output_prefix: Path
     threads: int = 1
 
-def run_cat(args):
-    run_CAT("args_placeholder",
-            args.contigs,
-            args.database,
-            args.taxonomy,
-            'log',
-            False,
-            args.threads,
-            0.6,
-            args.range_,
-            args.output_prefix,
-            '/'
-            )
-    return
-# shared.run_CAT(args, args.contigs_fasta, args.database_folder,
-#                            args.taxonomy_folder, args.log_file, args.quiet,
-#                            args.nproc, args.f, args.r, args.out_prefix,
-#                            path_to_CAT)
-#     message = "Running CAT."
-#     give_user_feedback(message, log_file, quiet, show_time=True)
+
+
+
+def run_cat(aruments: CatArgs, report: Report) -> None:
+
+    # Just placeholders for now. Stagebuilding will come later
+    stages = ["validate_input", 'protein_prediciton',
+              "alignment", 'classify']
+
+    for index, stage in enumerate(stages):
+        if stage == "protein_prediciton" and aruments.proteins is not None:
+            report(stage, "file reused", 0 , None)
