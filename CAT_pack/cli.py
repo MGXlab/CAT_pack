@@ -16,7 +16,7 @@ from typer import Typer, Option, Argument
 from rich.console import Console
 from rich.progress import Progress, BarColumn, MofNCompleteColumn, TextColumn, TimeElapsedColumn
 
-from pipeline import CatArgs
+from pipeline import CatArgs, run_cat
 
 
 
@@ -68,23 +68,23 @@ def cat(
 ):
     # notes: Decimal is not supported by typer (look into that)
     # Print is only for my own debugging for now
-    print(contigs, database, taxonomy)
+    #print(contigs, database, taxonomy)
 
     arguments = CatArgs(
         contigs=contigs,
         database=database,
         taxonomy=taxonomy,
-        _range=Decimal(str(range_)),
+        range_=Decimal(str(range_)),
         output_prefix=Path("./out.CAT"),
     )
 
-    console.print(arguments)
+    #console.print(arguments)
     console.print("Ready for takeoff")
     progress = show_progress()
     try:
         outputs = run_cat(
             arguments,
-            on_event=progress.handle_event,
+            #on_event=progress.handle_event,
         )
     except KeyboardInterrupt:
         console.print("\nRun cancelled :(")

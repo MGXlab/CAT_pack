@@ -1,3 +1,4 @@
+import sys
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -12,12 +13,23 @@ class CatArgs:
     database: Path
     taxonomy: Path
     # some of the optional args
-    _range: Decimal
+    range_: Decimal
     output_prefix: Path
     threads: int = 1
 
 def run_cat(args):
-    run_CAT(args)
+    run_CAT("args_placeholder",
+            args.contigs,
+            args.database,
+            args.taxonomy,
+            'log',
+            False,
+            args.threads,
+            0.6,
+            args.range_,
+            args.output_prefix,
+            '/'
+            )
     return
 # shared.run_CAT(args, args.contigs_fasta, args.database_folder,
 #                            args.taxonomy_folder, args.log_file, args.quiet,
