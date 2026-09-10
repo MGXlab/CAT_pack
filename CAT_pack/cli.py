@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from decimal import Decimal
 from pathlib import Path
 from typing import Annotated
 
@@ -32,8 +33,27 @@ def cat(
             Path,
             Option("--contigs", "-c" ,help="Input contig FASTA file" )
         ],
-
+        database: Annotated[
+            Path,
+            Option("--database", "-d" ,help="Directory that contains database files" )
+        ],
+        taxonomy: Annotated[
+            Path,
+            Option("--taxonomy", "-t", help="Directory that contains taxonomy files" )
+        ],
+        range_: Annotated[
+            float,
+            Option("--range", "-r", min=0.0, max=100, help="r parameter"),
+        ] = 10.0,
 ):
-    print(contigs)
-    #arguments = CatArgs(
-    #    contigs = contigs)
+    # notes: Decimal is not supported by typer (look into that)
+    # Print is only for my own debugging for now
+    print(contigs, database, taxonomy)
+
+    arguments = CatArgs(
+        contigs=contigs,
+        database=database,
+        taxonomy=taxonomy,
+        _range=Decimal(str(range_)),
+        output_prefix=Path("./out.CAT"),
+    )
