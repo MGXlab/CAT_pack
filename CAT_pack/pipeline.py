@@ -3,6 +3,7 @@ from decimal import Decimal
 from pathlib import Path
 from utils.errors import ExternalToolError, InputError
 from typing import Protocol
+from time import sleep
 
 
 class Report(Protocol):
@@ -21,20 +22,31 @@ class CatArgs:
     contigs: Path
     database: Path
     taxonomy: Path
+    proteins: Path
     # some of the optional args
     range_: Decimal
     output_prefix: Path
     threads: int = 1
 
-
-
-
-def run_cat(aruments: CatArgs, report: Report) -> None:
-
-    # Just placeholders for now. Stagebuilding will come later
-    stages = ["validate_input", 'protein_prediciton',
+# Just placeholders for now. Stagebuilding will come later
+# global for now to allow for easier import into cli.py
+stages = ["validate_input", 'protein_prediciton',
               "alignment", 'classify']
 
+
+def run_cat(aruments: CatArgs, report: Report) -> str:
+
+
+
     for index, stage in enumerate(stages):
+        if stage == "validate_input":
+            for i in range(100):
+                report(stage, "Validating input", 0, 100)
+
+
+
+
         if stage == "protein_prediciton" and aruments.proteins is not None:
             report(stage, "file reused", 0 , None)
+
+    return "done"
