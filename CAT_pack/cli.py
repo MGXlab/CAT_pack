@@ -80,7 +80,7 @@ def update_progress(progress, tasks, stage, status, completed=0, total=None):
     elif status in {"failed", "cancelled"}:
         progress.stop_task(task_id)
 
-    progress.update(task_id,status={status},refresh=True)
+    progress.update(task_id,status=status,refresh=True)
 
 
 
