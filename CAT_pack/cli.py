@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Testrun with this: python CAT_pack cat -c tests/data/contigs/small_contigs.fa   -d output2/db   -t output2/tax   -n 4   -o CAT_run_new   --verbose --force
+Testrun with this: python CAT_pack cat -c tests/data/contigs/small_contigs.fa   -d output2/db   -t output2/tax
 
 """
 import shlex
@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from rich import traceback
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
@@ -20,7 +21,7 @@ from rich.console import Console, Group
 from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
 
 from pipeline import CatArgs, run_cat, steps
-from utils.errors import CatError
+from utils.errors import CatError, show_error
 
 
 
@@ -185,7 +186,7 @@ def cat(
         raise typer.Exit(code=130)
 
     except CatError as error:
-        console.print(error)
+        show_error(error, console)
         raise typer.Exit(code=1)
 
 
