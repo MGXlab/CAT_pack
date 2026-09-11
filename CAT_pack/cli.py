@@ -3,18 +3,22 @@
 Testrun with this: python CAT_pack cat -c tests/data/contigs/small_contigs.fa   -d output2/db   -t output2/tax   -n 4   -o CAT_run_new   --verbose --force
 
 """
-
-
-
+import shlex
+import sys
 from decimal import Decimal
 from functools import partial
 from pathlib import Path
 from typing import Annotated
 
 import typer
+from rich.panel import Panel
+from rich.pretty import Pretty
+from rich.segment import Segment
+from rich.table import Table
+from rich.text import Text
 
 from typer import Typer, Option, Argument
-from rich.console import Console
+from rich.console import Console, Group
 from rich.progress import Progress, BarColumn, MofNCompleteColumn, TextColumn, TimeElapsedColumn
 
 from pipeline import CatArgs, run_cat, stages
@@ -72,7 +76,7 @@ def make_progress(stages):
     return progress, tasks
 
 
-def update_progress(progress, tasks, stage, status, completed=0, total=1):
+def update_progress(progress, tasks, stage, status, completed=0, total=None):
     task_id = tasks[stage]
 
     if status == "running":
@@ -136,7 +140,31 @@ def cat(
         output_prefix=Path("./out.CAT"),
     )
 
-    #console.print(arguments)
+    command = shlex.join(sys.argv)
+
+    info = Table.grid(padding=(0, 2))
+    info.add_column(style="bold cyan")
+    info.add_column()
+
+    info.add_row("Contigs", str(arguments.contigs))
+    info.add_row("Taxonomy", str(arguments.taxonomy))
+    info.add_row("Database", str(arguments.database))
+
+    content = Group(
+        Text("Supplied command", style="bold"),
+        Text(f"$ {command}", style="cyan"),
+        Text(""),
+        info,
+    )
+
+    console.print(
+        Panel(
+            content,
+            title="[bold]Rarw![/bold]",
+            border_style="blue",
+        )
+    )
+
     console.print("Ready for takeoff")
     progress, tasks = make_progress(stages)
     report = partial(update_progress, progress, tasks)
