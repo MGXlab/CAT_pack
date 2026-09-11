@@ -41,6 +41,8 @@ def check_folder(path: Path, label: str) -> None:
     if not path.is_dir():
         raise InputError(
             f"{label} was not found.",
+            hint="Double check if the folder exists.",
+            path=path,
         )
 
 
@@ -56,7 +58,9 @@ def run_cat(args: CatArgs, report: Report) -> str:
     report(step, "running", 0, 1)
 
     try:
+        report(step, "running", 0, 1)
         validate_args(args)
+        report(step, "complete", 1, 1)
     except Exception as e:
         report(step, "failed", 0, None)
 
@@ -64,4 +68,4 @@ def run_cat(args: CatArgs, report: Report) -> str:
             report(remaining, "skipped", 0, None)
 
         raise
-    report(step, "completed", 1, 1)
+    report(step, "complete", 1, 1)

@@ -6,7 +6,10 @@ from rich.table import Table
 from rich.text import Text
 
 class CatError(Exception):
-    """An expected error during a CAT run."""
+    """
+    An expected error during a CAT run.
+
+    """
     title = "CAT could not finish"
     exit_code = 1
 
@@ -23,6 +26,16 @@ class CatError(Exception):
 
 
 class InputError(CatError):
+    """
+    An input error during a CAT run.
+
+    Attributes:
+        title: The title of the error.
+        hint: The hint of the error.
+        path: The path of the error.
+        step: The step of the error.
+
+    """
     title = "Check your input"
 
 
