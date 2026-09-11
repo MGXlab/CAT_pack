@@ -76,21 +76,42 @@ def make_progress(stages):
 
 
 def update_progress(progress, tasks, stage, status, completed=0, total=None):
+    styles = {
+        "waiting": "dim",
+        "running": "yellow",
+        "complete": "green",
+        "reused": "cyan",
+        "failed": "bold red",
+        "skipped": "dim",
+        "cancelled": "yellow",
+    }
+
+    style = styles[status]
     task_id = tasks[stage]
 
     if status == "running":
         progress.start_task(task_id)
+        progress.update(task_id, status=f"[{style}]{status}[/{style}]")
 
         if total is not None:
             progress.update(task_id, total=total, completed=completed)
 
     elif status == "complete":
-        progress.update(task_id, total=total, completed=completed)
+        progress.update(task_id, status=f"[{style}]{status}[/{style}]",
+                        refresh=True, total=total, completed=completed)
+
+    elif status == "reused":
+        progress.update(task_id, status=f"[{style}]{status}[/{style}]")
+
+    elif status == "skipped":
+        progress.update(task_id, status=f"[{style}]{status}[/{style}]")
 
     elif status in {"failed", "cancelled"}:
+        progress.update(task_id, status=f"[{style}]{status}[/{style}]")
         progress.stop_task(task_id)
 
-    progress.update(task_id,status=status,refresh=True)
+    else:
+        progress.update(task_id,status=status,refresh=True)
 
 
 
