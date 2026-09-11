@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -22,7 +23,7 @@ class CatArgs:
     contigs: Path
     database: Path
     taxonomy: Path
-    proteins: Path
+    proteins: Path | None
     # some of the optional args
     range_: Decimal
     fraction: Decimal
@@ -32,24 +33,35 @@ class CatArgs:
 
 # Just placeholders for now. Stagebuilding will come later
 # global for now to allow for easier import into cli.py
-stages = ["validate_input", 'protein_prediciton',
+steps = ["Input validation", 'protein_prediciton',
               "alignment", 'classify']
 
 
-def run_cat(aruments: CatArgs, report: Report) -> str:
+def check_folder(path: Path, label: str) -> None:
+    if not path.is_dir():
+        raise InputError(
+            f"{label} was not found.",
+        )
+
+
+def validate_args(args):
+    check_folder(args.database, "Database folder")
 
 
 
-    for index, stage in enumerate(stages):
-        if stage == "validate_input":
-            for i in range(100):
-                report(stage, "running", i+1, 100)
-                sleep(0.1)
 
+def run_cat(args: CatArgs, report: Report) -> str:
+    step = steps[0]
 
+    report(step, "running", 0, 1)
 
+    try:
+        validate_args(args)
+    except Exception as e:
+        report(step, "failed", 0, None)
 
-        if stage == "protein_prediciton" and aruments.proteins is not None:
-            report(stage, "file reused", 0 , None)
+        for remaining in steps[1:]:
+            report(remaining, "skipped", 0, None)
 
-    return "done"
+        raise
+    report(step, "completed", 1, 1)

@@ -12,17 +12,15 @@ from typing import Annotated
 
 import typer
 from rich.panel import Panel
-from rich.pretty import Pretty
-from rich.segment import Segment
 from rich.table import Table
 from rich.text import Text
 
 from typer import Typer, Option, Argument
 from rich.console import Console, Group
-from rich.progress import Progress, BarColumn, MofNCompleteColumn, TextColumn, TimeElapsedColumn
+from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
 
-from pipeline import CatArgs, run_cat, stages
-
+from pipeline import CatArgs, run_cat, steps
+from utils.errors import CatError
 
 
 
@@ -177,7 +175,7 @@ def cat(
 
 
     #console.print("Ready for takeoff")
-    progress, tasks = make_progress(stages)
+    progress, tasks = make_progress(steps)
     report = partial(update_progress, progress, tasks)
     try:
         with progress:
@@ -186,7 +184,7 @@ def cat(
         console.print("\nRun cancelled :(")
         raise typer.Exit(code=130)
 
-    except Exception as error:
+    except CatError as error:
         console.print(error)
         raise typer.Exit(code=1)
 
