@@ -41,7 +41,8 @@ def run_cat(aruments: CatArgs, report: Report) -> str:
     for index, stage in enumerate(stages):
         if stage == "validate_input":
             for i in range(100):
-                report(stage, "Validating input", 0, 100)
+                report(stage, "running", i+1, 100)
+                sleep(0.1)
 
 
 
