@@ -43,10 +43,17 @@ def main():
 # )
 
 
+class StaticBarColumn(BarColumn):
+    def render(self, task):
+        bar = super().render(task)
+        bar.pulse = False
+        return bar
+
+
 def make_progress(stages):
     progress = Progress(
         TextColumn("[bold]{task.description:<20}"),
-        BarColumn(bar_width=28, pulse_style="bar.back"),
+        StaticBarColumn(bar_width=28),
         TextColumn("{task.fields[status]}"),
         TimeElapsedColumn(),
         console=console,
@@ -65,7 +72,7 @@ def make_progress(stages):
     return progress, tasks
 
 
-def update_progress(progress, tasks, stage, status, completed=0, total=None):
+def update_progress(progress, tasks, stage, status, completed=0, total=1):
     task_id = tasks[stage]
 
     if status == "running":
