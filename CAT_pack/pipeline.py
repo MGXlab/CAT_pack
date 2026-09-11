@@ -25,6 +25,8 @@ class CatArgs:
     proteins: Path
     # some of the optional args
     range_: Decimal
+    fraction: Decimal
+    log_file: Path
     output_prefix: Path
     threads: int = 1
 
