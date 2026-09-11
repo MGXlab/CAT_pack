@@ -120,6 +120,10 @@ def cat(
             float,
             Option("--range", "-r", min=0.0, max=100, help="r parameter"),
         ] = 10.0,
+        fraction: Annotated[
+            float,
+            Option("--fraction", "-f",min=0.0, max=0.99, help="fraction parameter"),
+        ] = 0.5,
         proteins: Annotated[
             Path,
             Option("--proteins_fatsa", "-p",
@@ -137,11 +141,12 @@ def cat(
         taxonomy=taxonomy,
         proteins=proteins,
         range_=Decimal(str(range_)),
+        fraction=Decimal(str(fraction)),
+        log_file=Path("./out.CAT.log"),
         output_prefix=Path("./out.CAT"),
     )
 
-    command = shlex.join(sys.argv)
-
+    # Table of used parameters (same as old message)
     info = Table.grid(padding=(0, 2))
     info.add_column(style="bold cyan")
     info.add_column()
@@ -149,23 +154,29 @@ def cat(
     info.add_row("Contigs", str(arguments.contigs))
     info.add_row("Taxonomy", str(arguments.taxonomy))
     info.add_row("Database", str(arguments.database))
+    info.add_row("Parameter r", str(arguments.range_))
+    info.add_row("Fraction", str(arguments.fraction))
+    info.add_row("Log file", str(arguments.log_file))
 
+    # group the supplied and parameters together
     content = Group(
         Text("Supplied command", style="bold"),
-        Text(f"$ {command}", style="cyan"),
+        Text(f"$ {shlex.join(sys.argv)}", style="cyan"),
         Text(""),
         info,
     )
 
+    # print the group in a panel
     console.print(
         Panel(
             content,
             title="[bold]Rarw![/bold]",
             border_style="blue",
-        )
+        ), "\n"
     )
 
-    console.print("Ready for takeoff")
+
+    #console.print("Ready for takeoff")
     progress, tasks = make_progress(stages)
     report = partial(update_progress, progress, tasks)
     try:
