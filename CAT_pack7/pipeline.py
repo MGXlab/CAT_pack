@@ -37,16 +37,10 @@ steps = ["Input validation", 'protein_prediciton',
               "alignment", 'classify']
 
 
-errors = []
 
 
-def check(function, *values, **options):
-    """Run a check, remember expected errors, and continue."""
-    try:
-        return function(*values, **options)
-    except CatError as error:
-        errors.append(error)
-        return None
+
+
 
 
 def check_folder(path: Path, label: str) -> None:
@@ -59,8 +53,21 @@ def check_folder(path: Path, label: str) -> None:
 
 
 def validate_args(args):
+    errors = []
+
+    def check(function, *values, **options):
+        """Run a check, remember expected errors, and continue."""
+        try:
+            return function(*values, **options)
+        except CatError as error:
+            errors.append(error)
+            return None
+
     check(check_folder, args.database, "Database folder")
     check(check_folder, args.taxonomy, "Taxonomy folder")
+
+    if errors:
+        raise ValidationError(errors)
 
 
 
@@ -72,14 +79,8 @@ def run_cat(args: CatArgs, report: Report) -> str:
     report(step, "running", 0, 1)
 
     try:
-        report(step, "running", 0, 1)
         validate_args(args)
-
-        if errors:
-            raise ValidationError(errors)
-
-        report(step, "complete", 1, 1)
-    except Exception:
+    except ValidationError:
         report(step, "failed", 0, None)
 
         for remaining in steps[1:]:
