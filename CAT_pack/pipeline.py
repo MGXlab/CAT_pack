@@ -2,7 +2,7 @@ import os
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from utils.errors import ExternalToolError, InputError
+from utils.errors import ExternalToolError, InputError, CatError, ValidationError
 from typing import Protocol
 from time import sleep
 
@@ -37,6 +37,18 @@ steps = ["Input validation", 'protein_prediciton',
               "alignment", 'classify']
 
 
+errors = []
+
+
+def check(function, *values, **options):
+    """Run a check, remember expected errors, and continue."""
+    try:
+        return function(*values, **options)
+    except CatError as error:
+        errors.append(error)
+        return None
+
+
 def check_folder(path: Path, label: str) -> None:
     if not path.is_dir():
         raise InputError(
@@ -47,7 +59,9 @@ def check_folder(path: Path, label: str) -> None:
 
 
 def validate_args(args):
-    check_folder(args.database, "Database folder")
+    check(check_folder, args.database, "Database folder")
+    check(check_folder, args.taxonomy, "Taxonomy folder")
+
 
 
 
@@ -60,8 +74,12 @@ def run_cat(args: CatArgs, report: Report) -> str:
     try:
         report(step, "running", 0, 1)
         validate_args(args)
+
+        if errors:
+            raise ValidationError(errors)
+
         report(step, "complete", 1, 1)
-    except Exception as e:
+    except Exception:
         report(step, "failed", 0, None)
 
         for remaining in steps[1:]:

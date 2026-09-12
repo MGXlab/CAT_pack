@@ -39,14 +39,34 @@ class InputError(CatError):
     title = "Check your input"
 
 
+class ValidationError(CatError):
+    title = "Input validation failed"
+
+    def __init__(self, errors: list[CatError]):
+        super().__init__(f"Found {len(errors)} problems.")
+        self.errors = errors
+
+
 class ExternalToolError(CatError):
     def __init__(self, tool: str, message: str):
         self.tool = tool
         super().__init__(f"{tool}: {message}")
 
 
-
 def show_error(error: CatError, console: Console) -> None:
+    if isinstance(error, ValidationError):
+        console.print(
+            f"\n[bold red]Input validation failed: "
+            f"Found {len(error.errors)} problems.[/bold red]"
+        )
+
+        for item in error.errors:
+            _show_single_error(item, console)
+    else:
+        _show_single_error(error, console)
+
+
+def _show_single_error(error: CatError, console: Console) -> None:
     details = Table.grid(padding=(0, 3))
     details.add_column(style="bold", no_wrap=True)
     details.add_column()
