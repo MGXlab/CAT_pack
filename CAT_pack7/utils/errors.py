@@ -48,6 +48,8 @@ class ValidationError(CatError):
 
 
 class ExternalToolError(CatError):
+    title = "External tool error"
+
     def __init__(self, tool: str, message: str):
         self.tool = tool
         super().__init__(f"{tool}: {message}")
@@ -87,7 +89,8 @@ def _show_single_error(error: CatError, console: Console) -> None:
             details,
             title=Text(error.title, style="bold red"),
             border_style="red",
-            expand=False,
+            expand=True,
+            width=90,
             padding=(0, 2),
         )
     )
