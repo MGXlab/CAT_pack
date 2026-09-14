@@ -9,7 +9,7 @@ import traceback
 
 from .utils.errors import CatError, InputError
 from .validation import validate_args
-from .tools.pyrodigal import run_pyrodigal
+from .tools.pyrodigal import run_pyrodigal, run_protein_prediction
 from .tools.aligner import run_aligner, DiamondArgs, MMseqsArgs
 from .classification import contig_classification
 
@@ -104,7 +104,6 @@ def run_cat(args: CatArgs, report: Report) -> dict[str, Path]:
                 # This forces "completion" of reused progressbar.
                 # And thus makes the progressbar green, currently if only
                 # reused is called the bar says dimmed (also a good indicator)
-                report(current_step.name, Status.RUNNING, 1, 1)
                 report(current_step.name, Status.SUPPLIED, 1, 1)
                 log.write(f"Reused: {current_step.name}\n")
                 log.flush()
@@ -115,7 +114,7 @@ def run_cat(args: CatArgs, report: Report) -> dict[str, Path]:
             log.flush()
 
             if current_step.name == "Protein prediction":
-                run_pyrodigal(args, files, log, report)
+                run_protein_prediction(args, files, log, report, "pyrodigal")
             elif current_step.name == "Alignment":
                 run_aligner(args, log, report)
             elif current_step.name == "Classify":
