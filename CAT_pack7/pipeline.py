@@ -3,10 +3,13 @@ from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 from typing import Protocol
-from time import sleep
+import traceback
 
-from utils.errors import ValidationError
-from validation import validate_args
+from .utils.errors import CatError, InputError
+from .validation import validate_args
+from .tools.pyrodigal import run_pyrodigal
+from .tools.diamond import run_diamond
+from .classification import contig_classification
 
 
 class Report(Protocol):
@@ -64,18 +67,90 @@ def build_plan(args: CatArgs) -> list[Step]:
         Step("Classify"),
     ]
 
-def run_cat(args: CatArgs, report: Report) -> str:
-    step = steps[0]
 
-    report(step, "running", 0, 1)
+def run_cat(args: CatArgs, report: Report) -> dict[str, Path]:
+    """Contig annotation tool (CAT) run"""
+
+    plan = build_plan(args)
+    step_index = 0
+    current_step = plan[step_index]
+    log = None #only activate log after input validation :D
+
 
     try:
-        validate_args(args)
-    except ValidationError:
-        report(step, "failed", 0, None)
+        report(current_step.name, "running", 0, 1)
+        files = validate_args(args)
 
-        for remaining in steps[1:]:
-            report(remaining, "skipped", 0, None)
+        # Exclusive creation ("x") this ensures no old log overwrite
+        # will become this, fornow placeholder
+        # log = files["log"].open("x", encoding="utf-8")
+        log = args.log_file.open("x", encoding="utf-8")
+        log.write(f"CAT_pack7\n{args!r}\n")
+        report(current_step.name, "complete", 1, 1)
 
+        for step_index, current_step in enumerate(plan[1:], start=1):
+            if current_step.reuse:
+                # This forces "completion" of reused progressbar.
+                # And thus makes the progressbar green, currently if only
+                # reused is called the bar says dimmed (also a good indicator)
+                report(current_step.name, "running", 1, 1)
+                report(current_step.name, "reused", 1, 1)
+                log.write(f"Reused: {current_step.name}\n")
+                log.flush()
+                continue
+
+            report(current_step.name, "running", 0, None)
+            log.write(f"Starting: {current_step.name}\n")
+            log.flush()
+
+            if current_step.name == "Protein prediction":
+                run_pyrodigal(args, files, log, report)
+            elif current_step.name == "Alignment":
+                run_diamond(args, files, log, report)
+            elif current_step.name == "Classify":
+                contig_classification(args, files, log, report)
+            else:
+                log.write(f"Can't spell that well, my misspelling:"
+                          f"{current_step.name}\n")
+
+            # always complete the step with 1 of 1 so 100% completion,
+            # errors will have caused the code to stop before this if there is
+            # an exception.
+            report(current_step.name, "complete", 1, 1)
+            log.write(f"Completed: {current_step.name}\n")
+            log.flush()
+
+        return {
+            "Contig classifications": Path("Future path to C2C file :)"),
+            "ORF classifications": Path("Future path to ORF2LCA file :)"),
+            "Log": files["log"],
+        }
+
+    except KeyboardInterrupt:
+        report(current_step.name, "cancelled", 0, None)
+
+        for skipped_steps in plan[step_index + 1:]:
+            report(skipped_steps.name, "skipped", 0, None)
+
+        if log is not None: log.write("Run cancelled\n")
         raise
-    report(step, "complete", 1, 1)
+
+    except Exception as error:
+        report(current_step.name, "failed", 0, None)
+        for remaining_step in plan[step_index + 1:]:
+            report(remaining_step.name, "skipped", 0, None)
+
+        # Log all details into the log file, and the CLI shows the short error
+        if log is not None: traceback.print_exc(file=log)
+
+        if isinstance(error, CatError):
+            error.step = current_step.name
+            error.log_file = args.log_file if log is not None else None
+            raise
+
+        # Catch all other exceptions
+        raise
+
+    finally:
+        if log is not None:
+            log.close()

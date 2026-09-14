@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Testrun with this: python CAT_pack cat -c tests/data/contigs/small_contigs.fa   -d output2/db   -t output2/tax
+Testrun with this: python CAT_pack cat -c tests/data/contigs/small_contigs.fa \
+                    -d output2/db   -t output2/tax
 
 """
 import shlex
@@ -20,8 +21,8 @@ from typer import Typer, Option, Argument
 from rich.console import Console, Group
 from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
 
-from pipeline import CatArgs, run_cat, steps
-from utils.errors import CatError, show_error
+from .pipeline import CatArgs, run_cat, build_plan
+from .utils.errors import CatError, show_error
 
 
 
@@ -31,7 +32,7 @@ console = Console(stderr=True)
 
 @app.callback()
 def main():
-    print("Hi!")
+    """Run CAT with progress reporting and collected preflight errors."""
 
 
 
@@ -118,7 +119,7 @@ def update_progress(progress, tasks, stage, status, completed=0, total=None):
 
 # @bastiaan there is a destinction between typer.Option and typer.Arguments
 # Arguments are stricly bound to input order of arguments, and do not allow for aliases
-# But they are by default required
+# But they are by default required.
 # Options on the other hand must be set by a argument name and allow for aliases
 # However they are by default NOT required. But can be set to be required
 # What do you think is best? For now I will go for Options and we can always re-evaluate
@@ -126,30 +127,59 @@ def update_progress(progress, tasks, stage, status, completed=0, total=None):
 def cat(
         contigs: Annotated[
             Path,
-            Option("--contigs", "-c" ,help="Input contig FASTA file" )
+            Option("--contigs", "-c" ,
+                   help="Input contig FASTA file" )
         ],
         database: Annotated[
             Path,
-            Option("--database", "-d" ,help="Directory that contains database files" )
+            Option("--database", "-d" ,
+                   help="Directory that contains database files" )
         ],
         taxonomy: Annotated[
             Path,
-            Option("--taxonomy", "-t", help="Directory that contains taxonomy files" )
+            Option("--taxonomy", "-t",
+                   help="Directory that contains taxonomy files" )
         ],
         range_: Annotated[
             float,
-            Option("--range", "-r", min=0.0, max=100, help="r parameter"),
+            Option("--range", "-r", min=0.0, max=11,
+                   help="r parameter (standard CAT range, 0-11)."),
         ] = 10.0,
         fraction: Annotated[
             float,
-            Option("--fraction", "-f",min=0.0, max=0.99, help="fraction parameter"),
+            Option("--fraction", "-f",min=0.0, max=0.99,
+                   help="fraction parameter"),
         ] = 0.5,
         proteins: Annotated[
-            Path,
-            Option("--proteins_fatsa", "-p",
+            Path | None,
+            Option("--proteins_fasta", "-p",
                    help="Predicted proteins fasta file. If supplied, "
-                        "the protein prediction step is skipped"),
-        ] = None
+                        "the protein prediction step is skipped")
+        ] = None,
+        alignment: Annotated[
+            Path | None,
+            Option("--alignment_table", "-a",
+                   help="Alignment table (in BLAST+6 format). If supplied, "
+                    "the alignment step is skipped and classification is "
+                    "carried out directly. A predicted proteins fasta file "
+                    "should also be supplied with argument --proteins_fasta.")
+        ] = None,
+        output_prefix: Annotated[
+            Path,
+            Option("--output-prefix", "-o")
+        ] = Path("out.CAT"),
+        threads: Annotated[
+            int,
+            Option("--threads", "-n", min=1)
+        ] = 1,
+        log_file: Annotated[
+            Path | None,
+            Option("--log-file")
+        ] = None,
+        debug: Annotated[
+            bool,
+            Option("--debug", help="Show unexpected-error tracebacks.")
+        ] = False,
 ):
     # notes: Decimal is not supported by typer (look into that)
     # Print is only for my own debugging for now
@@ -160,10 +190,12 @@ def cat(
         database=database,
         taxonomy=taxonomy,
         proteins=proteins,
+        alignment=alignment,
         range_=Decimal(str(range_)),
         fraction=Decimal(str(fraction)),
-        log_file=Path("./out.CAT.log"),
-        output_prefix=Path("./out.CAT"),
+        log_file=log_file or Path(f"{output_prefix}.log"),
+        output_prefix=output_prefix,
+        threads=threads,
     )
 
     # Table of used parameters (same as old message)
@@ -196,8 +228,8 @@ def cat(
     )
 
 
-    #console.print("Ready for takeoff")
-    progress, tasks = make_progress(steps)
+    console.print("Preparing for CAT run\n\n")
+    progress, tasks = make_progress([step.name for step in build_plan(arguments)])
     report = partial(update_progress, progress, tasks)
     try:
         with progress:
@@ -210,7 +242,18 @@ def cat(
         show_error(error, console)
         raise typer.Exit(code=1)
 
+    except Exception:
+        console.print("[red]Unexpected error. Check the run log or use --debug for a full traceback[/red]")
+        if debug:
+            console.print_exception(show_locals=True) # TODO: before release back to False
+        raise typer.Exit(code=1)
+
 
 
     else:
-        console.print(outputs)
+        results = Table(title="CAT completed")
+        results.add_column("Result", style="green")
+        results.add_column("Location")
+        for label, path in outputs.items():
+            results.add_row(label, Text(str(path)))
+        console.print(results)
