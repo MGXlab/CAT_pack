@@ -22,7 +22,7 @@ class CatError(Exception):
         self.hint = hint
         self.path = path
         self.step: str | None = None
-        #self.log_file: Path | None = None
+        self.log_file: Path | None = None
 
 
 class InputError(CatError):
@@ -50,9 +50,10 @@ class ValidationError(CatError):
 class ExternalToolError(CatError):
     title = "External tool error"
 
-    def __init__(self, tool: str, message: str):
+    def __init__(self, tool: str, message: str, hint: str | None = None):
         self.tool = tool
         super().__init__(f"{tool}: {message}")
+        self.hint = hint
 
 
 def show_error(error: CatError, console: Console) -> None:
@@ -83,6 +84,9 @@ def _show_single_error(error: CatError, console: Console) -> None:
 
     if error.hint is not None:
         details.add_row("Try this", Text(error.hint))
+
+    if error.log_file is not None:
+        details.add_row("Log", Text(str(error.log_file)))
 
     console.print(
         Panel(
