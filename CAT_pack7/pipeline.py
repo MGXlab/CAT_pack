@@ -82,9 +82,8 @@ def run_cat(args: CatArgs, report: Report) -> dict[str, Path]:
         files = validate_args(args)
 
         # Exclusive creation ("x") this ensures no old log overwrite
-        # will become this, fornow placeholder
-        # log = files["log"].open("x", encoding="utf-8")
-        log = args.log_file.open("x", encoding="utf-8")
+
+        log = files["log"].open("x", encoding="utf-8")
         log.write(f"CAT_pack7\n{args!r}\n")
         report(current_step.name, "complete", 1, 1)
 
