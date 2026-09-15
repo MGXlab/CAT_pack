@@ -8,7 +8,7 @@ import traceback
 from .utils.errors import CatError, InputError
 from .validation import validate_args
 from .tools.pyrodigal import run_pyrodigal
-from .tools.diamond import run_diamond
+from .tools.aligner import run_aligner
 from .classification import contig_classification
 
 
@@ -105,7 +105,7 @@ def run_cat(args: CatArgs, report: Report) -> dict[str, Path]:
             if current_step.name == "Protein prediction":
                 run_pyrodigal(args, files, log, report)
             elif current_step.name == "Alignment":
-                run_diamond(args, files, log, report)
+                run_aligner(args, log, report)
             elif current_step.name == "Classify":
                 contig_classification(args, files, log, report)
             else:

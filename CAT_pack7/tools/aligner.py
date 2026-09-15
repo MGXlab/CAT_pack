@@ -1,4 +1,4 @@
-"""Align proteins to the CAT database with DIAMOND."""
+"""aligner script"""
 import shutil
 import subprocess
 from dataclasses import dataclass
