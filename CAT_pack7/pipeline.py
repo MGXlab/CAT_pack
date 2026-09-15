@@ -1,15 +1,26 @@
 import os
 from dataclasses import dataclass
 from decimal import Decimal
+from enum import Enum, auto
 from pathlib import Path
 from typing import Protocol
 import traceback
 
+
 from .utils.errors import CatError, InputError
 from .validation import validate_args
 from .tools.pyrodigal import run_pyrodigal
-from .tools.diamond import run_diamond
+from .tools.aligner import run_aligner, DiamondArgs, MMseqsArgs
 from .classification import contig_classification
+
+
+class Status(Enum):
+    RUNNING = "Running"
+    COMPLETE = "Completed"
+    SUPPLIED = "Supplied"
+    SKIPPED = "Skipped"
+    FAILED = "Failed"
+    CANCELLED = "Cancelled"
 
 
 class Report(Protocol):
@@ -22,7 +33,7 @@ class Report(Protocol):
     Cancelled can also be used if user canceld the run
     """
 
-    def __call__(self, stage: str, status: str, completed: int,
+    def __call__(self, step: str, status: Status, completed: int,
                  total: int | None) -> None: ...
 
 
@@ -43,6 +54,7 @@ class CatArgs:
     fraction: Decimal
     log_file: Path
     output_prefix: Path
+    aligner: DiamondArgs | MMseqsArgs | None = None
     threads: int = 1
 
 @dataclass(frozen=True)
@@ -78,34 +90,34 @@ def run_cat(args: CatArgs, report: Report) -> dict[str, Path]:
 
 
     try:
-        report(current_step.name, "running", 0, 1)
+        report(current_step.name, Status.RUNNING, 0, 1)
         files = validate_args(args)
 
         # Exclusive creation ("x") this ensures no old log overwrite
 
         log = files["log"].open("x", encoding="utf-8")
         log.write(f"CAT_pack7\n{args!r}\n")
-        report(current_step.name, "complete", 1, 1)
+        report(current_step.name, Status.COMPLETE, 1, 1)
 
         for step_index, current_step in enumerate(plan[1:], start=1):
             if current_step.reuse:
                 # This forces "completion" of reused progressbar.
                 # And thus makes the progressbar green, currently if only
                 # reused is called the bar says dimmed (also a good indicator)
-                report(current_step.name, "running", 1, 1)
-                report(current_step.name, "reused", 1, 1)
+                report(current_step.name, Status.RUNNING, 1, 1)
+                report(current_step.name, Status.SUPPLIED, 1, 1)
                 log.write(f"Reused: {current_step.name}\n")
                 log.flush()
                 continue
 
-            report(current_step.name, "running", 0, None)
+            report(current_step.name, Status.RUNNING, 0, None)
             log.write(f"Starting: {current_step.name}\n")
             log.flush()
 
             if current_step.name == "Protein prediction":
                 run_pyrodigal(args, files, log, report)
             elif current_step.name == "Alignment":
-                run_diamond(args, files, log, report)
+                run_aligner(args, log, report)
             elif current_step.name == "Classify":
                 contig_classification(args, files, log, report)
             else:
@@ -115,7 +127,7 @@ def run_cat(args: CatArgs, report: Report) -> dict[str, Path]:
             # always complete the step with 1 of 1 so 100% completion,
             # errors will have caused the code to stop before this if there is
             # an exception.
-            report(current_step.name, "complete", 1, 1)
+            report(current_step.name, Status.COMPLETE, 1, 1)
             log.write(f"Completed: {current_step.name}\n")
             log.flush()
 
@@ -126,18 +138,18 @@ def run_cat(args: CatArgs, report: Report) -> dict[str, Path]:
         }
 
     except KeyboardInterrupt:
-        report(current_step.name, "cancelled", 0, None)
+        report(current_step.name, Status.CANCELLED, 0, None)
 
         for skipped_steps in plan[step_index + 1:]:
-            report(skipped_steps.name, "skipped", 0, None)
+            report(skipped_steps.name, Status.SKIPPED, 0, None)
 
         if log is not None: log.write("Run cancelled\n")
         raise
 
     except Exception as error:
-        report(current_step.name, "failed", 0, None)
+        report(current_step.name, Status.FAILED, 0, None)
         for remaining_step in plan[step_index + 1:]:
-            report(remaining_step.name, "skipped", 0, None)
+            report(remaining_step.name, Status.SKIPPED, 0, None)
 
         # Log all details into the log file, and the CLI shows the short error
         if log is not None: traceback.print_exc(file=log)

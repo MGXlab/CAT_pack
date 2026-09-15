@@ -22,6 +22,7 @@ from rich.console import Console, Group
 from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
 
 from .pipeline import CatArgs, run_cat, build_plan
+from .tools.aligner import DiamondArgs
 from .utils.errors import CatError, show_error
 
 
@@ -128,33 +129,35 @@ def cat(
         contigs: Annotated[
             Path,
             Option("--contigs", "-c" ,
-                   help="Input contig FASTA file" )
+                   help="Input contig FASTA file", metavar="<file>")
         ],
         database: Annotated[
             Path,
             Option("--database", "-d" ,
-                   help="Directory that contains database files" )
+                   help="Directory that contains database files",
+                   metavar="<directory>")
         ],
         taxonomy: Annotated[
             Path,
             Option("--taxonomy", "-t",
-                   help="Directory that contains taxonomy files" )
+                   help="Directory that contains taxonomy files",
+                   metavar="<directory>")
         ],
         range_: Annotated[
             float,
             Option("--range", "-r", min=0.0, max=11,
-                   help="r parameter (standard CAT range, 0-11)."),
+                   help="r parameter", metavar="<Decimal>"),
         ] = 10.0,
         fraction: Annotated[
             float,
             Option("--fraction", "-f",min=0.0, max=0.99,
-                   help="fraction parameter"),
+                   help="fraction parameter", metavar="<Decimal>"),
         ] = 0.5,
         proteins: Annotated[
             Path | None,
             Option("--proteins_fasta", "-p",
                    help="Predicted proteins fasta file. If supplied, "
-                        "the protein prediction step is skipped")
+                        "the protein prediction step is skipped", metavar="<file>")
         ] = None,
         alignment: Annotated[
             Path | None,
@@ -162,11 +165,12 @@ def cat(
                    help="Alignment table (in BLAST+6 format). If supplied, "
                     "the alignment step is skipped and classification is "
                     "carried out directly. A predicted proteins fasta file "
-                    "should also be supplied with argument --proteins_fasta.")
+                    "should also be supplied with argument --proteins_fasta."
+                   , metavar="<file>")
         ] = None,
         output_prefix: Annotated[
             Path,
-            Option("--output-prefix", "-o")
+            Option("--output-prefix", "-o", metavar="<prefix>")
         ] = Path("out.CAT"),
         threads: Annotated[
             int,
@@ -174,12 +178,17 @@ def cat(
         ] = 1,
         log_file: Annotated[
             Path | None,
-            Option("--log-file")
+            Option("--log-file" , metavar="<file>")
         ] = None,
         debug: Annotated[
             bool,
             Option("--debug", help="Show unexpected-error tracebacks.")
         ] = False,
+        aligner: Annotated[
+            str,
+            Option("--aligner", help="Protein aligner",
+                   metavar="<DIAMOND|MMseqs2>", case_sensitive=False)
+        ] =  "diamond"
 ):
     # notes: Decimal is not supported by typer (look into that)
     # Print is only for my own debugging for now
@@ -196,7 +205,10 @@ def cat(
         log_file=log_file or Path(f"{output_prefix}.log"),
         output_prefix=output_prefix,
         threads=threads,
+
     )
+
+
 
     # Table of used parameters (same as old message)
     info = Table.grid(padding=(0, 2))
