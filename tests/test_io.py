@@ -5,8 +5,12 @@ import sys
 import tempfile
 import unittest
 
+from CAT_pack7.pipeline import CatArgs
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "CAT_pack"))
+DATA_PATH = Path(__file__).resolve().parent / "data" / "catpack7"
+
 
 import shared
 import bins
@@ -113,6 +117,49 @@ class SharedFileTests(unittest.TestCase):
         self.assertEqual(set(orf2hits), {"orf_a", "orf_b"})
         self.assertEqual({hit for hit, _ in orf2hits["orf_a"]}, {"hit_1", "hit_2"})
         self.assertEqual(all_hits, {"hit_1", "hit_2", "hit_5"})
+
+
+class CatPack7Test(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        self.args = CatArgs(
+            contigs=DATA_PATH / "contigs.fna", database=DATA_PATH / "db",
+            taxonomy=DATA_PATH / "tax", proteins=DATA_PATH / "proteins.faa",
+            alignment=DATA_PATH / "alignment.tsv", range_=Decimal("10"),
+            fraction=Decimal("0.5"), log_file=self.root / "run.log",
+            output_prefix=self.root / "run",
+        )
+
+
+    def test_cli_runs_example(self):
+        from typer.testing import CliRunner
+        from CAT_pack7.cli import app
+        result = CliRunner().invoke(app, [
+            "cat", "-c", str(self.args.contigs), "-d", str(self.args.database),
+            "-t", str(self.args.taxonomy), "-p", str(self.args.proteins),
+            "-a", str(self.args.alignment), "-o", str(self.args.output_prefix),
+        ])
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertIn("CAT completed", result.output)
+
+    def test_cli_collects_missing_folder_errors(self):
+        """Should give back 2 problems, that the folders are missig
+        The tax and db folder should be missing (cus no-db and no-tax) are not
+        the correct folder names
+        """
+        from typer.testing import CliRunner
+        from CAT_pack7.cli import app
+        result = CliRunner().invoke(app, [
+            "cat", "-c", str(self.args.contigs), "-d", str("no-db"),
+            "-t", str(self.root / "no-tax"), "-p", str(self.args.proteins),
+            "-a", str(self.args.alignment), "-o", str(self.args.output_prefix),
+        ])
+        self.assertEqual(result.exit_code, 1, result.output)
+        self.assertIn("Found 2 problems", result.output)
+        self.assertIn("skipped", result.output)
+
+
 
 if __name__ == "__main__":
     unittest.main()
