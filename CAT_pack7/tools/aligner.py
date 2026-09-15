@@ -1,8 +1,10 @@
 """aligner script"""
+import os
 import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+
 
 @dataclass
 class MMseqsArgs:
@@ -69,9 +71,8 @@ def run_diamond(diamond: DiamondArgs, log, report):
     # blast_settings.add_row("Mode" , args.diamond_mode)
     # blast_settings.add_row("BLAST threads", args.threads)
 
-
-    tmpdir = diamond.alignment.with_name(f"{diamond.alignment}.tmp")
-    tmpdir.mkdir(parents=True, exist_ok=True)
+    if not os.path.isdir(diamond.tmpdir):
+        os.mkdir(diamond.tmpdir)
     log.flush()
 
     try:
@@ -80,7 +81,7 @@ def run_diamond(diamond: DiamondArgs, log, report):
         log.flush()
     finally:
         # removal of tmp directory
-        shutil.rmtree(tmpdir, ignore_errors=True)
+        shutil.rmtree(diamond.tmpdir, ignore_errors=True)
 
 
 
