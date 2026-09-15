@@ -71,6 +71,7 @@ def run_diamond(diamond: DiamondArgs, log, report):
     # blast_settings.add_row("Mode" , args.diamond_mode)
     # blast_settings.add_row("BLAST threads", args.threads)
 
+
     if not os.path.isdir(diamond.tmpdir):
         os.mkdir(diamond.tmpdir)
     log.flush()
