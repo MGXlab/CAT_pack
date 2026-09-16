@@ -4,7 +4,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from .classification import contig_classification
-from .tools.aligner import run_aligner, DiamondArgs, MMseqsArgs
+from .tools.aligner import run_aligner, DiamondArgs, MMseqsArgs, AlignerName
 from .tools.pyrodigal import run_protein_prediction
 from .utils.errors import CatError
 from .utils.logging import Status, Report
@@ -28,8 +28,14 @@ class CatArgs:
     fraction: Decimal
     log_file: Path
     output_prefix: Path
-    aligner: DiamondArgs | MMseqsArgs | None = None
+    diamond: DiamondArgs
+    mmseqs: MMseqsArgs
+    aligner: AlignerName = "diamond"
     threads: int = 1
+    top: int = 11
+    tmpdir: Path | None = None
+    compress: bool = False
+    verbose: bool = False
 
 @dataclass(frozen=True)
 class Step:
@@ -65,12 +71,11 @@ def run_cat(args: CatArgs, report: Report) -> dict[str, Path]:
 
     try:
         report(current_step.name, Status.RUNNING, 0, 1)
-        files = validate_args(args)
-        aligner_args = validate_aligner_args(args)
-        # Exclusive creation ("x") this ensures no old log overwrite
-
-
+        log.info(f"Starting: {current_step.name}")
+        files = validate_args(args) # TODO: still need to revamp this
+        aligner_args = validate_aligner_args(args, files)
         report(current_step.name, Status.COMPLETE, 1, 1)
+        log.info(f"Completed: {current_step.name}")
 
         for step_index, current_step in enumerate(plan[1:], start=1):
             if current_step.reuse:

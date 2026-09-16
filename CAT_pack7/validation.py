@@ -1,7 +1,13 @@
 from pathlib import Path
 
-from .tools.aligner import DiamondArgs
-from .utils.check import check_file, check_folder, check_db_file, check_pyrodigal, check_diamond
+from .tools.aligner import DiamondSettings, MMseqsSettings
+from .utils.check import (
+    check_file,
+    check_folder,
+    check_db_file,
+    check_pyrodigal,
+    check_diamond,
+)
 from .utils.errors import CatError, InputError, ValidationError
 
 
@@ -91,5 +97,32 @@ def validate_args(args):
     return file_path
 
 
-def validate_aligner_args(args):
-    return DiamondArgs
+def validate_aligner_args(args, files: dict) -> DiamondSettings | MMseqsSettings | None:
+    if args.alignment is not None:
+        return None
+
+    query = args.query
+    tmpdir = args.tmpdir or args.output_prefix.parent / "tmp"
+    shared = dict(
+        query=query,
+        database=files["database"],
+        alignment=files["alignment"],
+        tmpdir=tmpdir,
+        threads=args.threads,
+        compression=args.compress,
+        verbose=args.verbose,
+    )
+
+    if args.aligner == "diamond":
+        settings = args.diamond
+        return DiamondSettings(
+            diamond=files["diamond"],
+            top=args.top,
+            mode=settings.mode,
+            no_self_hits=settings.no_self_hits,
+            block_size=settings.block_size,
+            index_chunks=settings.index_chunks,
+            **shared,
+        )
+
+    return MMseqsSettings()

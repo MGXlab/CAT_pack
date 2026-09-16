@@ -20,7 +20,8 @@ from rich.text import Text
 from typer import Typer, Option
 
 from .pipeline import CatArgs, run_cat, build_plan, Status
-from .utils.errors import CatError, show_error
+from .tools.aligner import DiamondArgs, MMseqsArgs, AlignerName
+from .utils.errors import CatError, show_error, InputError
 from .utils.logging import init_logging
 
 app = Typer()
@@ -110,12 +111,6 @@ def update_progress(progress, tasks, step, status, completed=0, total=None):
 
 
 
-# @bastiaan there is a destinction between typer.Option and typer.Arguments
-# Arguments are stricly bound to input order of arguments, and do not allow for aliases
-# But they are by default required.
-# Options on the other hand must be set by a argument name and allow for aliases
-# However they are by default NOT required. But can be set to be required
-# What do you think is best? For now I will go for Options and we can always re-evaluate
 @app.command()
 def cat(
         contigs: Annotated[
@@ -168,6 +163,25 @@ def cat(
             int,
             Option("--threads", "-n", min=1)
         ] = 1,
+        top: Annotated[
+            int,
+            Option("--top", min=0, max=100,
+                   help="Hits within range of the best hit written to the alignment file. "
+                        "This is not --range."),
+        ] = 11,
+        tmpdir: Annotated[
+            Path | None,
+            Option("--tmpdir",
+                   help="Location for temporary aligner files."),
+        ] = None,
+        compress: Annotated[
+            bool,
+            Option("--compress", help="Compress the alignment output file."),
+        ] = False,
+        verbose: Annotated[
+            bool,
+            Option("--verbose", help="Show aligner stdout."),
+        ] = False,
         log_file: Annotated[
             Path | None,
             Option("--log-file" , metavar="<file>")
@@ -179,13 +193,75 @@ def cat(
         aligner: Annotated[
             str,
             Option("--aligner", help="Protein aligner",
-                   metavar="<DIAMOND|MMseqs2>", case_sensitive=False)
-        ] =  "diamond"
+                   metavar="<diamond|mmseqs2>", case_sensitive=False)
+        ] = "diamond",
+        # Seperate Arguments for diamond
+        diamond_mode: Annotated[str, Option("--diamond-mode",
+            rich_help_panel="DIAMOND",
+               help="default, faster, fast, mid-sensitive, sensitive, "
+                    "more-sensitive, very-sensitive, ultra-sensitive"
+        )] = "default",
+        block_size: Annotated[float, Option(
+            "--block-size", rich_help_panel="DIAMOND",
+            help="DIAMOND block-size. Lower uses less RAM/tmp.",
+        )] = 12.0,
+        index_chunks: Annotated[int, Option(
+            "--index-chunks", min=1, rich_help_panel="DIAMOND",
+            help="Set to 4 on low-memory machines.",
+        )] = 1,
+        no_self_hits: Annotated[bool, Option(
+            "--no-self-hits", rich_help_panel="DIAMOND",
+            help="Do not report identical self hits by DIAMOND.",
+        )] = False,
+        path_to_diamond: Annotated[Path | None, Option(
+            "--path-to-diamond", rich_help_panel="DIAMOND",
+            help="Path to DIAMOND. Supply if it is not on PATH.",
+        )] = None,
+        # Arguments for MMseqs2
+        sensitivity: Annotated[float, Option(
+            "--sensitivity", min=1.0, max=7.5, rich_help_panel="MMseqs2",
+            help="MMseqs2 sensitivity (-s).",
+        )] = 5.7,
+        split_memory_limit: Annotated[str, Option(
+            "--split-memory-limit", rich_help_panel="MMseqs2",
+            help="MMseqs2 max memory per split, e.g. 10M, 1G. 0 uses all available memory.",
+        )] = "0",
+        path_to_mmseqs: Annotated[Path | None, Option(
+            "--path-to-mmseqs", rich_help_panel="MMseqs2",
+            help="Path to MMseqs2. Supply if it is not on PATH.",
+        )] = None,
 ):
-    # notes: Decimal is not supported by typer (look into that)
-    # Print is only for my own debugging for now
-    #print(contigs, database, taxonomy)
 
+    log = init_logging(debug, quiet=False, log_file=log_file or Path(f"{output_prefix}.log"), console=console)
+
+    log.info("Setting up diamond")
+    diamond = DiamondArgs(
+        mode=diamond_mode,
+        no_self_hits=no_self_hits,
+        block_size=block_size,
+        index_chunks=index_chunks,
+        path_to_diamond=path_to_diamond,
+    )
+
+    log.info("Setting up mmseqs")
+    mmseqs = MMseqsArgs(
+        sensitivity=sensitivity,
+        split_memory_limit=split_memory_limit,
+        executable=path_to_mmseqs,
+    )
+
+
+    if aligner.lower() == "diamond":
+        log.info("Selected aligner is DIAMOND")
+        aligner: AlignerName = "diamond"
+    elif aligner.lower() in {"mmseqs2", "mmseqs"}:
+        log.info("Selected aligner is MMseqs2")
+        aligner: AlignerName = "mmseqs2"
+    else:
+        raise InputError("Aligner must be diamond or mmseqs2")
+
+
+    log.info("Setting up Arguments for CAT")
     arguments = CatArgs(
         contigs=contigs,
         database=database,
@@ -197,13 +273,15 @@ def cat(
         log_file=log_file or Path(f"{output_prefix}.log"),
         output_prefix=output_prefix,
         threads=threads,
-
+        aligner=aligner,
+        diamond=diamond,
+        mmseqs=mmseqs,
+        top=top,
+        tmpdir=tmpdir,
+        compress=compress,
+        verbose=verbose,
     )
 
-
-    logger = init_logging(debug, quiet=False, log_file=arguments.log_file, console=console)
-
-    # Table of used parameters (same as old message)
     info = Table.grid(padding=(0, 2))
     info.add_column(style="bold cyan")
     info.add_column()
@@ -211,25 +289,26 @@ def cat(
     info.add_row("Contigs", str(arguments.contigs))
     info.add_row("Taxonomy", str(arguments.taxonomy))
     info.add_row("Database", str(arguments.database))
+    info.add_row("Aligner", arguments.aligner)
     info.add_row("Parameter r", str(arguments.range_))
     info.add_row("Fraction", str(arguments.fraction))
     info.add_row("Log file", str(arguments.log_file))
 
-    # group the supplied and parameters together
+    # group the supplied command and parameters together
     content = Group(
         Text("Supplied command", style="bold"),
         Text(f"$ {shlex.join(sys.argv)}", style="cyan"),
         Text(""), info
     )
-    logger.info(f"Command supplied: $ {shlex.join(sys.argv)}")
-    logger.info(f"{arguments!r}")
+    log.info(f"Command supplied: $ {shlex.join(sys.argv)}")
+    log.info(f"{arguments!r}")
 
     # print the group in a panel
     console.print(Panel(content, title="[bold]Rarw![/bold]",
                         border_style="blue",), "\n")
 
     console.print("Preparing for CAT run\n\n")
-    logger.info("Preparing for CAT run")
+    log.info("Preparing for CAT run")
     progress, tasks = make_progress([step.name for step in build_plan(arguments)])
     report = partial(update_progress, progress, tasks)
     try:
@@ -244,8 +323,8 @@ def cat(
         raise typer.Exit(code=1)
 
     except Exception:
-        logger.exception("Unexpected error", exc_info=False)
-        logger.error("Check the run log or use --debug for a full traceback")
+        log.exception("Unexpected error", exc_info=False)
+        log.error("Check the run log or use --debug for a full traceback")
         if debug:
             console.print_exception(show_locals=True) # TODO: before release back to False
         raise typer.Exit(code=1)
@@ -253,6 +332,7 @@ def cat(
 
 
     else:
+        log.info("CAT ran successful!!")
         results = Table(title="CAT completed")
         results.add_column("Result", style="green")
         results.add_column("Location")
