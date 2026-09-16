@@ -15,6 +15,7 @@ from .classification import contig_classification
 
 
 class Status(Enum):
+    WAITING = "Waiting"
     RUNNING = "Running"
     COMPLETE = "Completed"
     SUPPLIED = "Supplied"
