@@ -20,7 +20,7 @@ from typer import Typer, Option
 from rich.console import Console, Group
 from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
 
-from .pipeline import CatArgs, run_cat, build_plan
+from .pipeline import CatArgs, run_cat, build_plan, Status
 from .tools.aligner import DiamondArgs
 from .utils.errors import CatError, show_error
 from .utils.logging import init_logging
@@ -75,43 +75,39 @@ def make_progress(stages):
     return progress, tasks
 
 
-def update_progress(progress, tasks, stage, status, completed=0, total=None):
+def update_progress(progress, tasks, step, status, completed=0, total=None):
     styles = {
-        "waiting": "dim",
-        "running": "yellow",
-        "complete": "green",
-        "reused": "cyan",
-        "failed": "bold red",
-        "skipped": "dim",
-        "cancelled": "yellow",
+        Status.WAITING: "dim",
+        Status.RUNNING: "yellow",
+        Status.COMPLETE: "green",
+        Status.SUPPLIED: "cyan",
+        Status.FAILED: "bold red",
+        Status.SKIPPED: "dim",
+        Status.CANCELLED: "red",
     }
 
     style = styles[status]
-    task_id = tasks[stage]
+    task_id = tasks[step]
 
-    if status == "running":
-        progress.start_task(task_id)
-        progress.update(task_id, status=f"[{style}]{status}[/{style}]")
-
-        if total is not None:
-            progress.update(task_id, total=total, completed=completed)
-
-    elif status == "complete":
-        progress.update(task_id, status=f"[{style}]{status}[/{style}]",
-                        refresh=True, total=total, completed=completed)
-
-    elif status == "reused":
-        progress.update(task_id, status=f"[{style}]{status}[/{style}]")
-
-    elif status == "skipped":
-        progress.update(task_id, status=f"[{style}]{status}[/{style}]")
-
-    elif status in {"failed", "cancelled"}:
-        progress.update(task_id, status=f"[{style}]{status}[/{style}]")
-        progress.stop_task(task_id)
-
-    else:
-        progress.update(task_id,status=status,refresh=True)
+    # Source https://docs.python.org/3.10/whatsnew/3.10.html#pep-634-structural-pattern-matching
+    match status:
+        case Status.RUNNING:
+            progress.start_task(task_id)
+            progress.update(task_id, status=f"[{style}]{status}[/{style}]")
+            if total is not None:
+                progress.update(task_id, total=total, completed=completed)
+        case Status.COMPLETE:
+            progress.update(task_id, status=f"[{style}]{status}[/{style}]",
+                            refresh=True, total=total, completed=completed)
+        case Status.SUPPLIED:
+            progress.update(task_id, status=f"[{style}]{status}[/{style}]")
+        case Status.SKIPPED:
+            progress.update(task_id, status=f"[{style}]{status}[/{style}]")
+        case Status.CANCELLED | Status.FAILED:
+            progress.update(task_id, status=f"[{style}]{str(status)}[/{style}]")
+            progress.stop_task(task_id)
+        case _: # catch all
+            progress.update(task_id,status=status,refresh=True)
 
 
 
