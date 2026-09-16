@@ -12,20 +12,18 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from rich import traceback
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from typer import Typer, Option, Argument
+from typer import Typer, Option
 from rich.console import Console, Group
 from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
 
 from .pipeline import CatArgs, run_cat, build_plan
 from .tools.aligner import DiamondArgs
 from .utils.errors import CatError, show_error
-
-
+from .utils.logging import init_logging
 
 app = Typer()
 
@@ -209,6 +207,7 @@ def cat(
     )
 
 
+    logger = init_logging(debug, quiet=False, log_file=arguments.log_file, console=console)
 
     # Table of used parameters (same as old message)
     info = Table.grid(padding=(0, 2))
@@ -226,21 +225,17 @@ def cat(
     content = Group(
         Text("Supplied command", style="bold"),
         Text(f"$ {shlex.join(sys.argv)}", style="cyan"),
-        Text(""),
-        info,
+        Text(""), info
     )
+    logger.info(f"Command supplied: $ {shlex.join(sys.argv)}")
+    logger.info(f"{arguments!r}")
 
     # print the group in a panel
-    console.print(
-        Panel(
-            content,
-            title="[bold]Rarw![/bold]",
-            border_style="blue",
-        ), "\n"
-    )
-
+    console.print(Panel(content, title="[bold]Rarw![/bold]",
+                        border_style="blue",), "\n")
 
     console.print("Preparing for CAT run\n\n")
+    logger.info("Preparing for CAT run")
     progress, tasks = make_progress([step.name for step in build_plan(arguments)])
     report = partial(update_progress, progress, tasks)
     try:
@@ -255,7 +250,8 @@ def cat(
         raise typer.Exit(code=1)
 
     except Exception:
-        console.print("[red]Unexpected error. Check the run log or use --debug for a full traceback[/red]")
+        logger.exception("Unexpected error", exc_info=False)
+        logger.error("Check the run log or use --debug for a full traceback")
         if debug:
             console.print_exception(show_locals=True) # TODO: before release back to False
         raise typer.Exit(code=1)
