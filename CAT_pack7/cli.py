@@ -12,16 +12,14 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from rich.console import Console, Group
 from rich.panel import Panel
+from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
 from rich.table import Table
 from rich.text import Text
-
 from typer import Typer, Option
-from rich.console import Console, Group
-from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
 
 from .pipeline import CatArgs, run_cat, build_plan, Status
-from .tools.aligner import DiamondArgs
 from .utils.errors import CatError, show_error
 from .utils.logging import init_logging
 
@@ -104,7 +102,7 @@ def update_progress(progress, tasks, step, status, completed=0, total=None):
         case Status.SKIPPED:
             progress.update(task_id, status=f"[{style}]{status}[/{style}]")
         case Status.CANCELLED | Status.FAILED:
-            progress.update(task_id, status=f"[{style}]{str(status)}[/{style}]")
+            progress.update(task_id, status=f"[{style}]{status}[/{style}]")
             progress.stop_task(task_id)
         case _: # catch all
             progress.update(task_id,status=status,refresh=True)

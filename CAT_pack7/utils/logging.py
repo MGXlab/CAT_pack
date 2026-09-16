@@ -1,8 +1,36 @@
 import logging
+from enum import Enum
 from pathlib import Path
+from typing import Protocol
 
 from rich.console import Console
 from rich.logging import RichHandler
+
+
+class Status(Enum):
+    WAITING = "Waiting"
+    RUNNING = "Running"
+    COMPLETE = "Completed"
+    SUPPLIED = "Supplied"
+    SKIPPED = "Skipped"
+    FAILED = "Failed"
+    CANCELLED = "Cancelled"
+
+    def __str__(self) -> str:
+        return self.value
+
+class Report(Protocol):
+    """Reports back to cli.py with the current progress.
+    Call it with a step name, the current status, how much is completed,
+    how much total work there must be done (including completed) Leave None if
+    the amount of work is not known (yet).
+
+    Within status make the choice: Running, complete, reused, skipped or failed
+    Cancelled can also be used if user canceld the run
+    """
+
+    def __call__(self, step: str, status: Status, completed: int,
+                 total: int | None) -> None: ...
 
 
 def init_logging(debug: bool = False,quiet: bool = False,
@@ -33,3 +61,4 @@ def init_logging(debug: bool = False,quiet: bool = False,
         logger.addHandler(file_handler)
 
     return logger
+
