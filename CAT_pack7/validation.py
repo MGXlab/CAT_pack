@@ -1,12 +1,18 @@
 from pathlib import Path
 
-from .tools.aligner import DiamondArgs
-from .utils.check import check_file, check_folder, check_db_file, check_pyrodigal, check_diamond
+from .tools.aligner import DiamondSettings, MMseqsSettings
+from .utils.check import (
+    check_file,
+    check_folder,
+    check_db_file,
+    check_pyrodigal,
+    check_diamond,
+)
 from .utils.errors import CatError, InputError, ValidationError
 
 
 def validate_args(args):
-    """Validiotion for the cat arguments"""
+    """Validation for the cat arguments"""
     errors = []
 
     def check(function, *values, **options):
@@ -43,7 +49,8 @@ def validate_args(args):
     database = check(check_folder, args.database, "Database folder")
     if database is not None:
         if args.alignment is None:
-            file_path["database"] = check(check_db_file, database, ".dmnd", "DIAMOND database")
+            if args.aligner == "diamond":
+                file_path["database"] = check(check_db_file, database, ".dmnd", "DIAMOND database")
         file_path["fastaid2LCA"] = check(check_db_file, database, "fastaid2LCAtaxid", "fastaid2LCAtaxid file")
         file_path["branches"] = check(check_db_file, database, "taxids_with_multiple_offspring",
                                   "taxids_with_multiple_offspring file", allow_empty=True)
@@ -91,5 +98,32 @@ def validate_args(args):
     return file_path
 
 
-def validate_aligner_args(args):
-    return DiamondArgs
+def validate_aligner_args(args, files: dict) -> DiamondSettings | MMseqsSettings | None:
+    if args.alignment is not None:
+        return None
+
+    query = args.contigs
+    tmpdir = args.tmpdir or args.output_prefix.parent / "tmp"
+    shared = dict(
+        query=query,
+        database=args.database,
+        alignment=args.alignment,
+        tmpdir=tmpdir,
+        threads=args.threads,
+        compression=args.compress,
+        verbose=args.verbose,
+    )
+
+    if args.aligner == "diamond":
+        settings = args.diamond
+        return DiamondSettings(
+            diamond=files["diamond"],
+            top=args.top,
+            mode=settings.mode,
+            no_self_hits=settings.no_self_hits,
+            block_size=settings.block_size,
+            index_chunks=settings.index_chunks,
+            **shared,
+        )
+
+    return MMseqsSettings()
