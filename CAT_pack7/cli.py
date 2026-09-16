@@ -12,20 +12,16 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from rich import traceback
+from rich.console import Console, Group
 from rich.panel import Panel
+from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
 from rich.table import Table
 from rich.text import Text
+from typer import Typer, Option
 
-from typer import Typer, Option, Argument
-from rich.console import Console, Group
-from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
-
-from .pipeline import CatArgs, run_cat, build_plan
-from .tools.aligner import DiamondArgs
+from .pipeline import CatArgs, run_cat, build_plan, Status
 from .utils.errors import CatError, show_error
-
-
+from .utils.logging import init_logging
 
 app = Typer()
 
@@ -77,43 +73,39 @@ def make_progress(stages):
     return progress, tasks
 
 
-def update_progress(progress, tasks, stage, status, completed=0, total=None):
+def update_progress(progress, tasks, step, status, completed=0, total=None):
     styles = {
-        "waiting": "dim",
-        "running": "yellow",
-        "complete": "green",
-        "reused": "cyan",
-        "failed": "bold red",
-        "skipped": "dim",
-        "cancelled": "yellow",
+        Status.WAITING: "dim",
+        Status.RUNNING: "yellow",
+        Status.COMPLETE: "green",
+        Status.SUPPLIED: "cyan",
+        Status.FAILED: "bold red",
+        Status.SKIPPED: "dim",
+        Status.CANCELLED: "red",
     }
 
     style = styles[status]
-    task_id = tasks[stage]
+    task_id = tasks[step]
 
-    if status == "running":
-        progress.start_task(task_id)
-        progress.update(task_id, status=f"[{style}]{status}[/{style}]")
-
-        if total is not None:
-            progress.update(task_id, total=total, completed=completed)
-
-    elif status == "complete":
-        progress.update(task_id, status=f"[{style}]{status}[/{style}]",
-                        refresh=True, total=total, completed=completed)
-
-    elif status == "reused":
-        progress.update(task_id, status=f"[{style}]{status}[/{style}]")
-
-    elif status == "skipped":
-        progress.update(task_id, status=f"[{style}]{status}[/{style}]")
-
-    elif status in {"failed", "cancelled"}:
-        progress.update(task_id, status=f"[{style}]{status}[/{style}]")
-        progress.stop_task(task_id)
-
-    else:
-        progress.update(task_id,status=status,refresh=True)
+    # Source https://docs.python.org/3.10/whatsnew/3.10.html#pep-634-structural-pattern-matching
+    match status:
+        case Status.RUNNING:
+            progress.start_task(task_id)
+            progress.update(task_id, status=f"[{style}]{status}[/{style}]")
+            if total is not None:
+                progress.update(task_id, total=total, completed=completed)
+        case Status.COMPLETE:
+            progress.update(task_id, status=f"[{style}]{status}[/{style}]",
+                            refresh=True, total=total, completed=completed)
+        case Status.SUPPLIED:
+            progress.update(task_id, status=f"[{style}]{status}[/{style}]")
+        case Status.SKIPPED:
+            progress.update(task_id, status=f"[{style}]{status}[/{style}]")
+        case Status.CANCELLED | Status.FAILED:
+            progress.update(task_id, status=f"[{style}]{status}[/{style}]")
+            progress.stop_task(task_id)
+        case _: # catch all
+            progress.update(task_id,status=status,refresh=True)
 
 
 
@@ -209,6 +201,7 @@ def cat(
     )
 
 
+    logger = init_logging(debug, quiet=False, log_file=arguments.log_file, console=console)
 
     # Table of used parameters (same as old message)
     info = Table.grid(padding=(0, 2))
@@ -226,21 +219,17 @@ def cat(
     content = Group(
         Text("Supplied command", style="bold"),
         Text(f"$ {shlex.join(sys.argv)}", style="cyan"),
-        Text(""),
-        info,
+        Text(""), info
     )
+    logger.info(f"Command supplied: $ {shlex.join(sys.argv)}")
+    logger.info(f"{arguments!r}")
 
     # print the group in a panel
-    console.print(
-        Panel(
-            content,
-            title="[bold]Rarw![/bold]",
-            border_style="blue",
-        ), "\n"
-    )
-
+    console.print(Panel(content, title="[bold]Rarw![/bold]",
+                        border_style="blue",), "\n")
 
     console.print("Preparing for CAT run\n\n")
+    logger.info("Preparing for CAT run")
     progress, tasks = make_progress([step.name for step in build_plan(arguments)])
     report = partial(update_progress, progress, tasks)
     try:
@@ -255,7 +244,8 @@ def cat(
         raise typer.Exit(code=1)
 
     except Exception:
-        console.print("[red]Unexpected error. Check the run log or use --debug for a full traceback[/red]")
+        logger.exception("Unexpected error", exc_info=False)
+        logger.error("Check the run log or use --debug for a full traceback")
         if debug:
             console.print_exception(show_locals=True) # TODO: before release back to False
         raise typer.Exit(code=1)

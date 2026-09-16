@@ -1,9 +1,13 @@
 """aligner script"""
+import logging
 import os
 import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+
+log = logging.getLogger("CAT_pack")
+
 
 
 @dataclass
@@ -53,9 +57,9 @@ class DiamondArgs:
     #     for item in self.__annotations__:
 
 
-def run_diamond(diamond: DiamondArgs, log, report):
+def run_diamond(diamond: DiamondArgs, report):
 
-    log.write(
+    log.warning(
         "Homology search with DIAMOND is starting. Please be patient. Do not "
         "forget to cite DIAMOND when using CAT or BAT in your publication.\n"
     )
@@ -73,13 +77,12 @@ def run_diamond(diamond: DiamondArgs, log, report):
 
 
     if not os.path.isdir(diamond.tmpdir):
+        log.info(f"making tmp dir: {diamond.tmpdir}")
         os.mkdir(diamond.tmpdir)
-    log.flush()
 
     try:
         subprocess.check_call(diamond.get_command())
-        log.write(f"DIAMOND finished. Alignment written to {diamond.alignment}\n")
-        log.flush()
+        log.info(f"DIAMOND finished. Alignment written to {diamond.alignment}\n")
     finally:
         # removal of tmp directory
         shutil.rmtree(diamond.tmpdir, ignore_errors=True)
@@ -88,9 +91,10 @@ def run_diamond(diamond: DiamondArgs, log, report):
 
 
 
-def run_aligner(arguments: DiamondArgs | MMseqsArgs, log, report):
+def run_aligner(arguments: DiamondArgs | MMseqsArgs, report):
     if type(arguments) == DiamondArgs:
-        run_diamond(arguments, log, report)
+        log.info(f"Aligning {arguments.query} to {arguments.alignment} with DIAMOND")
+        run_diamond(arguments, report)
     elif type(arguments) == MMseqsArgs:
         #run_mmseqs2(arguments)
         pass

@@ -1,6 +1,8 @@
 from pathlib import Path
-from .utils.errors import CatError, InputError, ValidationError
+
+from .tools.aligner import DiamondArgs
 from .utils.check import check_file, check_folder, check_db_file, check_pyrodigal, check_diamond
+from .utils.errors import CatError, InputError, ValidationError
 
 
 def validate_args(args):
@@ -58,7 +60,6 @@ def validate_args(args):
     outputs = {
         "orf_report": Path(f"{prefix}.ORF2LCA.txt"),
         "contig_report": Path(f"{prefix}.contig2classification.txt"),
-        "log": args.log_file,
     }
 
     if args.proteins is None:
@@ -88,3 +89,7 @@ def validate_args(args):
     file_path.update(outputs)
 
     return file_path
+
+
+def validate_aligner_args(args):
+    return DiamondArgs

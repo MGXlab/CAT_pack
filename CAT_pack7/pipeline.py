@@ -1,40 +1,14 @@
-import os
+import logging
 from dataclasses import dataclass
 from decimal import Decimal
-from enum import Enum, auto
 from pathlib import Path
-from typing import Protocol
-import traceback
 
-
-from .utils.errors import CatError, InputError
-from .validation import validate_args
-from .tools.pyrodigal import run_pyrodigal, run_protein_prediction
-from .tools.aligner import run_aligner, DiamondArgs, MMseqsArgs
 from .classification import contig_classification
-
-
-class Status(Enum):
-    RUNNING = "Running"
-    COMPLETE = "Completed"
-    SUPPLIED = "Supplied"
-    SKIPPED = "Skipped"
-    FAILED = "Failed"
-    CANCELLED = "Cancelled"
-
-
-class Report(Protocol):
-    """Reports back to cli.py with the current progress.
-    Call it with a step name, the current status, how much is completed,
-    how much total work there must be done (including completed) Leave None if
-    the amount of work is not known (yet).
-
-    Within status make the choice: Running, complete, reused, skipped or failed
-    Cancelled can also be used if user canceld the run
-    """
-
-    def __call__(self, step: str, status: Status, completed: int,
-                 total: int | None) -> None: ...
+from .tools.aligner import run_aligner, DiamondArgs, MMseqsArgs
+from .tools.pyrodigal import run_protein_prediction
+from .utils.errors import CatError
+from .utils.logging import Status, Report
+from .validation import validate_args, validate_aligner_args
 
 
 @dataclass(frozen=True)
@@ -86,17 +60,16 @@ def run_cat(args: CatArgs, report: Report) -> dict[str, Path]:
     plan = build_plan(args)
     step_index = 0
     current_step = plan[step_index]
-    log = None #only activate log after input validation :D
+    log = logging.getLogger("CAT_pack")
 
 
     try:
         report(current_step.name, Status.RUNNING, 0, 1)
         files = validate_args(args)
-
+        aligner_args = validate_aligner_args(args)
         # Exclusive creation ("x") this ensures no old log overwrite
 
-        log = files["log"].open("x", encoding="utf-8")
-        log.write(f"CAT_pack7\n{args!r}\n")
+
         report(current_step.name, Status.COMPLETE, 1, 1)
 
         for step_index, current_step in enumerate(plan[1:], start=1):
@@ -105,35 +78,32 @@ def run_cat(args: CatArgs, report: Report) -> dict[str, Path]:
                 # And thus makes the progressbar green, currently if only
                 # reused is called the bar says dimmed (also a good indicator)
                 report(current_step.name, Status.SUPPLIED, 1, 1)
-                log.write(f"Reused: {current_step.name}\n")
-                log.flush()
+                log.info(f"Supplied file: {current_step.name}")
                 continue
 
             report(current_step.name, Status.RUNNING, 0, None)
-            log.write(f"Starting: {current_step.name}\n")
-            log.flush()
+            log.info(f"Starting: {current_step.name}")
 
             if current_step.name == "Protein prediction":
-                run_protein_prediction(args, files, log, report, "pyrodigal")
+                run_protein_prediction(args, files, report, "pyrodigal")
             elif current_step.name == "Alignment":
-                run_aligner(args, log, report)
+                run_aligner(aligner_args, report)
             elif current_step.name == "Classify":
-                contig_classification(args, files, log, report)
+                contig_classification(args, files, report)
             else:
-                log.write(f"Can't spell that well, my misspelling:"
-                          f"{current_step.name}\n")
+                log.error(f"Can't spell that well, my misspelling:"
+                          f"{current_step.name}")
 
             # always complete the step with 1 of 1 so 100% completion,
             # errors will have caused the code to stop before this if there is
             # an exception.
             report(current_step.name, Status.COMPLETE, 1, 1)
-            log.write(f"Completed: {current_step.name}\n")
-            log.flush()
+            log.info(f"Completed: {current_step.name}")
 
         return {
             "Contig classifications": Path("Future path to C2C file :)"),
             "ORF classifications": Path("Future path to ORF2LCA file :)"),
-            "Log": files["log"],
+            "Log": args.log_file if args.log_file is not None else None,
         }
 
     except KeyboardInterrupt:
@@ -142,16 +112,13 @@ def run_cat(args: CatArgs, report: Report) -> dict[str, Path]:
         for skipped_steps in plan[step_index + 1:]:
             report(skipped_steps.name, Status.SKIPPED, 0, None)
 
-        if log is not None: log.write("Run cancelled\n")
+        if log is not None: log.error("Run cancelled")
         raise
 
     except Exception as error:
         report(current_step.name, Status.FAILED, 0, None)
         for remaining_step in plan[step_index + 1:]:
             report(remaining_step.name, Status.SKIPPED, 0, None)
-
-        # Log all details into the log file, and the CLI shows the short error
-        if log is not None: traceback.print_exc(file=log)
 
         if isinstance(error, CatError):
             error.step = current_step.name
@@ -161,6 +128,3 @@ def run_cat(args: CatArgs, report: Report) -> dict[str, Path]:
         # Catch all other exceptions
         raise
 
-    finally:
-        if log is not None:
-            log.close()
