@@ -6,6 +6,7 @@ Testrun with this: python CAT_pack cat -c tests/data/contigs/small_contigs.fa \
 """
 import shlex
 import sys
+from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
 from pathlib import Path
@@ -17,14 +18,15 @@ from rich.panel import Panel
 from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
 from rich.table import Table
 from rich.text import Text
-from typer import Typer, Option
+from typer import Option
+from typer_di import Depends, TyperDI
 
 from .pipeline import CatArgs, run_cat, build_plan, Status
 from .tools.aligner import DiamondArgs, MMseqsArgs, AlignerName
 from .utils.errors import CatError, show_error, InputError
 from .utils.logging import init_logging
 
-app = Typer()
+app = TyperDI()
 
 console = Console(stderr=True)
 
@@ -108,8 +110,58 @@ def update_progress(progress, tasks, step, status, completed=0, total=None):
         case _: # catch all
             progress.update(task_id,status=status,refresh=True)
 
+@dataclass
+class Settings: #@Bastiaan Know a better name?
+    quiet: bool = False
+    verbose: bool = False
+    threads: int = 1
 
+def system_settings(
+        threads: Annotated[
+            int,
+            Option("--threads", "-n", min=1)
+        ] = Settings.threads,
+        verbose: Annotated[
+            bool,
+            Option("--verbose", help="Show aligner stdout."),
+        ] = Settings.verbose,
+        quiet: Annotated[
+            bool,
+            Option("--quiet", help="Turns off logging in the terminal."),
+        ] = Settings.quiet
 
+):
+    return Settings(quiet=quiet, verbose=verbose, threads=threads)
+
+DIAMOND_PATH= Annotated[Path | None, Option(
+            "--path-to-diamond", rich_help_panel="DIAMOND",
+            help="Path to DIAMOND. Supply if it is not on PATH.")]
+
+@app.command()
+def prepare(
+        db_fasta: Annotated[
+            Path, Option("--db_fasta", help="Fasta file containing "
+                                            "all sequences.", metavar="<FastaFile>")
+        ],
+        names_dmp: Annotated[Path, Option("--names",
+                                          help="Names.dmp", metavar="<FILE>")],
+        nodes_dmp: Annotated[Path, Option("--nodes",
+                                          help="Nodes.dmp", metavar="<FILE>")],
+        # https://github.com/soedinglab/MMseqs2/blob/master/src/MMseqsBase.cpp#L25-L26
+        # MMseqs2 does use this notation of metavar as well, should we look into
+        # using this as well?
+        acc2tax: Annotated[Path, Option("--acc2tax", help="Accession2taxid.txt file. Can be gzipped.",
+                                        metavar="<FILE[.gz]>")],
+        db_dir: Annotated[Path,
+            Option("--db_dir", help="Directory where CAT/BAT/RAT "
+                                    "database files will be created",
+                   metavar="<DIR>")],
+        path_to_diamond: DIAMOND_PATH = None,
+        system_setting: Settings = Depends(system_settings),
+
+):
+    pass
+    #console.print(system_setting)
 
 @app.command()
 def cat(
@@ -213,10 +265,7 @@ def cat(
             "--no-self-hits", rich_help_panel="DIAMOND",
             help="Do not report identical self hits by DIAMOND.",
         )] = False,
-        path_to_diamond: Annotated[Path | None, Option(
-            "--path-to-diamond", rich_help_panel="DIAMOND",
-            help="Path to DIAMOND. Supply if it is not on PATH.",
-        )] = None,
+        path_to_diamond: DIAMOND_PATH = None,
         # Arguments for MMseqs2
         sensitivity: Annotated[float, Option(
             "--sensitivity", min=1.0, max=7.5, rich_help_panel="MMseqs2",
