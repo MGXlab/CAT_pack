@@ -6,7 +6,6 @@ Testrun with this: python CAT_pack cat -c tests/data/contigs/small_contigs.fa \
 """
 import shlex
 import sys
-from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
 from pathlib import Path
@@ -21,7 +20,7 @@ from rich.text import Text
 from typer import Option
 from typer_di import Depends, TyperDI
 
-from .pipeline import CatArgs, run_cat, build_plan, Status
+from .pipeline import CatArgs, run_cat, build_plan, Status, Settings, PrepareArgs, run_prepare
 from .tools.aligner import DiamondArgs, MMseqsArgs, AlignerName
 from .utils.errors import CatError, show_error, InputError
 from .utils.logging import init_logging
@@ -110,11 +109,7 @@ def update_progress(progress, tasks, step, status, completed=0, total=None):
         case _: # catch all
             progress.update(task_id,status=status,refresh=True)
 
-@dataclass
-class Settings: #@Bastiaan Know a better name?
-    quiet: bool = False
-    verbose: bool = False
-    threads: int = 1
+
 
 def system_settings(
         threads: Annotated[
@@ -154,14 +149,41 @@ def prepare(
                                         metavar="<FILE[.gz]>")],
         db_dir: Annotated[Path,
             Option("--db_dir", help="Directory where CAT/BAT/RAT "
-                                    "database files will be created",
-                   metavar="<DIR>")],
+                        "database files will be created", metavar="<DIR>")],
         path_to_diamond: DIAMOND_PATH = None,
-        system_setting: Settings = Depends(system_settings),
+        common_prefix: Annotated[str | None, Option(
+                "--common-prefix",
+                help="Prefix for all files that will be created",
+                show_default="<date>_CAT_pack",
+            ),] = None,
+        cleanup: Annotated["--cleanup"] = None,
+        settings: Settings = Depends(system_settings),
 
 ):
-    pass
-    #console.print(system_setting)
+    args = PrepareArgs(
+        db_fasta=db_fasta,
+        names=names_dmp,
+        nodes=nodes_dmp,
+        acc2tax=acc2tax,
+        db_dir=db_dir,
+        path_to_diamond=path_to_diamond,
+        settings=settings,
+        common_prefix=common_prefix,
+    )
+    progress, tasks = make_progress([step.name for step in build_plan(args)])
+    report = partial(update_progress, progress, tasks)
+    try:
+        with progress:
+            run_prepare(args, report)
+    except KeyboardInterrupt:
+        console.print("\nRun cancelled :(")
+        raise typer.Exit(code=130)
+    except CatError as error:
+        show_error(error, console)
+        raise typer.Exit(code=1)
+
+
+
 
 @app.command()
 def cat(
@@ -214,7 +236,7 @@ def cat(
         threads: Annotated[
             int,
             Option("--threads", "-n", min=1)
-        ] = 1,
+        ] = Settings.threads,
         top: Annotated[
             int,
             Option("--top", min=0, max=100,
@@ -375,7 +397,7 @@ def cat(
         log.exception("Unexpected error", exc_info=False)
         log.error("Check the run log or use --debug for a full traceback")
         if debug:
-            console.print_exception(show_locals=True) # TODO: before release back to False
+            console.print_exception(show_locals=False) # TODO: before release back to False
         raise typer.Exit(code=1)
 
 
