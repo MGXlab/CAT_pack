@@ -20,9 +20,9 @@ from rich.text import Text
 from typer import Option
 from typer_di import Depends, TyperDI
 
-from .pipeline import CatArgs, run_cat, build_plan, Status, Settings, PrepareArgs, run_prepare
-from .tools.aligner import DiamondArgs, MMseqsArgs, AlignerName
-from .utils.errors import CatError, show_error, InputError
+from .defaults import CatDefaults, Defaults, DiamondDefaults, MMseqsDefaults, PrepareDefaults
+from .pipeline import run_cat, build_plan, Status, run_prepare
+from .utils.errors import CatError, show_error
 from .utils.logging import init_logging
 
 app = TyperDI()
@@ -111,23 +111,29 @@ def update_progress(progress, tasks, step, status, completed=0, total=None):
 
 
 
-def system_settings(
+def system_defaults(
         threads: Annotated[
             int,
             Option("--threads", "-n", min=1)
-        ] = Settings.threads,
+        ] = Defaults.threads,
         verbose: Annotated[
             bool,
             Option("--verbose", help="Show aligner stdout."),
-        ] = Settings.verbose,
+        ] = Defaults.verbose,
         quiet: Annotated[
             bool,
             Option("--quiet", help="Turns off logging in the terminal."),
-        ] = Settings.quiet
+        ] = Defaults.quiet,
+        debug: Annotated[
+            bool,
+            Option("--debug", help="Show unexpected-error tracebacks."),
+        ] = Defaults.debug,
 
 ):
-    return Settings(quiet=quiet, verbose=verbose, threads=threads)
+    return Defaults(quiet=quiet, verbose=verbose, threads=threads, debug=debug)
 
+# this is just a testout, trying to come up with a solution to not depend
+# on typerDI
 DIAMOND_PATH= Annotated[Path | None, Option(
             "--path-to-diamond", rich_help_panel="DIAMOND",
             help="Path to DIAMOND. Supply if it is not on PATH.")]
@@ -147,28 +153,35 @@ def prepare(
         # using this as well?
         acc2tax: Annotated[Path, Option("--acc2tax", help="Accession2taxid.txt file. Can be gzipped.",
                                         metavar="<FILE[.gz]>")],
+        # Added --database here but kept db_dir for now too
         db_dir: Annotated[Path,
-            Option("--db_dir", help="Directory where CAT/BAT/RAT "
-                        "database files will be created", metavar="<DIR>")],
-        path_to_diamond: DIAMOND_PATH = None,
+            Option("--database", "--db_dir", "-d", help="Directory where CAT/BAT/RAT "
+                        "database and taxonomy files will be created", metavar="<DIR>")],
+        path_to_diamond: DIAMOND_PATH = PrepareDefaults.path_to_diamond,
         common_prefix: Annotated[str | None, Option(
                 "--common-prefix",
                 help="Prefix for all files that will be created",
                 show_default="<date>_CAT_pack",
-            ),] = None,
-        cleanup: Annotated["--cleanup"] = None,
-        settings: Settings = Depends(system_settings),
+            ),] = PrepareDefaults.common_prefix,
+        cleanup: Annotated[bool, Option("--cleanup",
+                    help="Remove unnecessary files after all data have been "
+                    "processed")] = PrepareDefaults.cleanup,
+        defaults: Defaults = Depends(system_defaults),
 
 ):
-    args = PrepareArgs(
+    args = PrepareDefaults(
         db_fasta=db_fasta,
         names=names_dmp,
         nodes=nodes_dmp,
         acc2tax=acc2tax,
         db_dir=db_dir,
         path_to_diamond=path_to_diamond,
-        settings=settings,
         common_prefix=common_prefix,
+        cleanup=cleanup,
+        threads=defaults.threads,
+        quiet=defaults.quiet,
+        verbose=defaults.verbose,
+        debug=defaults.debug,
     )
     progress, tasks = make_progress([step.name for step in build_plan(args)])
     report = partial(update_progress, progress, tasks)
@@ -195,31 +208,25 @@ def cat(
         database: Annotated[
             Path,
             Option("--database", "-d" ,
-                   help="Directory that contains database files",
-                   metavar="<directory>")
-        ],
-        taxonomy: Annotated[
-            Path,
-            Option("--taxonomy", "-t",
-                   help="Directory that contains taxonomy files",
+                   help="Directory that contains database and taxonomy files",
                    metavar="<directory>")
         ],
         range_: Annotated[
             float,
             Option("--range", "-r", min=0.0, max=11,
                    help="r parameter", metavar="<Decimal>"),
-        ] = 10.0,
+        ] = float(CatDefaults.range_),
         fraction: Annotated[
             float,
             Option("--fraction", "-f",min=0.0, max=0.99,
                    help="fraction parameter", metavar="<Decimal>"),
-        ] = 0.5,
+        ] = float(CatDefaults.fraction),
         proteins: Annotated[
             Path | None,
             Option("--proteins_fasta", "-p",
                    help="Predicted proteins fasta file. If supplied, "
                         "the protein prediction step is skipped", metavar="<file>")
-        ] = None,
+        ] = CatDefaults.proteins,
         alignment: Annotated[
             Path | None,
             Option("--alignment_table", "-a",
@@ -228,85 +235,71 @@ def cat(
                     "carried out directly. A predicted proteins fasta file "
                     "should also be supplied with argument --proteins_fasta."
                    , metavar="<file>")
-        ] = None,
+        ] = CatDefaults.alignment,
         output_prefix: Annotated[
             Path,
             Option("--output-prefix", "-o", metavar="<prefix>")
-        ] = Path("out.CAT"),
-        threads: Annotated[
-            int,
-            Option("--threads", "-n", min=1)
-        ] = Settings.threads,
+        ] = CatDefaults.output_prefix,
         top: Annotated[
             int,
             Option("--top", min=0, max=100,
                    help="Hits within range of the best hit written to the alignment file. "
                         "This is not --range."),
-        ] = 11,
+        ] = CatDefaults.top,
         tmpdir: Annotated[
             Path | None,
             Option("--tmpdir",
                    help="Location for temporary aligner files."),
-        ] = None,
+        ] = CatDefaults.tmpdir,
         compress: Annotated[
             bool,
             Option("--compress", help="Compress the alignment output file."),
-        ] = False,
-        verbose: Annotated[
-            bool,
-            Option("--verbose", help="Show aligner stdout."),
-        ] = False,
+        ] = CatDefaults.compress,
         log_file: Annotated[
             Path | None,
             Option("--log-file" , metavar="<file>")
-        ] = None,
-        debug: Annotated[
-            bool,
-            Option("--debug", help="Show unexpected-error tracebacks.")
-        ] = False,
+        ] = CatDefaults.log_file,
         aligner: Annotated[
             str,
             Option("--aligner", help="Protein aligner",
                    metavar="<diamond|mmseqs2>", case_sensitive=False)
-        ] = "diamond",
+        ] = CatDefaults.aligner,
         # Seperate Arguments for diamond
         diamond_mode: Annotated[str, Option("--diamond-mode",
             rich_help_panel="DIAMOND",
                help="default, faster, fast, mid-sensitive, sensitive, "
                     "more-sensitive, very-sensitive, ultra-sensitive"
-        )] = "default",
+        )] = DiamondDefaults.mode,
         block_size: Annotated[float, Option(
             "--block-size", rich_help_panel="DIAMOND",
             help="DIAMOND block-size. Lower uses less RAM/tmp.",
-        )] = 12.0,
+        )] = DiamondDefaults.block_size,
         index_chunks: Annotated[int, Option(
             "--index-chunks", min=1, rich_help_panel="DIAMOND",
             help="Set to 4 on low-memory machines.",
-        )] = 1,
+        )] = DiamondDefaults.index_chunks,
         no_self_hits: Annotated[bool, Option(
             "--no-self-hits", rich_help_panel="DIAMOND",
             help="Do not report identical self hits by DIAMOND.",
-        )] = False,
-        path_to_diamond: DIAMOND_PATH = None,
+        )] = DiamondDefaults.no_self_hits,
+        path_to_diamond: DIAMOND_PATH = DiamondDefaults.path_to_diamond,
         # Arguments for MMseqs2
         sensitivity: Annotated[float, Option(
             "--sensitivity", min=1.0, max=7.5, rich_help_panel="MMseqs2",
             help="MMseqs2 sensitivity (-s).",
-        )] = 5.7,
+        )] = MMseqsDefaults.sensitivity,
         split_memory_limit: Annotated[str, Option(
             "--split-memory-limit", rich_help_panel="MMseqs2",
             help="MMseqs2 max memory per split, e.g. 10M, 1G. 0 uses all available memory.",
-        )] = "0",
+        )] = MMseqsDefaults.split_memory_limit,
         path_to_mmseqs: Annotated[Path | None, Option(
             "--path-to-mmseqs", rich_help_panel="MMseqs2",
             help="Path to MMseqs2. Supply if it is not on PATH.",
-        )] = None,
+        )] = MMseqsDefaults.executable,
+        defaults: Defaults = Depends(system_defaults),
 ):
 
-    log = init_logging(debug, quiet=False, log_file=log_file or Path(f"{output_prefix}.log"), console=console)
-
-    log.info("Setting up diamond")
-    diamond = DiamondArgs(
+    diamond = DiamondDefaults(
         mode=diamond_mode,
         no_self_hits=no_self_hits,
         block_size=block_size,
@@ -314,56 +307,48 @@ def cat(
         path_to_diamond=path_to_diamond,
     )
 
-    log.info("Setting up mmseqs")
-    mmseqs = MMseqsArgs(
+    mmseqs = MMseqsDefaults(
         sensitivity=sensitivity,
         split_memory_limit=split_memory_limit,
         executable=path_to_mmseqs,
     )
 
 
-    if aligner.lower() == "diamond":
-        log.info("Selected aligner is DIAMOND")
-        aligner: AlignerName = "diamond"
-    elif aligner.lower() in {"mmseqs2", "mmseqs"}:
-        log.info("Selected aligner is MMseqs2")
-        aligner: AlignerName = "mmseqs2"
-    else:
-        raise InputError("Aligner must be diamond or mmseqs2")
-
-
-    log.info("Setting up Arguments for CAT")
-    arguments = CatArgs(
+    arguments = CatDefaults(
         contigs=contigs,
         database=database,
-        taxonomy=taxonomy,
         proteins=proteins,
         alignment=alignment,
         range_=Decimal(str(range_)),
         fraction=Decimal(str(fraction)),
-        log_file=log_file or Path(f"{output_prefix}.log"),
+        log_file=log_file,
         output_prefix=output_prefix,
-        threads=threads,
         aligner=aligner,
         diamond=diamond,
         mmseqs=mmseqs,
         top=top,
         tmpdir=tmpdir,
         compress=compress,
-        verbose=verbose,
+        threads=defaults.threads,
+        quiet=defaults.quiet,
+        verbose=defaults.verbose, # These two can be place under one name
+        debug=defaults.debug,     # TODO: merge debug and verbose together
     )
+
+    log = init_logging(arguments.debug, quiet=arguments.quiet,
+                       log_file=arguments.log_path, console=console)
+    log.info("Loaded all arguments")
 
     info = Table.grid(padding=(0, 2))
     info.add_column(style="bold cyan")
     info.add_column()
 
     info.add_row("Contigs", str(arguments.contigs))
-    info.add_row("Taxonomy", str(arguments.taxonomy))
     info.add_row("Database", str(arguments.database))
     info.add_row("Aligner", arguments.aligner)
     info.add_row("Parameter r", str(arguments.range_))
     info.add_row("Fraction", str(arguments.fraction))
-    info.add_row("Log file", str(arguments.log_file))
+    info.add_row("Log file", str(arguments.log_path))
 
     # group the supplied command and parameters together
     content = Group(
@@ -396,7 +381,7 @@ def cat(
     except Exception:
         log.exception("Unexpected error", exc_info=False)
         log.error("Check the run log or use --debug for a full traceback")
-        if debug:
+        if defaults.debug:
             console.print_exception(show_locals=False) # TODO: before release back to False
         raise typer.Exit(code=1)
 
