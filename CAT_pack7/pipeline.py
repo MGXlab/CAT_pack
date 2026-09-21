@@ -1,138 +1,17 @@
 import logging
 from dataclasses import dataclass
-from datetime import datetime
-from decimal import Decimal
 from pathlib import Path
 
 from .classification import contig_classification
-from .tools.aligner import run_aligner, DiamondArgs, MMseqsArgs, AlignerName
+from .defaults import CatDefaults, PrepareDefaults
+from .tools.aligner import run_aligner
 from .tools.pyrodigal import run_protein_prediction
 from .utils.errors import CatError
 from .utils.logging import Status, Report
-from .validation import validate_args, validate_aligner_args
-
-
-# Defaults
-# Parent
-
-# CatDefault
-# Child
-
-
-@dataclass(kw_only=True)
-class Defaults:
-    quiet: bool = False
-    verbose: bool = False
-    threads: int = 1
-    db: Path = None
-    path_to_diamond: Path = None
-    path_to_mmseqs2: Path = None
-    common_prefix: Path | Path = f"{datetime.now():%Y-%m-%d}_CAT_pack"
-    output_prefix: Path | None = None
-    log_file: Path | Path = f"{datetime.now():%Y-%m-%d}_CAT_pack.log"
-
-
-
-@dataclass(kw_only=True)
-class PrepareDefaults(Defaults):
-    db_fasta: Path
-    names: Path
-    nodes: Path
-    acc2tax: Path
-    db_dir: Path
-    path_to_diamond: Path | None
-    threads: int = 1
-
-
-@dataclass(kw_only=True)
-class CatDefaults(Defaults):
-    contigs: Path
-    database: Path
-    taxonomy: Path
-    proteins: Path | None = None
-    alignment: Path | None = None
-    range_: Decimal = 10.0
-    fraction: Decimal = 0.5
-    diamond: DiamondArgs
-    mmseqs: MMseqsArgs
-    aligner: AlignerName = "diamond"
-    top: int = 11
-    tmpdir: Path | None = None
-    compress: bool = False
-
+from .validation import get_file_names, get_validated_settings, validate_prepare
 
 
 @dataclass()
-class Settings: #@Bastiaan Know a better name?
-    quiet: bool = False
-    verbose: bool = False
-    threads: int = 1
-
-
-@dataclass(frozen=True)
-class CatArgs:
-    contigs: Path
-    database: Path
-    taxonomy: Path
-    proteins: Path | None
-    alignment: Path | None
-    range_: Decimal
-    fraction: Decimal
-    log_file: Path
-    output_prefix: Path
-    diamond: DiamondArgs
-    mmseqs: MMseqsArgs
-    aligner: AlignerName = "diamond"
-    threads: int = 1
-    top: int = 11
-    tmpdir: Path | None = None
-    compress: bool = False
-    verbose: bool = False
-
-@dataclass(frozen=True)
-class PrepareArgs:
-    def __init_subclass__(cls, **kwargs):
-        pass
-
-
-    db_fasta: Path
-    names: Path
-    nodes: Path
-    acc2tax: Path
-    db_dir: Path
-    path_to_diamond: Path | None
-    defaults: Defaults
-
-
-@dataclass(frozen=True)
-class PrepareOutputs:
-    prefix: str
-    db_folder: Path
-    tax_folder: Path
-    log_file: Path
-    diamond_database: Path
-    mmseqs2_database: Path
-    fastaid2LCAtaxid: Path
-    taxids_with_multiple_offspring: Path
-
-
-def expand_prepare(args: PrepareArgs) -> PrepareOutputs:
-    """Mini expand_arguments van shared.py"""
-    prefix = args.defaults.common_prefix or f"{datetime.now():%Y-%m-%d}_CAT_pack"
-    db_folder = args.db_dir / "db"
-    tax_folder = args.db_dir / "tax"
-    return PrepareOutputs(
-        prefix=prefix,
-        db_folder=db_folder, # on folder
-        tax_folder=tax_folder,
-        log_file=args.db_dir / f"{prefix}.log",
-        diamond_database=db_folder / f"{prefix}.dmnd",
-        mmseqs2_database=db_folder / f"{prefix}.mmseqs2",
-        fastaid2LCAtaxid=db_folder / f"{prefix}.fastaid2LCAtaxid",
-        taxids_with_multiple_offspring=db_folder / f"{prefix}.taxids_with_multiple_offspring",
-    )
-
-@dataclass(frozen=True)
 class Step:
     """
     A simple dataclass currently acting like a dictionairy that stores the
@@ -141,23 +20,27 @@ class Step:
 
     name: str
     supplied: bool = False
+    citation_message: bool = False
+
 
     def __str__(self) -> str:
         return self.name
 
 
-def build_plan(args: CatArgs | PrepareArgs) -> list[Step]:
-    if type(args) == PrepareArgs:
-        files = expand_prepare(args)
+def build_plan(args: CatDefaults | PrepareDefaults, files=None) -> list[Step]:
+    if type(args) == PrepareDefaults:
         return [
             Step("Input validation"),
-            Step("Make DIAMOND database", supplied=files.diamond_database.is_file()),
-            Step("Make MMseqs2 database", supplied=files.mmseqs2_database.is_file()),
-            Step("Make fastaid2LCAtaxid", supplied=files.fastaid2LCAtaxid.is_file()),
+            Step("Make DIAMOND database",
+                 supplied=files is not None and files.diamond_database.is_file()),
+            Step("Make MMseqs2 database",
+                 supplied=files is not None and files.mmseqs2_database.is_file()),
+            Step("Make fastaid2LCAtaxid",
+                 supplied=files is not None and files.fastaid2LCAtaxid.is_file()),
             Step("Make taxids with multiple offspring",
-                 supplied=files.taxids_with_multiple_offspring.is_file()),
+                 supplied=files is not None and files.taxids_with_multiple_offspring.is_file()),
         ]
-    if type(args) == CatArgs:
+    if type(args) == CatDefaults:
         return [
             Step("Input validation"),
             Step("Protein prediction", supplied=args.proteins is not None),
@@ -167,7 +50,7 @@ def build_plan(args: CatArgs | PrepareArgs) -> list[Step]:
     raise CatError("I haven't figured out how to build that specific plan")
 
 
-def run_cat(args: CatArgs, report: Report) -> dict[str, Path]:
+def run_cat(args: CatDefaults, report: Report) -> dict[str, Path]:
     """Contig annotation tool (CAT) run"""
 
     plan = build_plan(args)
@@ -179,16 +62,12 @@ def run_cat(args: CatArgs, report: Report) -> dict[str, Path]:
     try:
         report(current_step.name, Status.RUNNING, 0, 1)
         log.info(f"Starting: {current_step.name}")
-        files = validate_args(args) # TODO: still need to revamp this
-        aligner_args = validate_aligner_args(args, files)
+        settings = get_validated_settings(args)
         report(current_step.name, Status.COMPLETE, 1, 1)
         log.info(f"Completed: {current_step.name}")
 
         for step_index, current_step in enumerate(plan[1:], start=1):
             if current_step.supplied:
-                # This forces "completion" of reused progressbar.
-                # And thus makes the progressbar green, currently if only
-                # reused is called the bar says dimmed (also a good indicator)
                 report(current_step.name, Status.SUPPLIED, 1, 1)
                 log.info(f"Supplied file: {current_step.name}")
                 continue
@@ -197,11 +76,11 @@ def run_cat(args: CatArgs, report: Report) -> dict[str, Path]:
             log.info(f"Starting: {current_step.name}")
 
             if current_step.name == "Protein prediction":
-                run_protein_prediction(args, files, report, "pyrodigal")
+                run_protein_prediction(settings, report, "pyrodigal")
             elif current_step.name == "Alignment":
-                run_aligner(aligner_args, report)
+                run_aligner(settings.aligner, report)
             elif current_step.name == "Classify":
-                contig_classification(args, files, report)
+                contig_classification(settings, settings.files, report)
             else:
                 log.error(f"Can't spell that well, my misspelling:"
                           f"{current_step.name}")
@@ -213,9 +92,9 @@ def run_cat(args: CatArgs, report: Report) -> dict[str, Path]:
             log.info(f"Completed: {current_step.name}")
 
         return {
-            "Contig classifications": Path("Future path to C2C file :)"),
-            "ORF classifications": Path("Future path to ORF2LCA file :)"),
-            "Log": args.log_file if args.log_file is not None else None,
+            "Contig classifications": settings.files.contig_report,
+            "ORF classifications": settings.files.orf_report,
+            "Log": settings.log_file,
         }
 
     except KeyboardInterrupt:
@@ -234,7 +113,7 @@ def run_cat(args: CatArgs, report: Report) -> dict[str, Path]:
 
         if isinstance(error, CatError):
             error.step = current_step.name
-            error.log_file = args.log_file if log is not None else None
+            error.log_file = args.log_path if args.log_path.is_file() else None
             raise
 
         # Catch all other exceptions
@@ -244,12 +123,12 @@ def run_cat(args: CatArgs, report: Report) -> dict[str, Path]:
 
 
 
-def run_prepare(args: PrepareArgs, report: Report):
-    plan = build_plan(args)
+def run_prepare(args: PrepareDefaults, report: Report):
+    files = get_file_names(args)
+    plan = build_plan(args, get_file_names(args))
     step_index = 0
     current_step = plan[step_index]
     log = logging.getLogger("CAT_pack")
-    files = expand_prepare(args)
 
     try:
         for step_index, current_step in enumerate(plan):
@@ -258,13 +137,11 @@ def run_prepare(args: PrepareArgs, report: Report):
                 log.info(f"Already exists, skipped making of: {current_step.name}")
                 continue
 
-            if step_index == 0:
-                # TODO: validate prepare inputs (fasta, names, nodes, acc2tax)
-                pass
-
             report(current_step.name, Status.RUNNING, 0, None)
             log.info(f"Starting: {current_step.name}")
-            # TODO: Port over the actual steps
+            if step_index == 0:
+                settings = validate_prepare(args)
+            # TODO: Port over the next steps
             report(current_step.name, Status.COMPLETE, 1, 1)
             log.info(f"Completed: {current_step.name}")
 
@@ -284,6 +161,6 @@ def run_prepare(args: PrepareArgs, report: Report):
 
         if isinstance(error, CatError):
             error.step = current_step.name
-            error.log_file = files.log_file
+            error.log_file = files.log_file if files.log_file.is_file() else None
             raise
         raise

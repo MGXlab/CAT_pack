@@ -31,7 +31,7 @@ console = Console(stderr=True)
 
 @app.callback()
 def main():
-    """Run CAT with progress reporting and collected preflight errors."""
+    """Ah oh"""
 
 
 
@@ -213,7 +213,7 @@ def cat(
         ],
         range_: Annotated[
             float,
-            Option("--range", "-r", min=0.0, max=11,
+            Option("--range", "-r", min=0.0, max=100,
                    help="r parameter", metavar="<Decimal>"),
         ] = float(CatDefaults.range_),
         fraction: Annotated[
