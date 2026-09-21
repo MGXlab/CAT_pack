@@ -3,7 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
-from .defaults import AlignerName, CatDefaults, Defaults, DiamondDefaults, PrepareDefaults
+from .options import AlignerName, CatOptions, ExecutionOptions, DiamondOptions, PrepareOptions
 from .settings import (
     CatFiles, CatSettings, ClassificationSettings, DatabaseFiles, DiamondParameters,
     DiamondSettings, ExecutionSettings, PrepareOutputs, PrepareSettings, TaxonomyFiles,
@@ -20,8 +20,8 @@ DIAMOND_MODES = {
 }
 
 
-def validate_execution(defaults: Defaults) -> ExecutionSettings:
-    return ExecutionSettings(defaults.threads, defaults.quiet, defaults.verbose, defaults.debug)
+def validate_execution(options: ExecutionOptions) -> ExecutionSettings:
+    return ExecutionSettings(options.threads, options.quiet, options.verbose, options.debug)
 
 
 def validate_classification(range_, fraction) -> ClassificationSettings:
@@ -49,15 +49,15 @@ def validate_aligner_name(name: str) -> AlignerName:
     return normalized
 
 
-def validate_diamond(defaults: DiamondDefaults) -> DiamondParameters:
+def validate_diamond(options: DiamondOptions) -> DiamondParameters:
     checks = ValErrorCollector()
-    executable = checks.check(check_diamond, defaults.path_to_diamond)
-    if defaults.mode not in DIAMOND_MODES:
+    executable = checks.check(check_diamond, options.path_to_diamond)
+    if options.mode not in DIAMOND_MODES:
         checks.add(InputError("Unknown DIAMOND mode.", hint=", ".join(DIAMOND_MODES)))
     checks.finish()
     return DiamondParameters(
-        executable, defaults.mode, defaults.no_self_hits,
-        defaults.block_size, defaults.index_chunks,
+        executable, options.mode, options.no_self_hits,
+        options.block_size, options.index_chunks,
     )
 
 
@@ -87,13 +87,13 @@ def validate_database(folder: Path, *, require_diamond=False) -> DatabaseFiles:
 # the replace(args) makes sure that if the run is started just before midnight
 # and the get_file_names is run again after midnight the common_prefix will be
 # the date of the day before
-def make_prefix(args: PrepareDefaults) -> PrepareDefaults:
+def make_prefix(args: PrepareOptions) -> PrepareOptions:
     if args.common_prefix is not None:
         return args
     return replace(args, common_prefix=f"{datetime.now():%Y-%m-%d}_CAT_pack")
 
 
-def get_file_names(args: PrepareDefaults) -> PrepareOutputs:
+def get_file_names(args: PrepareOptions) -> PrepareOutputs:
     prefix = make_prefix(args).common_prefix
     folder = args.db_dir
     return PrepareOutputs(
@@ -109,7 +109,7 @@ def get_file_names(args: PrepareDefaults) -> PrepareOutputs:
     )
 
 
-def validate_prepare(args: PrepareDefaults) -> PrepareSettings:
+def validate_prepare(args: PrepareOptions) -> PrepareSettings:
     args = make_prefix(args)
     checks = ValErrorCollector()
     execution = checks.check(validate_execution, args)
@@ -131,7 +131,7 @@ def validate_prepare(args: PrepareDefaults) -> PrepareSettings:
     )
 
 
-def validate_cat_files(args: CatDefaults, aligner: AlignerName | None) -> CatFiles:
+def validate_cat_files(args: CatOptions, aligner: AlignerName | None) -> CatFiles:
     checks = ValErrorCollector()
 
     contigs = checks.check(check_file, args.contigs, "Contigs file")
@@ -183,7 +183,7 @@ def validate_cat_files(args: CatDefaults, aligner: AlignerName | None) -> CatFil
     )
 
 
-def validate_cat(args: CatDefaults) -> CatSettings:
+def validate_cat(args: CatOptions) -> CatSettings:
     checks = ValErrorCollector()
     execution = checks.check(validate_execution, args)
     classification = checks.check(validate_classification, args.range_, args.fraction)
@@ -225,9 +225,9 @@ def validate_cat(args: CatDefaults) -> CatSettings:
     )
 
 
-def get_validated_settings(args: CatDefaults | PrepareDefaults) -> CatSettings | PrepareSettings:
-    if type(args) == CatDefaults:
+def get_validated_settings(args: CatOptions | PrepareOptions) -> CatSettings | PrepareSettings:
+    if type(args) == CatOptions:
         return validate_cat(args)
-    if type(args) == PrepareDefaults:
+    if type(args) == PrepareOptions:
         return validate_prepare(args)
-    raise TypeError(f"Hmmm, that type of Default class I don't know yet")
+    raise TypeError(f"Hmmm, that type of options class I don't know yet")

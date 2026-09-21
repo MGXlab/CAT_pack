@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .classification import contig_classification
-from .defaults import CatDefaults, PrepareDefaults
+from .options import CatOptions, PrepareOptions
 from .tools.aligner import run_aligner
 from .tools.pyrodigal import run_protein_prediction
 from .utils.errors import CatError
@@ -27,8 +27,8 @@ class Step:
         return self.name
 
 
-def build_plan(args: CatDefaults | PrepareDefaults, files=None) -> list[Step]:
-    if type(args) == PrepareDefaults:
+def build_plan(args: CatOptions | PrepareOptions, files=None) -> list[Step]:
+    if type(args) == PrepareOptions:
         return [
             Step("Input validation"),
             Step("Make DIAMOND database",
@@ -40,7 +40,7 @@ def build_plan(args: CatDefaults | PrepareDefaults, files=None) -> list[Step]:
             Step("Make taxids with multiple offspring",
                  supplied=files is not None and files.taxids_with_multiple_offspring.is_file()),
         ]
-    if type(args) == CatDefaults:
+    if type(args) == CatOptions:
         return [
             Step("Input validation"),
             Step("Protein prediction", supplied=args.proteins is not None),
@@ -50,7 +50,7 @@ def build_plan(args: CatDefaults | PrepareDefaults, files=None) -> list[Step]:
     raise CatError("I haven't figured out how to build that specific plan")
 
 
-def run_cat(args: CatDefaults, report: Report) -> dict[str, Path]:
+def run_cat(args: CatOptions, report: Report) -> dict[str, Path]:
     """Contig annotation tool (CAT) run"""
 
     plan = build_plan(args)
@@ -71,7 +71,6 @@ def run_cat(args: CatDefaults, report: Report) -> dict[str, Path]:
                 report(current_step.name, Status.SUPPLIED, 1, 1)
                 log.info(f"Supplied file: {current_step.name}")
                 continue
-
             report(current_step.name, Status.RUNNING, 0, None)
             log.info(f"Starting: {current_step.name}")
 
@@ -123,7 +122,7 @@ def run_cat(args: CatDefaults, report: Report) -> dict[str, Path]:
 
 
 
-def run_prepare(args: PrepareDefaults, report: Report):
+def run_prepare(args: PrepareOptions, report: Report):
     files = get_file_names(args)
     plan = build_plan(args, get_file_names(args))
     step_index = 0

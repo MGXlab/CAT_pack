@@ -20,7 +20,7 @@ from rich.text import Text
 from typer import Option
 from typer_di import Depends, TyperDI
 
-from .defaults import CatDefaults, Defaults, DiamondDefaults, MMseqsDefaults, PrepareDefaults
+from .options import CatOptions, ExecutionOptions, DiamondOptions, MMseqsOptions, PrepareOptions
 from .pipeline import run_cat, build_plan, Status, run_prepare
 from .utils.errors import CatError, show_error
 from .utils.logging import init_logging
@@ -111,26 +111,26 @@ def update_progress(progress, tasks, step, status, completed=0, total=None):
 
 
 
-def system_defaults(
+def execution_options(
         threads: Annotated[
             int,
             Option("--threads", "-n", min=1)
-        ] = Defaults.threads,
+        ] = ExecutionOptions.threads,
         verbose: Annotated[
             bool,
             Option("--verbose", help="Show aligner stdout."),
-        ] = Defaults.verbose,
+        ] = ExecutionOptions.verbose,
         quiet: Annotated[
             bool,
             Option("--quiet", help="Turns off logging in the terminal."),
-        ] = Defaults.quiet,
+        ] = ExecutionOptions.quiet,
         debug: Annotated[
             bool,
             Option("--debug", help="Show unexpected-error tracebacks."),
-        ] = Defaults.debug,
+        ] = ExecutionOptions.debug,
 
 ):
-    return Defaults(quiet=quiet, verbose=verbose, threads=threads, debug=debug)
+    return ExecutionOptions(quiet=quiet, verbose=verbose, threads=threads, debug=debug)
 
 # this is just a testout, trying to come up with a solution to not depend
 # on typerDI
@@ -157,19 +157,19 @@ def prepare(
         db_dir: Annotated[Path,
             Option("--database", "--db_dir", "-d", help="Directory where CAT/BAT/RAT "
                         "database and taxonomy files will be created", metavar="<DIR>")],
-        path_to_diamond: DIAMOND_PATH = PrepareDefaults.path_to_diamond,
+        path_to_diamond: DIAMOND_PATH = PrepareOptions.path_to_diamond,
         common_prefix: Annotated[str | None, Option(
                 "--common-prefix",
                 help="Prefix for all files that will be created",
                 show_default="<date>_CAT_pack",
-            ),] = PrepareDefaults.common_prefix,
+            ),] = PrepareOptions.common_prefix,
         cleanup: Annotated[bool, Option("--cleanup",
                     help="Remove unnecessary files after all data have been "
-                    "processed")] = PrepareDefaults.cleanup,
-        defaults: Defaults = Depends(system_defaults),
+                    "processed")] = PrepareOptions.cleanup,
+        options: ExecutionOptions = Depends(execution_options),
 
 ):
-    args = PrepareDefaults(
+    args = PrepareOptions(
         db_fasta=db_fasta,
         names=names_dmp,
         nodes=nodes_dmp,
@@ -178,10 +178,10 @@ def prepare(
         path_to_diamond=path_to_diamond,
         common_prefix=common_prefix,
         cleanup=cleanup,
-        threads=defaults.threads,
-        quiet=defaults.quiet,
-        verbose=defaults.verbose,
-        debug=defaults.debug,
+        threads=options.threads,
+        quiet=options.quiet,
+        verbose=options.verbose,
+        debug=options.debug,
     )
     progress, tasks = make_progress([step.name for step in build_plan(args)])
     report = partial(update_progress, progress, tasks)
@@ -215,18 +215,18 @@ def cat(
             float,
             Option("--range", "-r", min=0.0, max=100,
                    help="r parameter", metavar="<Decimal>"),
-        ] = float(CatDefaults.range_),
+        ] = float(CatOptions.range_),
         fraction: Annotated[
             float,
             Option("--fraction", "-f",min=0.0, max=0.99,
                    help="fraction parameter", metavar="<Decimal>"),
-        ] = float(CatDefaults.fraction),
+        ] = float(CatOptions.fraction),
         proteins: Annotated[
             Path | None,
             Option("--proteins_fasta", "-p",
                    help="Predicted proteins fasta file. If supplied, "
                         "the protein prediction step is skipped", metavar="<file>")
-        ] = CatDefaults.proteins,
+        ] = CatOptions.proteins,
         alignment: Annotated[
             Path | None,
             Option("--alignment_table", "-a",
@@ -235,71 +235,71 @@ def cat(
                     "carried out directly. A predicted proteins fasta file "
                     "should also be supplied with argument --proteins_fasta."
                    , metavar="<file>")
-        ] = CatDefaults.alignment,
+        ] = CatOptions.alignment,
         output_prefix: Annotated[
             Path,
             Option("--output-prefix", "-o", metavar="<prefix>")
-        ] = CatDefaults.output_prefix,
+        ] = CatOptions.output_prefix,
         top: Annotated[
             int,
             Option("--top", min=0, max=100,
                    help="Hits within range of the best hit written to the alignment file. "
                         "This is not --range."),
-        ] = CatDefaults.top,
+        ] = CatOptions.top,
         tmpdir: Annotated[
             Path | None,
             Option("--tmpdir",
                    help="Location for temporary aligner files."),
-        ] = CatDefaults.tmpdir,
+        ] = CatOptions.tmpdir,
         compress: Annotated[
             bool,
             Option("--compress", help="Compress the alignment output file."),
-        ] = CatDefaults.compress,
+        ] = CatOptions.compress,
         log_file: Annotated[
             Path | None,
             Option("--log-file" , metavar="<file>")
-        ] = CatDefaults.log_file,
+        ] = CatOptions.log_file,
         aligner: Annotated[
             str,
             Option("--aligner", help="Protein aligner",
                    metavar="<diamond|mmseqs2>", case_sensitive=False)
-        ] = CatDefaults.aligner,
+        ] = CatOptions.aligner,
         # Seperate Arguments for diamond
         diamond_mode: Annotated[str, Option("--diamond-mode",
             rich_help_panel="DIAMOND",
                help="default, faster, fast, mid-sensitive, sensitive, "
                     "more-sensitive, very-sensitive, ultra-sensitive"
-        )] = DiamondDefaults.mode,
+        )] = DiamondOptions.mode,
         block_size: Annotated[float, Option(
             "--block-size", rich_help_panel="DIAMOND",
             help="DIAMOND block-size. Lower uses less RAM/tmp.",
-        )] = DiamondDefaults.block_size,
+        )] = DiamondOptions.block_size,
         index_chunks: Annotated[int, Option(
             "--index-chunks", min=1, rich_help_panel="DIAMOND",
             help="Set to 4 on low-memory machines.",
-        )] = DiamondDefaults.index_chunks,
+        )] = DiamondOptions.index_chunks,
         no_self_hits: Annotated[bool, Option(
             "--no-self-hits", rich_help_panel="DIAMOND",
             help="Do not report identical self hits by DIAMOND.",
-        )] = DiamondDefaults.no_self_hits,
-        path_to_diamond: DIAMOND_PATH = DiamondDefaults.path_to_diamond,
+        )] = DiamondOptions.no_self_hits,
+        path_to_diamond: DIAMOND_PATH = DiamondOptions.path_to_diamond,
         # Arguments for MMseqs2
         sensitivity: Annotated[float, Option(
             "--sensitivity", min=1.0, max=7.5, rich_help_panel="MMseqs2",
             help="MMseqs2 sensitivity (-s).",
-        )] = MMseqsDefaults.sensitivity,
+        )] = MMseqsOptions.sensitivity,
         split_memory_limit: Annotated[str, Option(
             "--split-memory-limit", rich_help_panel="MMseqs2",
             help="MMseqs2 max memory per split, e.g. 10M, 1G. 0 uses all available memory.",
-        )] = MMseqsDefaults.split_memory_limit,
+        )] = MMseqsOptions.split_memory_limit,
         path_to_mmseqs: Annotated[Path | None, Option(
             "--path-to-mmseqs", rich_help_panel="MMseqs2",
             help="Path to MMseqs2. Supply if it is not on PATH.",
-        )] = MMseqsDefaults.executable,
-        defaults: Defaults = Depends(system_defaults),
+        )] = MMseqsOptions.executable,
+        options: ExecutionOptions = Depends(execution_options),
 ):
 
-    diamond = DiamondDefaults(
+    diamond = DiamondOptions(
         mode=diamond_mode,
         no_self_hits=no_self_hits,
         block_size=block_size,
@@ -307,14 +307,14 @@ def cat(
         path_to_diamond=path_to_diamond,
     )
 
-    mmseqs = MMseqsDefaults(
+    mmseqs = MMseqsOptions(
         sensitivity=sensitivity,
         split_memory_limit=split_memory_limit,
         executable=path_to_mmseqs,
     )
 
 
-    arguments = CatDefaults(
+    arguments = CatOptions(
         contigs=contigs,
         database=database,
         proteins=proteins,
@@ -329,10 +329,10 @@ def cat(
         top=top,
         tmpdir=tmpdir,
         compress=compress,
-        threads=defaults.threads,
-        quiet=defaults.quiet,
-        verbose=defaults.verbose, # These two can be place under one name
-        debug=defaults.debug,     # TODO: merge debug and verbose together
+        threads=options.threads,
+        quiet=options.quiet,
+        verbose=options.verbose, # These two can be place under one name
+        debug=options.debug,     # TODO: merge debug and verbose together
     )
 
     log = init_logging(arguments.debug, quiet=arguments.quiet,
@@ -381,7 +381,7 @@ def cat(
     except Exception:
         log.exception("Unexpected error", exc_info=False)
         log.error("Check the run log or use --debug for a full traceback")
-        if defaults.debug:
+        if options.debug:
             console.print_exception(show_locals=False) # TODO: before release back to False
         raise typer.Exit(code=1)
 
