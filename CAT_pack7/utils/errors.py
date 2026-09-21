@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 from pathlib import Path
+
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
+
 
 class CatError(Exception):
     """
@@ -54,6 +56,46 @@ class ExternalToolError(CatError):
         self.tool = tool
         super().__init__(f"{tool}: {message}")
         self.hint = hint
+
+
+class ValErrorCollector:
+    """A class that collects all the errors
+    Example Usage:
+        checks = ValErrorCollector()
+        diamond_path = checks.check(check_if_diamond_exists_function, the_path_to_diamond_given by the user)
+        Optionally:
+            checks.add(SomeError("With other text can be added to the error list"))
+        check.finish() # this will raise the VailidationError if any errors where stored
+
+    It can be used nested, that's where the: if isinstance(error, ValidationError)
+    comes in to play. That unpacks the "sub" errors of subchecks.
+
+    For example, this can be used with checks for diamond. This way you don't
+    need to supply checks, through every function call
+    """
+
+    def __init__(self):
+        self.errors = []
+
+    def add(self, error):
+        if isinstance(error, ValidationError):
+            self.errors.extend(error.errors)
+        else:
+            self.errors.append(error)
+
+    def check(self, function, *args, **kwargs):
+        try:
+            return function(*args, **kwargs)
+        except CatError as error:
+            self.add(error)
+            return None
+        except OSError as error:
+            self.add(InputError(str(error)))
+            return None
+
+    def finish(self):
+        if self.errors:
+            raise ValidationError(self.errors)
 
 
 def show_error(error: CatError, console: Console) -> None:
