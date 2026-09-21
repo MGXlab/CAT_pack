@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 
+import logging
 import sys
+from pathlib import Path
 
-import shared
+log = logging.getLogger("CAT_pack")
 
 
-def import_nodes(nodes_dmp, log_file, quiet):
-    message = "Loading file {0}.".format(nodes_dmp)
-    shared.give_user_feedback(message, log_file, quiet)
-    
+def import_nodes(nodes_dmp):
+    log.info(f"Loading file {nodes_dmp}.")
+
     taxid2parent = {}
     taxid2rank = {}
 
@@ -23,12 +24,11 @@ def import_nodes(nodes_dmp, log_file, quiet):
             taxid2parent[taxid] = parent
             taxid2rank[taxid] = rank
 
-    return (taxid2parent, taxid2rank)
+    return taxid2parent, taxid2rank
 
 
-def import_names(names_dmp, log_file, quiet):
-    message = "Loading file {0}.".format(names_dmp)
-    shared.give_user_feedback(message, log_file, quiet)
+def import_names(names_dmp: Path):
+    log.info(f"Loading file {names_dmp}.")
 
     taxid2name = {}
 
@@ -45,9 +45,8 @@ def import_names(names_dmp, log_file, quiet):
     return taxid2name
 
 
-def import_fastaid2LCAtaxid(fastaid2LCAtaxid_file, all_hits, log_file, quiet):
-    message = "Loading file {0}.".format(fastaid2LCAtaxid_file)
-    shared.give_user_feedback(message, log_file, quiet)
+def import_fastaid2LCAtaxid(fastaid2LCAtaxid_file: Path, all_hits):
+    log.info(f"Loading file {fastaid2LCAtaxid_file}.")
 
     fastaid2LCAtaxid = {}
 
@@ -62,10 +61,8 @@ def import_fastaid2LCAtaxid(fastaid2LCAtaxid_file, all_hits, log_file, quiet):
     return fastaid2LCAtaxid
 
 
-def import_taxids_with_multiple_offspring(
-    taxids_with_multiple_offspring_file, log_file, quiet):
-    message = "Loading file {0}.".format(taxids_with_multiple_offspring_file)
-    shared.give_user_feedback(message, log_file, quiet)
+def import_taxids_with_multiple_offspring(taxids_with_multiple_offspring_file):
+    log.info(f"Loading file {taxids_with_multiple_offspring_file}.")
 
     taxids_with_multiple_offspring = set()
 
