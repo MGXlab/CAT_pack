@@ -40,7 +40,6 @@ class MMseqsDefaults:
 class CatDefaults(Defaults):
     contigs: Path
     database: Path
-    taxonomy: Path
     proteins: Path | None = None
     alignment: Path | None = None
     range_: Decimal = Decimal("10.0")
