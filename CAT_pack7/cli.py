@@ -17,19 +17,21 @@ from rich.panel import Panel
 from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
 from rich.table import Table
 from rich.text import Text
-from typer import Typer, Option
+from typer import Option
+from typer_di import Depends, TyperDI
 
-from .pipeline import CatArgs, run_cat, build_plan, Status
+from .defaults import CatDefaults, Defaults, DiamondDefaults, MMseqsDefaults, PrepareDefaults
+from .pipeline import run_cat, build_plan, Status, run_prepare
 from .utils.errors import CatError, show_error
 from .utils.logging import init_logging
 
-app = Typer()
+app = TyperDI()
 
 console = Console(stderr=True)
 
 @app.callback()
 def main():
-    """Run CAT with progress reporting and collected preflight errors."""
+    """Ah oh"""
 
 
 
@@ -109,13 +111,93 @@ def update_progress(progress, tasks, step, status, completed=0, total=None):
 
 
 
+def system_defaults(
+        threads: Annotated[
+            int,
+            Option("--threads", "-n", min=1)
+        ] = Defaults.threads,
+        verbose: Annotated[
+            bool,
+            Option("--verbose", help="Show aligner stdout."),
+        ] = Defaults.verbose,
+        quiet: Annotated[
+            bool,
+            Option("--quiet", help="Turns off logging in the terminal."),
+        ] = Defaults.quiet,
+        debug: Annotated[
+            bool,
+            Option("--debug", help="Show unexpected-error tracebacks."),
+        ] = Defaults.debug,
 
-# @bastiaan there is a destinction between typer.Option and typer.Arguments
-# Arguments are stricly bound to input order of arguments, and do not allow for aliases
-# But they are by default required.
-# Options on the other hand must be set by a argument name and allow for aliases
-# However they are by default NOT required. But can be set to be required
-# What do you think is best? For now I will go for Options and we can always re-evaluate
+):
+    return Defaults(quiet=quiet, verbose=verbose, threads=threads, debug=debug)
+
+# this is just a testout, trying to come up with a solution to not depend
+# on typerDI
+DIAMOND_PATH= Annotated[Path | None, Option(
+            "--path-to-diamond", rich_help_panel="DIAMOND",
+            help="Path to DIAMOND. Supply if it is not on PATH.")]
+
+@app.command()
+def prepare(
+        db_fasta: Annotated[
+            Path, Option("--db_fasta", help="Fasta file containing "
+                                            "all sequences.", metavar="<FastaFile>")
+        ],
+        names_dmp: Annotated[Path, Option("--names",
+                                          help="Names.dmp", metavar="<FILE>")],
+        nodes_dmp: Annotated[Path, Option("--nodes",
+                                          help="Nodes.dmp", metavar="<FILE>")],
+        # https://github.com/soedinglab/MMseqs2/blob/master/src/MMseqsBase.cpp#L25-L26
+        # MMseqs2 does use this notation of metavar as well, should we look into
+        # using this as well?
+        acc2tax: Annotated[Path, Option("--acc2tax", help="Accession2taxid.txt file. Can be gzipped.",
+                                        metavar="<FILE[.gz]>")],
+        # Added --database here but kept db_dir for now too
+        db_dir: Annotated[Path,
+            Option("--database", "--db_dir", "-d", help="Directory where CAT/BAT/RAT "
+                        "database and taxonomy files will be created", metavar="<DIR>")],
+        path_to_diamond: DIAMOND_PATH = PrepareDefaults.path_to_diamond,
+        common_prefix: Annotated[str | None, Option(
+                "--common-prefix",
+                help="Prefix for all files that will be created",
+                show_default="<date>_CAT_pack",
+            ),] = PrepareDefaults.common_prefix,
+        cleanup: Annotated[bool, Option("--cleanup",
+                    help="Remove unnecessary files after all data have been "
+                    "processed")] = PrepareDefaults.cleanup,
+        defaults: Defaults = Depends(system_defaults),
+
+):
+    args = PrepareDefaults(
+        db_fasta=db_fasta,
+        names=names_dmp,
+        nodes=nodes_dmp,
+        acc2tax=acc2tax,
+        db_dir=db_dir,
+        path_to_diamond=path_to_diamond,
+        common_prefix=common_prefix,
+        cleanup=cleanup,
+        threads=defaults.threads,
+        quiet=defaults.quiet,
+        verbose=defaults.verbose,
+        debug=defaults.debug,
+    )
+    progress, tasks = make_progress([step.name for step in build_plan(args)])
+    report = partial(update_progress, progress, tasks)
+    try:
+        with progress:
+            run_prepare(args, report)
+    except KeyboardInterrupt:
+        console.print("\nRun cancelled :(")
+        raise typer.Exit(code=130)
+    except CatError as error:
+        show_error(error, console)
+        raise typer.Exit(code=1)
+
+
+
+
 @app.command()
 def cat(
         contigs: Annotated[
@@ -126,31 +208,25 @@ def cat(
         database: Annotated[
             Path,
             Option("--database", "-d" ,
-                   help="Directory that contains database files",
-                   metavar="<directory>")
-        ],
-        taxonomy: Annotated[
-            Path,
-            Option("--taxonomy", "-t",
-                   help="Directory that contains taxonomy files",
+                   help="Directory that contains database and taxonomy files",
                    metavar="<directory>")
         ],
         range_: Annotated[
             float,
-            Option("--range", "-r", min=0.0, max=11,
+            Option("--range", "-r", min=0.0, max=100,
                    help="r parameter", metavar="<Decimal>"),
-        ] = 10.0,
+        ] = float(CatDefaults.range_),
         fraction: Annotated[
             float,
             Option("--fraction", "-f",min=0.0, max=0.99,
                    help="fraction parameter", metavar="<Decimal>"),
-        ] = 0.5,
+        ] = float(CatDefaults.fraction),
         proteins: Annotated[
             Path | None,
             Option("--proteins_fasta", "-p",
                    help="Predicted proteins fasta file. If supplied, "
                         "the protein prediction step is skipped", metavar="<file>")
-        ] = None,
+        ] = CatDefaults.proteins,
         alignment: Annotated[
             Path | None,
             Option("--alignment_table", "-a",
@@ -159,77 +235,136 @@ def cat(
                     "carried out directly. A predicted proteins fasta file "
                     "should also be supplied with argument --proteins_fasta."
                    , metavar="<file>")
-        ] = None,
+        ] = CatDefaults.alignment,
         output_prefix: Annotated[
             Path,
             Option("--output-prefix", "-o", metavar="<prefix>")
-        ] = Path("out.CAT"),
-        threads: Annotated[
+        ] = CatDefaults.output_prefix,
+        top: Annotated[
             int,
-            Option("--threads", "-n", min=1)
-        ] = 1,
+            Option("--top", min=0, max=100,
+                   help="Hits within range of the best hit written to the alignment file. "
+                        "This is not --range."),
+        ] = CatDefaults.top,
+        tmpdir: Annotated[
+            Path | None,
+            Option("--tmpdir",
+                   help="Location for temporary aligner files."),
+        ] = CatDefaults.tmpdir,
+        compress: Annotated[
+            bool,
+            Option("--compress", help="Compress the alignment output file."),
+        ] = CatDefaults.compress,
         log_file: Annotated[
             Path | None,
             Option("--log-file" , metavar="<file>")
-        ] = None,
-        debug: Annotated[
-            bool,
-            Option("--debug", help="Show unexpected-error tracebacks.")
-        ] = False,
+        ] = CatDefaults.log_file,
         aligner: Annotated[
             str,
             Option("--aligner", help="Protein aligner",
-                   metavar="<DIAMOND|MMseqs2>", case_sensitive=False)
-        ] =  "diamond"
+                   metavar="<diamond|mmseqs2>", case_sensitive=False)
+        ] = CatDefaults.aligner,
+        # Seperate Arguments for diamond
+        diamond_mode: Annotated[str, Option("--diamond-mode",
+            rich_help_panel="DIAMOND",
+               help="default, faster, fast, mid-sensitive, sensitive, "
+                    "more-sensitive, very-sensitive, ultra-sensitive"
+        )] = DiamondDefaults.mode,
+        block_size: Annotated[float, Option(
+            "--block-size", rich_help_panel="DIAMOND",
+            help="DIAMOND block-size. Lower uses less RAM/tmp.",
+        )] = DiamondDefaults.block_size,
+        index_chunks: Annotated[int, Option(
+            "--index-chunks", min=1, rich_help_panel="DIAMOND",
+            help="Set to 4 on low-memory machines.",
+        )] = DiamondDefaults.index_chunks,
+        no_self_hits: Annotated[bool, Option(
+            "--no-self-hits", rich_help_panel="DIAMOND",
+            help="Do not report identical self hits by DIAMOND.",
+        )] = DiamondDefaults.no_self_hits,
+        path_to_diamond: DIAMOND_PATH = DiamondDefaults.path_to_diamond,
+        # Arguments for MMseqs2
+        sensitivity: Annotated[float, Option(
+            "--sensitivity", min=1.0, max=7.5, rich_help_panel="MMseqs2",
+            help="MMseqs2 sensitivity (-s).",
+        )] = MMseqsDefaults.sensitivity,
+        split_memory_limit: Annotated[str, Option(
+            "--split-memory-limit", rich_help_panel="MMseqs2",
+            help="MMseqs2 max memory per split, e.g. 10M, 1G. 0 uses all available memory.",
+        )] = MMseqsDefaults.split_memory_limit,
+        path_to_mmseqs: Annotated[Path | None, Option(
+            "--path-to-mmseqs", rich_help_panel="MMseqs2",
+            help="Path to MMseqs2. Supply if it is not on PATH.",
+        )] = MMseqsDefaults.executable,
+        defaults: Defaults = Depends(system_defaults),
 ):
-    # notes: Decimal is not supported by typer (look into that)
-    # Print is only for my own debugging for now
-    #print(contigs, database, taxonomy)
 
-    arguments = CatArgs(
+    diamond = DiamondDefaults(
+        mode=diamond_mode,
+        no_self_hits=no_self_hits,
+        block_size=block_size,
+        index_chunks=index_chunks,
+        path_to_diamond=path_to_diamond,
+    )
+
+    mmseqs = MMseqsDefaults(
+        sensitivity=sensitivity,
+        split_memory_limit=split_memory_limit,
+        executable=path_to_mmseqs,
+    )
+
+
+    arguments = CatDefaults(
         contigs=contigs,
         database=database,
-        taxonomy=taxonomy,
         proteins=proteins,
         alignment=alignment,
         range_=Decimal(str(range_)),
         fraction=Decimal(str(fraction)),
-        log_file=log_file or Path(f"{output_prefix}.log"),
+        log_file=log_file,
         output_prefix=output_prefix,
-        threads=threads,
-
+        aligner=aligner,
+        diamond=diamond,
+        mmseqs=mmseqs,
+        top=top,
+        tmpdir=tmpdir,
+        compress=compress,
+        threads=defaults.threads,
+        quiet=defaults.quiet,
+        verbose=defaults.verbose, # These two can be place under one name
+        debug=defaults.debug,     # TODO: merge debug and verbose together
     )
 
+    log = init_logging(arguments.debug, quiet=arguments.quiet,
+                       log_file=arguments.log_path, console=console)
+    log.info("Loaded all arguments")
 
-    logger = init_logging(debug, quiet=False, log_file=arguments.log_file, console=console)
-
-    # Table of used parameters (same as old message)
     info = Table.grid(padding=(0, 2))
     info.add_column(style="bold cyan")
     info.add_column()
 
     info.add_row("Contigs", str(arguments.contigs))
-    info.add_row("Taxonomy", str(arguments.taxonomy))
     info.add_row("Database", str(arguments.database))
+    info.add_row("Aligner", arguments.aligner)
     info.add_row("Parameter r", str(arguments.range_))
     info.add_row("Fraction", str(arguments.fraction))
-    info.add_row("Log file", str(arguments.log_file))
+    info.add_row("Log file", str(arguments.log_path))
 
-    # group the supplied and parameters together
+    # group the supplied command and parameters together
     content = Group(
         Text("Supplied command", style="bold"),
         Text(f"$ {shlex.join(sys.argv)}", style="cyan"),
         Text(""), info
     )
-    logger.info(f"Command supplied: $ {shlex.join(sys.argv)}")
-    logger.info(f"{arguments!r}")
+    log.info(f"Command supplied: $ {shlex.join(sys.argv)}")
+    log.info(f"{arguments!r}")
 
     # print the group in a panel
     console.print(Panel(content, title="[bold]Rarw![/bold]",
                         border_style="blue",), "\n")
 
     console.print("Preparing for CAT run\n\n")
-    logger.info("Preparing for CAT run")
+    log.info("Preparing for CAT run")
     progress, tasks = make_progress([step.name for step in build_plan(arguments)])
     report = partial(update_progress, progress, tasks)
     try:
@@ -244,15 +379,16 @@ def cat(
         raise typer.Exit(code=1)
 
     except Exception:
-        logger.exception("Unexpected error", exc_info=False)
-        logger.error("Check the run log or use --debug for a full traceback")
-        if debug:
-            console.print_exception(show_locals=True) # TODO: before release back to False
+        log.exception("Unexpected error", exc_info=False)
+        log.error("Check the run log or use --debug for a full traceback")
+        if defaults.debug:
+            console.print_exception(show_locals=False) # TODO: before release back to False
         raise typer.Exit(code=1)
 
 
 
     else:
+        log.info("CAT ran successful!!")
         results = Table(title="CAT completed")
         results.add_column("Result", style="green")
         results.add_column("Location")

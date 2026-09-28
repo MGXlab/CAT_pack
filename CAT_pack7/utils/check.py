@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 import importlib
 import shutil
-
-from .errors import InputError, ExternalToolError
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
+
+from .errors import InputError, ExternalToolError, ValErrorCollector
+
 
 def check_folder(path: Path, label: str) -> Path:
     if not path.is_dir():
@@ -14,24 +16,18 @@ def check_folder(path: Path, label: str) -> Path:
         )
     return path
 
-def check_file(path: Path, label: str, *, allow_empty=False) -> Path:
+
+def check_file(path: Path, label: str) -> Path:
     if not path.is_file():
         raise InputError(
             f"{label} was not found.",
             hint="Double check if the file exists.",
             path=path,
         )
-
-    # For files that must have data in them
-    with path.open("rb") as handle:
-        if not handle.read(1) and not allow_empty:
-            raise InputError(f"{label} is empty", path=path,
-                             hint="Remove file and try again or check if the "
-                                  "correct file is supplied.")
     return path
 
 
-def check_db_file(folder: Path, suffix: str, label: str, *, allow_empty=False) -> Path:
+def check_db_file(folder: Path, suffix: str, label: str) -> Path:
     matches = sorted(
         path for path in folder.iterdir()
         if path.is_file() and path.name.endswith(suffix)
@@ -52,7 +48,8 @@ def check_db_file(folder: Path, suffix: str, label: str, *, allow_empty=False) -
             path=folder,
             hint="Use a folder containing one prepared database.",
         )
-    return check_file(matches[0], label, allow_empty=allow_empty)
+    return matches[0]
+
 
 def check_pyrodigal():
     try:
@@ -61,15 +58,62 @@ def check_pyrodigal():
         raise ExternalToolError(
             "pyrodigal",
             "Package was not found",
-            hint="Please check whether it is installed and if the correct envirnment is active",
+            hint="Please check whether it is installed and if the correct environment is active",
         )
 
-def check_diamond():
-    diamon_executable = shutil.which("diamond")
-    if diamon_executable is None:
+
+def check_diamond(path: Path | None = None) -> Path:
+    command = str(path.resolve()) if path is not None else "diamond"
+    found = shutil.which(command)
+    if found is None:
         raise ExternalToolError(
             "DIAMOND",
             "was not found on PATH",
-            hint="Activate the environment containing DIAMOND"
+            hint="Activate the environment containing DIAMOND",
         )
-    return Path(diamon_executable)
+    return Path(found)
+
+
+def check_number(value, label: str, minimum, maximum) -> Decimal:
+    try:
+        number = Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        number = None
+    if number is not None and number.is_finite() and minimum <= number <= maximum:
+        return number
+    raise InputError(f"{label} must be a number between {minimum} and {maximum}.")
+
+
+def check_integer(value, label: str, minimum, maximum) -> int:
+    number = check_number(value, label, minimum, maximum)
+    if number != number.to_integral_value():
+        raise InputError(f"{label} must be an integer between {minimum} and {maximum}.")
+    return int(number)
+
+
+def check_output_prefix(prefix: Path) -> Path:
+    if prefix.is_dir():
+        raise InputError(
+            "prefix for output files is a directory.",
+            path=prefix,
+            hint="Include a filename prefix, for example results/CAT",
+        )
+    if not prefix.parent.is_dir():
+        raise InputError(
+            f"cannot find output directory {prefix.parent} "
+                    f"to which output files should be written.",
+            path=prefix.parent,
+        )
+    return prefix
+
+
+def check_outputs(paths: list[Path]) -> None:
+    checks = ValErrorCollector()
+    for path in paths:
+        if path.is_file():
+            checks.add(InputError(
+                "Output already exists!",
+                path=path,
+                hint="Choose a different output location",
+            ))
+    checks.finish()
