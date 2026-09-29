@@ -68,8 +68,8 @@ def parse_arguments():
     
     CAT_args = parser.add_argument_group('CAT/BAT-specific arguments')
     shared.add_argument(CAT_args, 'database_folder', False)
-    shared.add_argument(optional, "proteins_fasta", False)
-    shared.add_argument(optional, "alignment_file", False)
+    shared.add_argument(CAT_args, "proteins_fasta", False)
+    shared.add_argument(CAT_args, "alignment_file", False)
     shared.add_argument(CAT_args, 'r', False, default=decimal.Decimal(10))
     shared.add_argument(CAT_args, 'f', False, default=decimal.Decimal(0.5))
     shared.add_argument(CAT_args, 'no_stars', False)
