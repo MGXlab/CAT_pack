@@ -1337,8 +1337,6 @@ def run_CAT(
                 "-f", str(fraction),
                 "-r", str(CAT_range)
                 ]
-        if args.path_to_prodigal!="prodigal":
-            command.extend(["--path_to_prodigal", args.path_to_prodigal])
         if args.path_to_diamond!="diamond":
             command.extend(["--path_to_diamond", args.path_to_diamond])
         
@@ -1394,8 +1392,6 @@ def run_BAT(
         if CAT_diamond_alignment:
             command.append("-a")
             command.append(CAT_diamond_alignment)
-        if args.path_to_prodigal!="prodigal":
-            command.extend(["--path_to_prodigal", args.path_to_prodigal])
         if args.path_to_diamond!="diamond":
             command.extend(["--path_to_diamond", args.path_to_diamond])
         if args.force:
