@@ -804,9 +804,7 @@ def add_argument(argument_group, dest, required, default=None, help_=None):
 def add_all_diamond_arguments(argument_group):
     add_argument(argument_group, "path_to_diamond", False, default="diamond")
     add_argument(argument_group, "diamond_mode", False, default="default")
-    add_argument(argument_group, "top", False, default=11)
     add_argument(argument_group, "no_self_hits", False)
-    add_argument(argument_group, "compress", False)
     add_argument(argument_group, "block_size", False, default=12.0)
     add_argument(argument_group, "index_chunks", False, default=1)
 

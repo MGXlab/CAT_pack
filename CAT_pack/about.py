@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-__authors__ = [
-        "F. A. Bastiaan von Meijenfeldt", "Nikos Pappas", "Ernestina Hauptfeld"
-        ]
-__version__ = "6.1.1beta"
-__date__ = "29 September, 2026"
+__authors__ = ["F. A. Bastiaan von Meijenfeldt", "Nikos Pappas", "Ernestina Hauptfeld"]
+__version__ = "6.1.2beta"
+__date__ = "30 September, 2026"
