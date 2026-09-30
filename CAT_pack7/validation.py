@@ -3,9 +3,10 @@ from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
-from .options import AlignerName, CatOptions, ExecutionOptions, DiamondOptions, PrepareOptions
+from .bins import import_bins
+from .options import AlignerName, BatOptions, CatOptions, ExecutionOptions, DiamondOptions, PrepareOptions
 from .settings import (
-    CatFiles, CatSettings, ClassificationSettings, DatabaseFiles, DiamondParameters,
+    BatFiles, BatSettings, CatFiles, CatSettings, ClassificationSettings, DatabaseFiles, DiamondParameters,
     DiamondSettings, ExecutionSettings, PrepareOutputs, PrepareSettings, TaxonomyFiles,
 )
 from .utils.check import (
@@ -131,10 +132,13 @@ def validate_prepare(args: PrepareOptions) -> PrepareSettings:
     )
 
 
-def validate_cat_files(args: CatOptions, aligner: AlignerName | None) -> CatFiles:
+def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | None) -> CatFiles | BatFiles:
     checks = ValErrorCollector()
 
-    contigs = checks.check(check_file, args.contigs, "Contigs file")
+    is_bat = isinstance(args, BatOptions)
+    bins = checks.check(import_bins, args.bins, args.bin_suffix) if is_bat else None
+    contigs = (Path(f"{args.output_prefix}.concatenated.fasta") if is_bat
+               else checks.check(check_file, args.contigs, "Contigs file"))
 
     proteins = None
     alignment = None
@@ -157,33 +161,39 @@ def validate_cat_files(args: CatOptions, aligner: AlignerName | None) -> CatFile
     prefix = args.output_prefix
     checks.check(check_output_prefix, prefix)
     orf_report = Path(f"{prefix}.ORF2LCA.txt")
-    contig_report = Path(f"{prefix}.contig2classification.txt")
+    contig_report = Path(f"{prefix}.{'bin' if is_bat else 'contig'}2classification.txt")
 
     outputs = [orf_report, contig_report]
     proteins_gff = None
+    intermediate_prefix = f"{prefix}.concatenated" if is_bat else str(prefix)
     if args.proteins is None:
-        proteins = Path(f"{prefix}.predicted_proteins.faa")
-        proteins_gff = Path(f"{prefix}.predicted_proteins.gff")
+        proteins = Path(f"{intermediate_prefix}.predicted_proteins.faa")
+        proteins_gff = Path(f"{intermediate_prefix}.predicted_proteins.gff")
         outputs.extend((proteins, proteins_gff))
+        if is_bat:
+            outputs.append(contigs)
     if args.alignment is None:
         suffix = ".gz" if args.compress else ""
-        alignment = Path(f"{prefix}.alignment.{aligner or args.aligner}{suffix}")
+        alignment = Path(f"{intermediate_prefix}.alignment.{aligner or args.aligner}{suffix}")
         outputs.append(alignment)
 
     checks.check(check_outputs, outputs)
 
     checks.finish()
 
-    return CatFiles(
+    report_fields = (dict(bin_report=contig_report, bin2contigs=bins[0], bin_paths=bins[1])
+                     if is_bat else dict(contig_report=contig_report))
+    files_type = BatFiles if is_bat else CatFiles
+    return files_type(
         contigs=contigs, proteins_fasta=proteins, proteins_gff=proteins_gff,
         alignment=alignment, fastaid2LCA=database.fastaid2LCA, branches=database.branches,
         names=database.names, nodes=database.nodes,
-        orf_report=orf_report, contig_report=contig_report,
+        orf_report=orf_report, **report_fields,
         diamond_database=database.diamond,
     )
 
 
-def validate_cat(args: CatOptions) -> CatSettings:
+def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
     checks = ValErrorCollector()
     execution = checks.check(validate_execution, args)
     classification = checks.check(validate_classification, args.range_, args.fraction)
@@ -216,17 +226,29 @@ def validate_cat(args: CatOptions) -> CatSettings:
             top=top, compression=args.compress, verbose=execution.verbose
         )
 
-    return CatSettings(
+    # @bastiaan and @tina option 1 the "the small but more complex version"
+    settings_type = BatSettings if isinstance(args, BatOptions) else CatSettings
+    extra = dict(no_stars=args.no_stars) if isinstance(args, BatOptions) else {}
+    return settings_type(
         threads=execution.threads, quiet=execution.quiet,
         verbose=execution.verbose, debug=execution.debug,
         files=files, aligner=aligner,
         range_=classification.range_, fraction=classification.fraction,
-        log_file=args.log_path
+        log_file=args.log_path, **extra,
     )
 
+    # Else we could do it the more end user friendly variant:
+    # if isinstance(args, BatOptions):
+    #     return the filled BatSetting
+    # elif Catoptions
+    #     return the filles CatSettings
+    # Pick and choose :)
+    # I think it's best to deside this now, then I will keep it in mind when
+    # writing other return statements
 
-def get_validated_settings(args: CatOptions | PrepareOptions) -> CatSettings | PrepareSettings:
-    if type(args) == CatOptions:
+
+def get_validated_settings(args: CatOptions | BatOptions | PrepareOptions) -> CatSettings | BatSettings | PrepareSettings:
+    if isinstance(args, (CatOptions, BatOptions)):
         return validate_cat(args)
     if type(args) == PrepareOptions:
         return validate_prepare(args)

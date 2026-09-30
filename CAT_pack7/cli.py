@@ -20,8 +20,8 @@ from rich.text import Text
 from typer import Option
 from typer_di import Depends, TyperDI
 
-from .options import CatOptions, ExecutionOptions, DiamondOptions, MMseqsOptions, PrepareOptions
-from .pipeline import run_cat, build_plan, Status, run_prepare
+from .options import BatOptions, CatOptions, ExecutionOptions, DiamondOptions, MMseqsOptions, PrepareOptions
+from .pipeline import run_bat, run_cat, build_plan, Status, run_prepare
 from .utils.errors import CatError, show_error
 from .utils.logging import init_logging
 
@@ -335,6 +335,161 @@ def cat(
         debug=options.debug,     # TODO: merge debug and verbose together
     )
 
+    run_annotation_cli(arguments)
+
+# @bastiaan and @tina, something I found on stackoverflow, for a bit of backwards
+# compatibility, we can still let users call CAT_pack bins [OPTIONS] but hide
+# it from the --help interface. Yay or Nay?
+@app.command("bins", hidden=True)
+@app.command()
+def bat(
+        bins: Annotated[
+            Path,
+            Option("--bin_fasta", "--bin_folder", "-b",
+                   help="Bin fasta file or directory containing bins.", metavar="<FILE|DIR>")
+        ],
+        database: Annotated[
+            Path,
+            Option("--database", "-d" ,
+                   help="Directory that contains database and taxonomy files",
+                   metavar="<directory>")
+        ],
+        bin_suffix: Annotated[str, Option(
+            "--bin_suffix", "--bin-suffix", "-s",
+            help="Suffix of bins in bin directory.",
+        )] = BatOptions.bin_suffix,
+        no_stars: Annotated[bool, Option(
+            "--no_stars", "--no-stars",
+            help="Suppress marking of suggestive taxonomic assignments.",
+        )] = BatOptions.no_stars,
+        range_: Annotated[
+            float,
+            Option("--range", "-r", min=0.0, max=100,
+                   help="r parameter", metavar="<Decimal>"),
+        ] = float(BatOptions.range_),
+        fraction: Annotated[
+            float,
+            Option("--fraction", "-f",min=0.0, max=0.99,
+                   help="f parameter", metavar="<Decimal>"),
+        ] = float(BatOptions.fraction),
+        proteins: Annotated[
+            Path | None,
+            Option("--proteins_fasta", "-p",
+                   help="Predicted proteins fasta file. If supplied, "
+                        "the protein prediction step is skipped.", metavar="<file>")
+        ] = BatOptions.proteins,
+        alignment: Annotated[
+            Path | None,
+            Option("--alignment_table", "-a",
+                   help="Alignment table (in BLAST+6 format). If supplied, "
+                    "the alignment step is skipped and classification is "
+                    "carried out directly. A predicted proteins fasta file "
+                    "should also be supplied with argument --proteins_fasta."
+                   , metavar="<file>")
+        ] = BatOptions.alignment,
+        output_prefix: Annotated[
+            Path,
+            Option("--output-prefix", "--out_prefix", "-o", metavar="<prefix>", help="Prefix for output files.")
+        ] = BatOptions.output_prefix,
+        top: Annotated[
+            int,
+            Option("--top", min=0, max=100,
+                   help="Hits within range of the best hit written to the alignment file. "
+                        "This is not --range."),
+        ] = BatOptions.top,
+        tmpdir: Annotated[
+            Path | None,
+            Option("--tmpdir",
+                   help="Location for temporary aligner files."),
+        ] = BatOptions.tmpdir,
+        compress: Annotated[
+            bool,
+            Option("--compress", help="Compress the alignment output file."),
+        ] = BatOptions.compress,
+        log_file: Annotated[
+            Path | None,
+            Option("--log-file" , metavar="<file>")
+        ] = BatOptions.log_file,
+        aligner: Annotated[
+            str,
+            Option("--aligner", help="Protein aligner",
+                   metavar="<diamond|mmseqs2>", case_sensitive=False)
+        ] = BatOptions.aligner,
+        diamond_mode: Annotated[str, Option("--diamond-mode",
+            rich_help_panel="DIAMOND",
+               help="default, faster, fast, mid-sensitive, sensitive, "
+                    "more-sensitive, very-sensitive, ultra-sensitive"
+        )] = DiamondOptions.mode,
+        block_size: Annotated[float, Option(
+            "--block-size", rich_help_panel="DIAMOND",
+            help="DIAMOND block-size. Lower uses less RAM/tmp.",
+        )] = DiamondOptions.block_size,
+        index_chunks: Annotated[int, Option(
+            "--index-chunks", min=1, rich_help_panel="DIAMOND",
+            help="Set to 4 on low-memory machines.",
+        )] = DiamondOptions.index_chunks,
+        no_self_hits: Annotated[bool, Option(
+            "--no-self-hits", rich_help_panel="DIAMOND",
+            help="Do not report identical self hits by DIAMOND.",
+        )] = DiamondOptions.no_self_hits,
+        path_to_diamond: DIAMOND_PATH = DiamondOptions.path_to_diamond,
+        sensitivity: Annotated[float, Option(
+            "--sensitivity", min=1.0, max=7.5, rich_help_panel="MMseqs2",
+            help="MMseqs2 sensitivity (-s).",
+        )] = MMseqsOptions.sensitivity,
+        split_memory_limit: Annotated[str, Option(
+            "--split-memory-limit", rich_help_panel="MMseqs2",
+            help="MMseqs2 max memory per split, e.g. 10M, 1G. 0 uses all available memory.",
+        )] = MMseqsOptions.split_memory_limit,
+        path_to_mmseqs: Annotated[Path | None, Option(
+            "--path-to-mmseqs", rich_help_panel="MMseqs2",
+            help="Path to MMseqs2. Supply if it is not on PATH.",
+        )] = MMseqsOptions.executable,
+        options: ExecutionOptions = Depends(execution_options),
+):
+    """Run Bin Annotation Tool (BAT)."""
+    diamond = DiamondOptions(
+        mode=diamond_mode,
+        no_self_hits=no_self_hits,
+        block_size=block_size,
+        index_chunks=index_chunks,
+        path_to_diamond=path_to_diamond,
+    )
+
+    mmseqs = MMseqsOptions(
+        sensitivity=sensitivity,
+        split_memory_limit=split_memory_limit,
+        executable=path_to_mmseqs,
+    )
+
+
+    arguments = BatOptions(
+        bins=bins,
+        bin_suffix=bin_suffix,
+        no_stars=no_stars,
+        database=database,
+        proteins=proteins,
+        alignment=alignment,
+        range_=Decimal(str(int(range_) if range_ == int(range_) else range_)),
+        fraction=Decimal(str(fraction)),
+        log_file=log_file,
+        output_prefix=output_prefix,
+        aligner=aligner,
+        diamond=diamond,
+        mmseqs=mmseqs,
+        top=top,
+        tmpdir=tmpdir,
+        compress=compress,
+        threads=options.threads,
+        quiet=options.quiet,
+        verbose=options.verbose,
+        debug=options.debug,
+    )
+
+    run_annotation_cli(arguments)
+
+
+def run_annotation_cli(arguments: CatOptions | BatOptions):
     log = init_logging(arguments.debug, quiet=arguments.quiet,
                        log_file=arguments.log_path, console=console)
     log.info("Loaded all arguments")
@@ -343,7 +498,13 @@ def cat(
     info.add_column(style="bold cyan")
     info.add_column()
 
-    info.add_row("Contigs", str(arguments.contigs))
+    is_bat = isinstance(arguments, BatOptions)
+    tool = "BAT" if is_bat else "CAT"
+    if is_bat:
+        label = "Bin folder" if arguments.bins.is_dir() else "Bin fasta"
+        info.add_row(label, str(arguments.bins))
+    else:
+        info.add_row("Contigs", str(arguments.contigs))
     info.add_row("Database", str(arguments.database))
     info.add_row("Aligner", arguments.aligner)
     info.add_row("Parameter r", str(arguments.range_))
@@ -363,13 +524,14 @@ def cat(
     console.print(Panel(content, title="[bold]Rarw![/bold]",
                         border_style="blue",), "\n")
 
-    console.print("Preparing for CAT run\n\n")
-    log.info("Preparing for CAT run")
+
+    console.print(f"Preparing for {'BAT' if is_bat else 'CAT'} run\n\n")
+    log.info(f"Preparing for {'BAT' if is_bat else 'CAT'} run")
     progress, tasks = make_progress([step.name for step in build_plan(arguments)])
     report = partial(update_progress, progress, tasks)
     try:
         with progress:
-            outputs = run_cat(arguments, report)
+            outputs = (run_bat if is_bat else run_cat)(arguments, report)
     except KeyboardInterrupt:
         console.print("\nRun cancelled :(")
         raise typer.Exit(code=130)
@@ -381,15 +543,15 @@ def cat(
     except Exception:
         log.exception("Unexpected error", exc_info=False)
         log.error("Check the run log or use --debug for a full traceback")
-        if options.debug:
+        if arguments.debug:
             console.print_exception(show_locals=False) # TODO: before release back to False
         raise typer.Exit(code=1)
 
 
 
     else:
-        log.info("CAT ran successful!!")
-        results = Table(title="CAT completed")
+        log.info(f"{tool} ran successful!!")
+        results = Table(title=f"{tool} completed")
         results.add_column("Result", style="green")
         results.add_column("Location")
         for label, path in outputs.items():

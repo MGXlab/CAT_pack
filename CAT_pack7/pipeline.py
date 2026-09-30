@@ -2,8 +2,9 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
+from .bins import bin_classification, make_concatenated_fasta
 from .classification import contig_classification
-from .options import CatOptions, PrepareOptions
+from .options import BatOptions, CatOptions, PrepareOptions
 from .tools.aligner import run_aligner
 from .tools.pyrodigal import run_protein_prediction
 from .utils.errors import CatError
@@ -27,7 +28,7 @@ class Step:
         return self.name
 
 
-def build_plan(args: CatOptions | PrepareOptions, files=None) -> list[Step]:
+def build_plan(args: CatOptions | BatOptions | PrepareOptions, files=None) -> list[Step]:
     if type(args) == PrepareOptions:
         return [
             Step("Input validation"),
@@ -40,7 +41,7 @@ def build_plan(args: CatOptions | PrepareOptions, files=None) -> list[Step]:
             Step("Make taxids with multiple offspring",
                  supplied=files is not None and files.taxids_with_multiple_offspring.is_file()),
         ]
-    if type(args) == CatOptions:
+    if isinstance(args, (CatOptions, BatOptions)):
         return [
             Step("Input validation"),
             Step("Protein prediction", supplied=args.proteins is not None),
@@ -52,6 +53,26 @@ def build_plan(args: CatOptions | PrepareOptions, files=None) -> list[Step]:
 
 def run_cat(args: CatOptions, report: Report) -> dict[str, Path]:
     """Contig annotation tool (CAT) run"""
+    return _run_annotation(args, report)
+
+
+def run_bat(args: BatOptions, report: Report) -> dict[str, Path]:
+    """Run Bin Annotation Tool (BAT)."""
+    log = logging.getLogger("CAT_pack")
+    if args.proteins is None:
+        log.info("BAT is running. Protein prediction, alignment, and bin classification are carried out.")
+    elif args.alignment is None:
+        log.info("BAT is running. Since a predicted protein fasta is supplied, "
+                 "only alignment and bin classification are carried out.")
+    else:
+        log.info("BAT is running. Since a predicted protein fasta and alignment "
+                 "file are supplied, only bin classification is carried out.")
+    log.info("Doing some pre-flight checks first.")
+    return _run_annotation(args, report)
+
+
+def _run_annotation(args: CatOptions | BatOptions, report: Report) -> dict[str, Path]:
+    is_bat = isinstance(args, BatOptions)
 
     plan = build_plan(args)
     step_index = 0
@@ -65,6 +86,8 @@ def run_cat(args: CatOptions, report: Report) -> dict[str, Path]:
         settings = get_validated_settings(args)
         report(current_step.name, Status.COMPLETE, 1, 1)
         log.info(f"Completed: {current_step.name}")
+        if is_bat:
+            log.info("Ready to fly!\n\n-----------------\n")
 
         for step_index, current_step in enumerate(plan[1:], start=1):
             if current_step.supplied:
@@ -75,11 +98,14 @@ def run_cat(args: CatOptions, report: Report) -> dict[str, Path]:
             log.info(f"Starting: {current_step.name}")
 
             if current_step.name == "Protein prediction":
+                if is_bat:
+                    make_concatenated_fasta(settings.files)
                 run_protein_prediction(settings, report, "pyrodigal")
             elif current_step.name == "Alignment":
                 run_aligner(settings.aligner, report)
             elif current_step.name == "Classify":
-                contig_classification(settings, settings.files, report)
+                classify = bin_classification if is_bat else contig_classification
+                classify(settings, settings.files, report)
             else:
                 log.error(f"Can't spell that well, my misspelling:"
                           f"{current_step.name}")
@@ -90,8 +116,10 @@ def run_cat(args: CatOptions, report: Report) -> dict[str, Path]:
             report(current_step.name, Status.COMPLETE, 1, 1)
             log.info(f"Completed: {current_step.name}")
 
+        classification_output = ({"Bin classifications": settings.files.bin_report} if is_bat
+                                 else {"Contig classifications": settings.files.contig_report})
         return {
-            "Contig classifications": settings.files.contig_report,
+            **classification_output,
             "ORF classifications": settings.files.orf_report,
             "Log": settings.log_file,
         }

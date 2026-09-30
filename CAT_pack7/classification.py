@@ -306,7 +306,7 @@ def format_lineage(lineage: Sequence[str], branches: set[str]) -> str:
     return ";".join(lineage[::-1])
 
 
-def _check_orfs_match_contigs(contig_names: set[str], contig2ORFs: Mapping[str, Sequence[str]], path: Path) -> None:
+def check_orfs_match_contigs(contig_names: set[str], contig2ORFs: Mapping[str, Sequence[str]], path: Path) -> None:
     overlap = len(contig_names & set(contig2ORFs))
     if overlap == 0:
         example = next(iter(contig2ORFs.values()))[0] if contig2ORFs else "contig_name_1"
@@ -334,7 +334,7 @@ def _check_orfs_match_contigs(contig_names: set[str], contig2ORFs: Mapping[str, 
 def contig_classification(settings, files, report) -> None:
     contig_names = import_contig_names(files.contigs)
     contig2ORFs = import_ORFs(files.proteins_fasta)
-    _check_orfs_match_contigs(contig_names, contig2ORFs, files.proteins_fasta)
+    check_orfs_match_contigs(contig_names, contig2ORFs, files.proteins_fasta)
 
     one_minus_r = (Decimal("100") - settings.range_) / Decimal("100")
     ORF2hits, all_hits = parse_alignment(files.alignment, one_minus_r)
