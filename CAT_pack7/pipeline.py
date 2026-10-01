@@ -1,15 +1,18 @@
 import logging
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 
-from .bins import bin_classification, make_concatenated_fasta
-from .classification import contig_classification
+from .classification import ClassificationEngine
 from .options import BatOptions, CatOptions, PrepareOptions
+from .parsers import ClassificationParser, FastaParser
+from .settings import BatFiles, BatSettings, CatFiles, CatSettings
 from .tools.aligner import run_aligner
 from .tools.pyrodigal import run_protein_prediction
 from .utils.errors import CatError
 from .utils.logging import Status, Report
-from .validation import get_file_names, get_validated_settings, validate_prepare
+from .validation import check_orfs_match_contigs, get_file_names, get_validated_settings, validate_prepare
+from .writers import ClassificationWriter, FastaWriter
 
 
 @dataclass()
@@ -99,13 +102,17 @@ def _run_annotation(args: CatOptions | BatOptions, report: Report) -> dict[str, 
 
             if current_step.name == "Protein prediction":
                 if is_bat:
-                    make_concatenated_fasta(settings.files)
+                    # the concentrated fasta seems te be required by the protein prediction right now
+                    # Let's discuss nex monday
+                    records = (
+                        record for path in settings.files.bin_paths for record in FastaParser(path)
+                    )
+                    FastaWriter(settings.files.contigs).write(records)
                 run_protein_prediction(settings, report, "pyrodigal")
             elif current_step.name == "Alignment":
                 run_aligner(settings.aligner, report)
             elif current_step.name == "Classify":
-                classify = bin_classification if is_bat else contig_classification
-                classify(settings, settings.files, report)
+                run_classification(settings, settings.files, report)
             else:
                 log.error(f"Can't spell that well, my misspelling:"
                           f"{current_step.name}")
@@ -147,7 +154,80 @@ def _run_annotation(args: CatOptions | BatOptions, report: Report) -> dict[str, 
         raise
 
 
+def run_classification(
+    settings: CatSettings | BatSettings,
+    files: CatFiles | BatFiles,
+    report: Report,
+) -> None:
+    """Load and validate inputs, then classify and write the results."""
+    log = logging.getLogger("CAT_pack")
+    inputs = ClassificationParser(files, settings.range_).parse()
+    check_orfs_match_contigs(inputs.contig_names, inputs.contig2ORFs, files.proteins_fasta)
+    engine = ClassificationEngine(
+        taxid2parent=inputs.taxid2parent,
+        fastaid2taxid=inputs.fastaid2taxid,
+        fraction=settings.fraction,
+    )
 
+    if isinstance(files, BatFiles):
+        classification_file = files.bin_report
+        tool = "BAT"
+        action = "flying"
+    else:
+        classification_file = files.contig_report
+        tool = "CAT"
+        action = "spinning"
+    log.info(f"{tool} is {action}! Files {classification_file} and {files.orf_report} are created.")
+    n_classified = 0
+    total = len(inputs.entity2ORFs)
+    report("Classify", Status.RUNNING, 0, total)
+    with (
+        classification_file.open("w", encoding="utf-8") as classification_out,
+        files.orf_report.open("w", encoding="utf-8") as orf_out,
+    ):
+        writer = ClassificationWriter(
+            classification_out,
+            orf_out,
+            entity_type=inputs.entity_type,
+            fraction=settings.fraction,
+            range_=settings.range_,
+            branches=inputs.branches,
+            no_stars=getattr(settings, "no_stars", False),
+        )
+        for index, entity_id in enumerate(sorted(inputs.entity2ORFs), start=1):
+            result = engine.classify_group(
+                entity_id=entity_id,
+                orf_ids=inputs.entity2ORFs[entity_id],
+                orf2hits=inputs.alignment.orf2hits,
+            )
+            writer.write(result)
+            if result.assigned:
+                n_classified += 1
+            report("Classify", Status.RUNNING, index, total)
+    classification_summary(n_classified, total, inputs.entity_type, settings.fraction)
+
+
+def classification_summary(
+    n_classified: int,
+    total: int,
+    entity_type: str,
+    fraction: Decimal,
+) -> None:
+    log = logging.getLogger("CAT_pack")
+    tool = "CAT"
+    if entity_type == "bin":
+        tool = "BAT"
+    percent = 0
+    if total > 0:
+        percent = n_classified / total * 100
+    log.info(
+        f"{tool} is done! {n_classified:,d}/{total:,d} {entity_type}s "
+        f"({percent:.2f}%) have taxonomy assigned."
+    )
+    if fraction < Decimal("0.5"):
+        log.warning(
+            f"since f is set to smaller than 0.5, one {entity_type} may have multiple classifications."
+        )
 
 
 def run_prepare(args: PrepareOptions, report: Report):
