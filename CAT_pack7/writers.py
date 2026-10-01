@@ -9,8 +9,6 @@ from .results import ClassificationResult, Lineage, ORFClassification, ORFStatus
 
 
 class FastaWriter:
-    """Write FASTA records using normalized identifiers and line endings."""
-
     def __init__(self, path: Path) -> None:
         self.path = path
 
@@ -22,7 +20,7 @@ class FastaWriter:
 
 
 class ClassificationWriter:
-    """Write headers on creation, then format results into the open streams."""
+    """Write headers on creation, then write and format the results"""
 
     def __init__(
         self, classification_out: TextIO, orf_out: TextIO, *,
