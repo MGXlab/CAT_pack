@@ -212,7 +212,7 @@ def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
             checks.add(InputError(
                 "MMseqs2 execution is not implemented yet.",
                 hint="Use --aligner diamond or supply an existing alignment and proteins.",
-            ))
+            )) # TODO: Implement MMseqs2?
 
     checks.finish()
 
@@ -226,25 +226,24 @@ def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
             top=top, compression=args.compress, verbose=execution.verbose
         )
 
-    # @bastiaan and @tina option 1 the "the small but more complex version"
-    settings_type = BatSettings if isinstance(args, BatOptions) else CatSettings
-    extra = dict(no_stars=args.no_stars) if isinstance(args, BatOptions) else {}
-    return settings_type(
-        threads=execution.threads, quiet=execution.quiet,
-        verbose=execution.verbose, debug=execution.debug,
-        files=files, aligner=aligner,
-        range_=classification.range_, fraction=classification.fraction,
-        log_file=args.log_path, **extra,
-    )
-
-    # Else we could do it the more end user friendly variant:
-    # if isinstance(args, BatOptions):
-    #     return the filled BatSetting
-    # elif Catoptions
-    #     return the filles CatSettings
-    # Pick and choose :)
-    # I think it's best to deside this now, then I will keep it in mind when
-    # writing other return statements
+    if isinstance(args, BatOptions):
+        return BatSettings(
+            threads=execution.threads, quiet=execution.quiet,
+            verbose=execution.verbose, debug=execution.debug,
+            files=files, aligner=aligner,
+            range_=classification.range_, fraction=classification.fraction,
+            log_file=args.log_path, no_stars=args.no_stars,
+        )
+    elif isinstance(args, CatOptions):
+        return CatSettings(
+            threads=execution.threads, quiet=execution.quiet,
+            verbose=execution.verbose, debug=execution.debug,
+            files=files, aligner=aligner,
+            range_=classification.range_, fraction=classification.fraction,
+            log_file=args.log_path #TODO: Add no stars compatibility
+        )
+    else:
+        raise TypeError(f"Hmmm, that type of options I don't know yet")
 
 
 def get_validated_settings(args: CatOptions | BatOptions | PrepareOptions) -> CatSettings | BatSettings | PrepareSettings:
