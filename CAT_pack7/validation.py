@@ -1,10 +1,11 @@
+import logging
 from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
-from .bins import import_bins
 from .options import AlignerName, BatOptions, CatOptions, ExecutionOptions, DiamondOptions, PrepareOptions
+from .parsers import BinParser
 from .settings import (
     BatFiles, BatSettings, CatFiles, CatSettings, ClassificationSettings, DatabaseFiles, DiamondParameters,
     DiamondSettings, ExecutionSettings, PrepareOutputs, PrepareSettings, TaxonomyFiles,
@@ -14,6 +15,8 @@ from .utils.check import (
     check_output_prefix, check_outputs, check_pyrodigal,
 )
 from .utils.errors import InputError, ValErrorCollector
+
+log = logging.getLogger("CAT_pack")
 
 DIAMOND_MODES = {
     "default", "faster", "fast", "mid-sensitive", "sensitive",
@@ -136,7 +139,7 @@ def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | Non
     checks = ValErrorCollector()
 
     is_bat = isinstance(args, BatOptions)
-    bins = checks.check(import_bins, args.bins, args.bin_suffix) if is_bat else None
+    bins = checks.check(BinParser(args.bins, args.bin_suffix).parse) if is_bat else None
     contigs = (Path(f"{args.output_prefix}.concatenated.fasta") if is_bat
                else checks.check(check_file, args.contigs, "Contigs file"))
 
@@ -181,7 +184,7 @@ def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | Non
 
     checks.finish()
 
-    report_fields = (dict(bin_report=contig_report, bin2contigs=bins[0], bin_paths=bins[1])
+    report_fields = (dict(bin_report=contig_report, bin2contigs=bins.bin2contigs, bin_paths=bins.bin_paths)
                      if is_bat else dict(contig_report=contig_report))
     files_type = BatFiles if is_bat else CatFiles
     return files_type(
@@ -252,3 +255,35 @@ def get_validated_settings(args: CatOptions | BatOptions | PrepareOptions) -> Ca
     if type(args) == PrepareOptions:
         return validate_prepare(args)
     raise TypeError(f"Hmmm, that type of options class I don't know yet")
+
+
+def check_orfs_match_contigs(
+    contig_names: set[str],
+    contig2ORFs: dict[str, list[str]],
+    path: Path,
+) -> None:
+    overlap = len(contig_names & set(contig2ORFs))
+    if overlap == 0:
+        example = "contig_name_1"
+        for orfs in contig2ORFs.values():
+            example = orfs[0]
+            break
+        raise InputError(
+            f"no ORFs found that can be traced back to one of the contigs "
+            f"in the contigs fasta file: {example}. ORFs should be named "
+            f"contig_name_#.",
+            path=path,
+        )
+
+    rel_overlap = overlap / len(contig_names)
+    log.info(
+        f"ORFs found on {overlap:,d} / {len(contig_names):,d} contigs "
+        f"({rel_overlap * 100:.2f}%)."
+    )
+    if rel_overlap < 0.97:
+        log.warning(
+            f"only {rel_overlap * 100:.2f}% contigs found with ORF predictions. This may "
+            f"indicate that some contigs were missing from the protein "
+            f"prediction. Please make sure that the protein prediction was "
+            f"based on all contigs."
+        )
