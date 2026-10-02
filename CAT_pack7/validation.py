@@ -1,4 +1,6 @@
 import logging
+import shutil
+import sys
 from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal
@@ -14,7 +16,7 @@ from .utils.check import (
     check_db_file, check_diamond, check_file, check_folder, check_integer, check_number,
     check_output_prefix, check_outputs, check_pyrodigal,
 )
-from .utils.errors import InputError, ValErrorCollector
+from .utils.errors import ExternalToolError, InputError, ValErrorCollector
 
 log = logging.getLogger("CAT_pack")
 
@@ -113,25 +115,47 @@ def get_file_names(args: PrepareOptions) -> PrepareOutputs:
     )
 
 
-def validate_prepare(args: PrepareOptions) -> PrepareSettings:
+def validate_prepare(args: PrepareOptions, files: PrepareOutputs | None = None) -> PrepareSettings:
     args = make_prefix(args)
     checks = ValErrorCollector()
     execution = checks.check(validate_execution, args)
     db_fasta = checks.check(check_file, args.db_fasta, "Database FASTA")
     taxonomy = checks.check(validate_taxonomy, args.names, args.nodes)
     acc2tax = checks.check(check_file, args.acc2tax, "Accession-to-taxid file")
-    files = get_file_names(args)
+    files = files or get_file_names(args)
+    threads = checks.check(check_integer, args.threads, "Threads", 1, sys.maxsize)
+    if not files.prefix or files.prefix in {".", ".."} or any(c in files.prefix for c in '/\\:'):
+        checks.add(InputError("The prefix contains directory separators",
+                              hint="The prefix must be a filename without directory separators."))
+    if files.data_folder.exists() and not files.data_folder.is_dir():
+        checks.add(InputError("Database output location must be a directory.", path=files.data_folder))
+    for output in (files.names, files.nodes, files.log_file, files.diamond_database,
+                   files.mmseqs2_database, files.fastaid2LCAtaxid,
+                   files.taxids_with_multiple_offspring):
+        if output.exists() and not output.is_file():
+            checks.add(InputError("Expected a file at the output location.", path=output))
 
     diamond = None
     if not files.diamond_database.is_file():
         diamond = checks.check(check_diamond, args.path_to_diamond)
 
+    # Keeps mmseq2 use optional
+    mmseqs = None
+    if args.build_mmseqs2 and not files.mmseqs2_database.is_file():
+        command = str(args.path_to_mmseqs.resolve()) if args.path_to_mmseqs else "mmseqs"
+        found = shutil.which(command)
+        if found is None:
+            checks.add(ExternalToolError("MMseqs2", "was not found", hint="Supply --path-to-mmseqs."))
+        else:
+            mmseqs = Path(found)
+
     checks.finish()
     return PrepareSettings(
-        threads=execution.threads, quiet=execution.quiet,
+        threads=threads, quiet=execution.quiet,
         verbose=execution.verbose, debug=execution.debug,
         files=files, db_fasta=db_fasta, names=taxonomy.names,
-        nodes=taxonomy.nodes, acc2tax=acc2tax, diamond=diamond, cleanup=args.cleanup,
+        nodes=taxonomy.nodes, acc2tax=acc2tax, diamond=diamond,
+        mmseqs=mmseqs,
     )
 
 
