@@ -88,6 +88,7 @@ class MMseqsSettings:
 
 @dataclass(frozen=True)
 class AnnotationFiles:
+    report: Path
     proteins_fasta: Path
     proteins_gff: Path | None
     alignment: Path
@@ -102,12 +103,10 @@ class AnnotationFiles:
 @dataclass(frozen=True)
 class CatFiles(AnnotationFiles):
     contigs: Path
-    contig_report: Path
 
 
 @dataclass(frozen=True)
 class BatFiles(AnnotationFiles):
-    bin_report: Path
     bin2contigs: dict[str, list[str]]
     bin_paths: tuple[Path, ...]
 
