@@ -60,17 +60,7 @@ def run_cat(args: CatOptions, report: Report) -> dict[str, Path]:
 
 
 def run_bat(args: BatOptions, report: Report) -> dict[str, Path]:
-    """Run Bin Annotation Tool (BAT)."""
-    log = logging.getLogger("CAT_pack")
-    if args.proteins is None:
-        log.info("BAT is running. Protein prediction, alignment, and bin classification are carried out.")
-    elif args.alignment is None:
-        log.info("BAT is running. Since a predicted protein fasta is supplied, "
-                 "only alignment and bin classification are carried out.")
-    else:
-        log.info("BAT is running. Since a predicted protein fasta and alignment "
-                 "file are supplied, only bin classification is carried out.")
-    log.info("Doing some pre-flight checks first.")
+    """Run Bin Annotation Tool (BAT) run"""
     return _run_annotation(args, report)
 
 
@@ -82,6 +72,10 @@ def _run_annotation(args: CatOptions | BatOptions, report: Report) -> dict[str, 
     current_step = plan[step_index]
     log = logging.getLogger("CAT_pack")
 
+
+    planned_steps = ", ".join(step.name for step in plan[1:] if not step.supplied)
+    log.info(f"{"BAT" if is_bat else "CAT"} is running. Planned steps: {planned_steps}.")
+    log.info("Doing some pre-flight checks first.")
 
     try:
         report(current_step.name, Status.RUNNING, 0, 1)
@@ -116,10 +110,8 @@ def _run_annotation(args: CatOptions | BatOptions, report: Report) -> dict[str, 
             report(current_step.name, Status.COMPLETE, 1, 1)
             log.info(f"Completed: {current_step.name}")
 
-        classification_output = ({"Bin classifications": settings.files.bin_report} if is_bat
-                                 else {"Contig classifications": settings.files.contig_report})
         return {
-            **classification_output,
+            f"{"Bin" if is_bat else "Contig"} Classifications": settings.files.report,
             "ORF classifications": settings.files.orf_report,
             "Log": settings.log_file,
         }
@@ -163,19 +155,17 @@ def run_classification(
     )
 
     if isinstance(files, BatFiles):
-        classification_file = files.bin_report
         tool = "BAT"
         action = "flying"
     else:
-        classification_file = files.contig_report
         tool = "CAT"
         action = "spinning"
-    log.info(f"{tool} is {action}! Files {classification_file} and {files.orf_report} are created.")
+    log.info(f"{tool} is {action}! Files {files.report} and {files.orf_report} are created.")
     n_classified = 0
     total = len(inputs.entity2ORFs)
     report("Classify", Status.RUNNING, 0, total)
     with (
-        classification_file.open("w", encoding="utf-8") as classification_out,
+        files.report.open("w", encoding="utf-8") as classification_out,
         files.orf_report.open("w", encoding="utf-8") as orf_out,
     ):
         writer = ClassificationWriter(
