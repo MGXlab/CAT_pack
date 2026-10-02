@@ -164,9 +164,9 @@ def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | Non
     prefix = args.output_prefix
     checks.check(check_output_prefix, prefix)
     orf_report = Path(f"{prefix}.ORF2LCA.txt")
-    contig_report = Path(f"{prefix}.{'bin' if is_bat else 'contig'}2classification.txt")
+    report = Path(f"{prefix}.{'bin' if is_bat else 'contig'}2classification.txt")
 
-    outputs = [orf_report, contig_report]
+    outputs = [orf_report, report]
     proteins_gff = None
     intermediate_prefix = f"{prefix}.concatenated" if is_bat else str(prefix)
     if args.proteins is None:
@@ -182,15 +182,15 @@ def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | Non
 
     checks.finish()
 
-    report_fields = (dict(bin_report=contig_report, bin2contigs=bins.bin2contigs, bin_paths=bins.bin_paths)
-                     if is_bat else dict(contigs=contigs, contig_report=contig_report))
+    report_fields = (dict(bin2contigs=bins.bin2contigs, bin_paths=bins.bin_paths)
+                     if is_bat else dict(contigs=contigs))
     files_type = BatFiles if is_bat else CatFiles
     return files_type(
         proteins_fasta=proteins, proteins_gff=proteins_gff,
         alignment=alignment, fastaid2LCA=database.fastaid2LCA, branches=database.branches,
         names=database.names, nodes=database.nodes,
-        orf_report=orf_report, **report_fields,
-        diamond_database=database.diamond,
+        orf_report=orf_report, report=report,
+        **report_fields, diamond_database=database.diamond,
     )
 
 
