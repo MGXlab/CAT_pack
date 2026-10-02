@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""
-Testrun with this: python CAT_pack cat -c tests/data/contigs/small_contigs.fa \
-                    -d output2/db   -t output2/tax
-
-"""
 import shlex
 import sys
 from decimal import Decimal
@@ -14,7 +9,7 @@ from typing import Annotated
 import typer
 from rich.console import Console, Group
 from rich.panel import Panel
-from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
+from rich.progress import Progress, ProgressColumn, BarColumn, TextColumn, TimeElapsedColumn
 from rich.table import Table
 from rich.text import Text
 from typer import Option
@@ -53,12 +48,21 @@ class StaticBarColumn(BarColumn):
         return bar
 
 
-def make_progress(stages):
+class ProcessingSpeedColumn(ProgressColumn):
+    def render(self, task):
+        unit = task.fields.get("unit")
+        if not unit or not task.started:
+            return Text("")
+        return Text(f"{task.speed or 0:,.1f} {unit}/s", style="cyan")
+
+
+def make_progress(stages, unit=None):
     progress = Progress(
         TextColumn("[bold]{task.description:<20}"),
         StaticBarColumn(bar_width=28),
         TextColumn("{task.fields[status]}"),
         TimeElapsedColumn(),
+        ProcessingSpeedColumn(),
         console=console,
     )
 
@@ -68,6 +72,7 @@ def make_progress(stages):
             total=1,
             start=False,
             status="[dim]waiting[/dim]",
+            unit=unit if stage == "Classify" else None, # a bit ductaped for now, but for the idea
         )
         for stage in stages
     }
@@ -97,8 +102,10 @@ def update_progress(progress, tasks, step, status, completed=0, total=None):
             if total is not None:
                 progress.update(task_id, total=total, completed=completed)
         case Status.COMPLETE:
+            task = next(task for task in progress.tasks if task.id == task_id)
+            progress.stop_task(task_id)
             progress.update(task_id, status=f"[{style}]{status}[/{style}]",
-                            refresh=True, total=total, completed=completed)
+                            refresh=True, completed=task.total)
         case Status.SUPPLIED:
             progress.update(task_id, status=f"[{style}]{status}[/{style}]")
         case Status.SKIPPED:
@@ -527,7 +534,10 @@ def run_annotation_cli(arguments: CatOptions | BatOptions):
 
     console.print(f"Preparing for {tool} run\n\n")
     log.info(f"Preparing for {tool} run")
-    progress, tasks = make_progress([step.name for step in build_plan(arguments)])
+    progress, tasks = make_progress(
+        [step.name for step in build_plan(arguments)],
+        unit="bins" if is_bat else "contigs",
+    )
     report = partial(update_progress, progress, tasks)
     try:
         with progress:
