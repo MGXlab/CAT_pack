@@ -88,7 +88,6 @@ class MMseqsSettings:
 
 @dataclass(frozen=True)
 class AnnotationFiles:
-    contigs: Path
     proteins_fasta: Path
     proteins_gff: Path | None
     alignment: Path
@@ -102,6 +101,7 @@ class AnnotationFiles:
 
 @dataclass(frozen=True)
 class CatFiles(AnnotationFiles):
+    contigs: Path
     contig_report: Path
 
 

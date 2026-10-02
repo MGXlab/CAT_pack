@@ -5,14 +5,14 @@ from pathlib import Path
 
 from .classification import ClassificationEngine
 from .options import BatOptions, CatOptions, PrepareOptions
-from .parsers import ClassificationParser, FastaParser
+from .parsers import ClassificationParser
 from .settings import BatFiles, BatSettings, CatFiles, CatSettings
 from .tools.aligner import run_aligner
 from .tools.pyrodigal import run_protein_prediction
 from .utils.errors import CatError
 from .utils.logging import Status, Report
 from .validation import check_orfs_match_contigs, get_file_names, get_validated_settings, validate_prepare
-from .writers import ClassificationWriter, FastaWriter
+from .writers import ClassificationWriter
 
 
 @dataclass()
@@ -101,13 +101,6 @@ def _run_annotation(args: CatOptions | BatOptions, report: Report) -> dict[str, 
             log.info(f"Starting: {current_step.name}")
 
             if current_step.name == "Protein prediction":
-                if is_bat:
-                    # the concentrated fasta seems te be required by the protein prediction right now
-                    # Let's discuss nex monday
-                    records = (
-                        record for path in settings.files.bin_paths for record in FastaParser(path)
-                    )
-                    FastaWriter(settings.files.contigs).write(records)
                 run_protein_prediction(settings, report, "pyrodigal")
             elif current_step.name == "Alignment":
                 run_aligner(settings.aligner, report)
