@@ -140,7 +140,7 @@ def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | Non
 
     is_bat = isinstance(args, BatOptions)
     bins = checks.check(BinParser(args.bins, args.bin_suffix).parse) if is_bat else None
-    contigs = (Path(f"{args.output_prefix}.concatenated.fasta") if is_bat
+    contigs = (None if is_bat
                else checks.check(check_file, args.contigs, "Contigs file"))
 
     proteins = None
@@ -173,8 +173,6 @@ def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | Non
         proteins = Path(f"{intermediate_prefix}.predicted_proteins.faa")
         proteins_gff = Path(f"{intermediate_prefix}.predicted_proteins.gff")
         outputs.extend((proteins, proteins_gff))
-        if is_bat:
-            outputs.append(contigs)
     if args.alignment is None:
         suffix = ".gz" if args.compress else ""
         alignment = Path(f"{intermediate_prefix}.alignment.{aligner or args.aligner}{suffix}")
@@ -185,10 +183,10 @@ def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | Non
     checks.finish()
 
     report_fields = (dict(bin_report=contig_report, bin2contigs=bins.bin2contigs, bin_paths=bins.bin_paths)
-                     if is_bat else dict(contig_report=contig_report))
+                     if is_bat else dict(contigs=contigs, contig_report=contig_report))
     files_type = BatFiles if is_bat else CatFiles
     return files_type(
-        contigs=contigs, proteins_fasta=proteins, proteins_gff=proteins_gff,
+        proteins_fasta=proteins, proteins_gff=proteins_gff,
         alignment=alignment, fastaid2LCA=database.fastaid2LCA, branches=database.branches,
         names=database.names, nodes=database.nodes,
         orf_report=orf_report, **report_fields,

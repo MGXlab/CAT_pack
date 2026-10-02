@@ -1,6 +1,9 @@
 import logging
 import multiprocessing
 
+from ..parsers import FastaParser
+from ..settings import BatFiles
+
 
 def run_protein_prediction(settings, report, predictor):
     if predictor == "pyrodigal":
@@ -9,7 +12,7 @@ def run_protein_prediction(settings, report, predictor):
 
 
 def run_pyrodigal(settings, files, report):
-    """placeholder for the pyrodigal"""
+    """Predict proteins from the CAT contigs or the BAT bin files."""
     log = logging.getLogger("CAT_pack")
     import pyrodigal
     gene_finder = pyrodigal.GeneFinder(meta=True)
@@ -18,31 +21,22 @@ def run_pyrodigal(settings, files, report):
         f" and {files.proteins_gff} will be generated. Do not forget to cite"
         " Pyrodigal and Prodigal when using CAT or BAT in your publication.")
 
-    header2seq = {}
-    contig_order = []
-
-    def import_contigs(contigs_fasta):
-        log.info(f"Parsing contigs fasta {contigs_fasta}")
-        with open(contigs_fasta, "r") as f1:
-            for line in f1:
-                line = line.rstrip()
-
-                if line.startswith(">"):
-                    header = line.rstrip().split(" ")[0].lstrip(">")
-                    header2seq.setdefault(header, "")
-                    contig_order.append(header)
-                else:
-                    header2seq[header] += line.rstrip()
-
-    import_contigs(files.contigs)
+    input_paths = files.bin_paths if isinstance(files, BatFiles) else (files.contigs,)
+    contig_names = []
+    sequences = []
+    for path in input_paths:
+        log.info(f"Parsing contigs fasta {path}")
+        for record in FastaParser(path):
+            contig_names.append(record.name)
+            sequences.append(record.sequence.encode())
 
     with multiprocessing.Pool(processes=settings.threads) as pool:
         predictions = pool.map(
             gene_finder.find_genes,
-            [bytes(header2seq[header].encode()) for header in contig_order]
+            sequences,
         )
 
     with open(files.proteins_fasta, "w") as outf1, open(files.proteins_gff, "w") as outf2:
-        for header, prediction in zip(contig_order, predictions):
+        for header, prediction in zip(contig_names, predictions):
             prediction.write_translations(outf1, sequence_id=header)
             prediction.write_gff(outf2, sequence_id=header)
