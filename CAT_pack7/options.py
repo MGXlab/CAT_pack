@@ -37,8 +37,7 @@ class MMseqsOptions:
 
 
 @dataclass(frozen=True, kw_only=True)
-class CatOptions(ExecutionOptions):
-    contigs: Path
+class AnnotationOptions(ExecutionOptions):
     database: Path
     proteins: Path | None = None
     alignment: Path | None = None
@@ -56,6 +55,21 @@ class CatOptions(ExecutionOptions):
     @property
     def log_path(self) -> Path:
         return self.log_file if self.log_file is not None else Path(f"{self.output_prefix}.log")
+
+
+@dataclass(frozen=True, kw_only=True)
+class CatOptions(AnnotationOptions):
+    contigs: Path
+
+
+@dataclass(frozen=True, kw_only=True)
+class BatOptions(AnnotationOptions):
+    bins: Path
+    bin_suffix: str = ".fna"
+    range_: Decimal = Decimal("5")
+    fraction: Decimal = Decimal("0.3")
+    output_prefix: Path = Path("out.BAT")
+    no_stars: bool = False
 
 
 @dataclass(frozen=True, kw_only=True)

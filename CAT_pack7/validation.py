@@ -1,11 +1,13 @@
+import logging
 from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
-from .options import AlignerName, CatOptions, ExecutionOptions, DiamondOptions, PrepareOptions
+from .options import AlignerName, BatOptions, CatOptions, ExecutionOptions, DiamondOptions, PrepareOptions
+from .parsers import BinParser
 from .settings import (
-    CatFiles, CatSettings, ClassificationSettings, DatabaseFiles, DiamondParameters,
+    BatFiles, BatSettings, CatFiles, CatSettings, ClassificationSettings, DatabaseFiles, DiamondParameters,
     DiamondSettings, ExecutionSettings, PrepareOutputs, PrepareSettings, TaxonomyFiles,
 )
 from .utils.check import (
@@ -13,6 +15,8 @@ from .utils.check import (
     check_output_prefix, check_outputs, check_pyrodigal,
 )
 from .utils.errors import InputError, ValErrorCollector
+
+log = logging.getLogger("CAT_pack")
 
 DIAMOND_MODES = {
     "default", "faster", "fast", "mid-sensitive", "sensitive",
@@ -131,10 +135,13 @@ def validate_prepare(args: PrepareOptions) -> PrepareSettings:
     )
 
 
-def validate_cat_files(args: CatOptions, aligner: AlignerName | None) -> CatFiles:
+def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | None) -> CatFiles | BatFiles:
     checks = ValErrorCollector()
 
-    contigs = checks.check(check_file, args.contigs, "Contigs file")
+    is_bat = isinstance(args, BatOptions)
+    bins = checks.check(BinParser(args.bins, args.bin_suffix).parse) if is_bat else None
+    contigs = (Path(f"{args.output_prefix}.concatenated.fasta") if is_bat
+               else checks.check(check_file, args.contigs, "Contigs file"))
 
     proteins = None
     alignment = None
@@ -157,33 +164,39 @@ def validate_cat_files(args: CatOptions, aligner: AlignerName | None) -> CatFile
     prefix = args.output_prefix
     checks.check(check_output_prefix, prefix)
     orf_report = Path(f"{prefix}.ORF2LCA.txt")
-    contig_report = Path(f"{prefix}.contig2classification.txt")
+    contig_report = Path(f"{prefix}.{'bin' if is_bat else 'contig'}2classification.txt")
 
     outputs = [orf_report, contig_report]
     proteins_gff = None
+    intermediate_prefix = f"{prefix}.concatenated" if is_bat else str(prefix)
     if args.proteins is None:
-        proteins = Path(f"{prefix}.predicted_proteins.faa")
-        proteins_gff = Path(f"{prefix}.predicted_proteins.gff")
+        proteins = Path(f"{intermediate_prefix}.predicted_proteins.faa")
+        proteins_gff = Path(f"{intermediate_prefix}.predicted_proteins.gff")
         outputs.extend((proteins, proteins_gff))
+        if is_bat:
+            outputs.append(contigs)
     if args.alignment is None:
         suffix = ".gz" if args.compress else ""
-        alignment = Path(f"{prefix}.alignment.{aligner or args.aligner}{suffix}")
+        alignment = Path(f"{intermediate_prefix}.alignment.{aligner or args.aligner}{suffix}")
         outputs.append(alignment)
 
     checks.check(check_outputs, outputs)
 
     checks.finish()
 
-    return CatFiles(
+    report_fields = (dict(bin_report=contig_report, bin2contigs=bins.bin2contigs, bin_paths=bins.bin_paths)
+                     if is_bat else dict(contig_report=contig_report))
+    files_type = BatFiles if is_bat else CatFiles
+    return files_type(
         contigs=contigs, proteins_fasta=proteins, proteins_gff=proteins_gff,
         alignment=alignment, fastaid2LCA=database.fastaid2LCA, branches=database.branches,
         names=database.names, nodes=database.nodes,
-        orf_report=orf_report, contig_report=contig_report,
+        orf_report=orf_report, **report_fields,
         diamond_database=database.diamond,
     )
 
 
-def validate_cat(args: CatOptions) -> CatSettings:
+def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
     checks = ValErrorCollector()
     execution = checks.check(validate_execution, args)
     classification = checks.check(validate_classification, args.range_, args.fraction)
@@ -202,7 +215,7 @@ def validate_cat(args: CatOptions) -> CatSettings:
             checks.add(InputError(
                 "MMseqs2 execution is not implemented yet.",
                 hint="Use --aligner diamond or supply an existing alignment and proteins.",
-            ))
+            )) # TODO: Implement MMseqs2?
 
     checks.finish()
 
@@ -216,18 +229,61 @@ def validate_cat(args: CatOptions) -> CatSettings:
             top=top, compression=args.compress, verbose=execution.verbose
         )
 
-    return CatSettings(
-        threads=execution.threads, quiet=execution.quiet,
-        verbose=execution.verbose, debug=execution.debug,
-        files=files, aligner=aligner,
-        range_=classification.range_, fraction=classification.fraction,
-        log_file=args.log_path
-    )
+    if isinstance(args, BatOptions):
+        return BatSettings(
+            threads=execution.threads, quiet=execution.quiet,
+            verbose=execution.verbose, debug=execution.debug,
+            files=files, aligner=aligner,
+            range_=classification.range_, fraction=classification.fraction,
+            log_file=args.log_path, no_stars=args.no_stars,
+        )
+    elif isinstance(args, CatOptions):
+        return CatSettings(
+            threads=execution.threads, quiet=execution.quiet,
+            verbose=execution.verbose, debug=execution.debug,
+            files=files, aligner=aligner,
+            range_=classification.range_, fraction=classification.fraction,
+            log_file=args.log_path #TODO: Add no stars compatibility
+        )
+    else:
+        raise TypeError(f"Hmmm, that type of options I don't know yet")
 
 
-def get_validated_settings(args: CatOptions | PrepareOptions) -> CatSettings | PrepareSettings:
-    if type(args) == CatOptions:
+def get_validated_settings(args: CatOptions | BatOptions | PrepareOptions) -> CatSettings | BatSettings | PrepareSettings:
+    if isinstance(args, (CatOptions, BatOptions)):
         return validate_cat(args)
     if type(args) == PrepareOptions:
         return validate_prepare(args)
     raise TypeError(f"Hmmm, that type of options class I don't know yet")
+
+
+def check_orfs_match_contigs(
+    contig_names: set[str],
+    contig2ORFs: dict[str, list[str]],
+    path: Path,
+) -> None:
+    overlap = len(contig_names & set(contig2ORFs))
+    if overlap == 0:
+        example = "contig_name_1"
+        for orfs in contig2ORFs.values():
+            example = orfs[0]
+            break
+        raise InputError(
+            f"no ORFs found that can be traced back to one of the contigs "
+            f"in the contigs fasta file: {example}. ORFs should be named "
+            f"contig_name_#.",
+            path=path,
+        )
+
+    rel_overlap = overlap / len(contig_names)
+    log.info(
+        f"ORFs found on {overlap:,d} / {len(contig_names):,d} contigs "
+        f"({rel_overlap * 100:.2f}%)."
+    )
+    if rel_overlap < 0.97:
+        log.warning(
+            f"only {rel_overlap * 100:.2f}% contigs found with ORF predictions. This may "
+            f"indicate that some contigs were missing from the protein "
+            f"prediction. Please make sure that the protein prediction was "
+            f"based on all contigs."
+        )
