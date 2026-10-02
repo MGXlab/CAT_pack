@@ -525,8 +525,8 @@ def run_annotation_cli(arguments: CatOptions | BatOptions):
                         border_style="blue",), "\n")
 
 
-    console.print(f"Preparing for {'BAT' if is_bat else 'CAT'} run\n\n")
-    log.info(f"Preparing for {'BAT' if is_bat else 'CAT'} run")
+    console.print(f"Preparing for {tool} run\n\n")
+    log.info(f"Preparing for {tool} run")
     progress, tasks = make_progress([step.name for step in build_plan(arguments)])
     report = partial(update_progress, progress, tasks)
     try:
