@@ -148,4 +148,4 @@ class PrepareSettings(ExecutionSettings):
     nodes: Path
     acc2tax: Path
     diamond: Path | None
-    cleanup: bool
+    mmseqs: Path | None = None

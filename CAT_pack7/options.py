@@ -81,4 +81,5 @@ class PrepareOptions(ExecutionOptions):
     db_dir: Path
     path_to_diamond: Path | None = DiamondOptions.path_to_diamond
     common_prefix: str | None = None
-    cleanup: bool = False
+    build_mmseqs2: bool = False
+    path_to_mmseqs: Path | None = None
