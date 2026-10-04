@@ -80,7 +80,7 @@ def _run_annotation(args: CatOptions | BatOptions, report: Report) -> dict[str, 
 
 
     planned_steps = ", ".join(step.name for step in plan[1:] if not step.supplied)
-    log.info(f"{"BAT" if is_bat else "CAT"} is running. Planned steps: {planned_steps}.")
+    log.info(f"{'BAT' if is_bat else 'CAT'} is running. Planned steps: {planned_steps}.")
     log.info("Doing some pre-flight checks first.")
 
     try:
@@ -117,7 +117,7 @@ def _run_annotation(args: CatOptions | BatOptions, report: Report) -> dict[str, 
             log.info(f"Completed: {current_step.name}")
 
         return {
-            f"{"Bin" if is_bat else "Contig"} Classifications": settings.files.report,
+            f"{'Bin' if is_bat else 'Contig'} Classifications": settings.files.report,
             "ORF classifications": settings.files.orf_report,
             "Log": settings.log_file,
         }
