@@ -1,12 +1,12 @@
 import gzip
 import logging
 import shutil
-import subprocess
 from pathlib import Path
 
 from . import tax
 from .settings import PrepareSettings
-from .utils.errors import ExternalToolError, InputError
+from .tools.tool_runner import run_tool
+from .utils.errors import InputError
 from .utils.logging import Report, Status
 
 log = logging.getLogger("CAT_pack")
@@ -161,14 +161,6 @@ def write_taxids_with_multiple_offspring_file(
         for taxid in taxid2offspring:
             if len(taxid2offspring[taxid]) >= 2:
                 outf1.write(f"{taxid}\n")
-
-
-def run_tool(command: list[str], tool: str) -> None:
-    log.info("Running command: %s", " ".join(command))
-    try:
-        subprocess.run(command, check=True)
-    except (OSError, subprocess.CalledProcessError) as error:
-        raise ExternalToolError(tool, f"database creation failed: {error}") from error
 
 
 def make_diamond_database(settings: PrepareSettings) -> None:

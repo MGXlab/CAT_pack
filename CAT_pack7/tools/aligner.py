@@ -1,8 +1,8 @@
 """protein aligners DIAMOND and MMseqs2"""
 import logging
 import shutil
-import subprocess
 
+from .tool_runner import run_tool
 from ..settings import DiamondSettings, MMseqsSettings
 
 log = logging.getLogger("CAT_pack")
@@ -18,10 +18,8 @@ def run_diamond(diamond: DiamondSettings, report):
         log.info(f"making tmp dir: {diamond.tmpdir}")
         diamond.tmpdir.mkdir(parents=True, exist_ok=True)
 
-    log.info(f"Running command: {' '.join(diamond.get_command())}")
-
     try:
-        subprocess.check_call(diamond.get_command())
+        run_tool(diamond.get_command(), "DIAMOND", operation="homology search")
         log.info(f"DIAMOND finished. Alignment written to {diamond.alignment}\n")
     finally:
         shutil.rmtree(diamond.tmpdir, ignore_errors=True)
