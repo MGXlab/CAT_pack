@@ -172,35 +172,15 @@ def run_tool(command: list[str], tool: str) -> None:
 
 
 def make_diamond_database(settings: PrepareSettings) -> None:
-    diamond_database = settings.files.diamond_database
-    diamond_database_prefix = diamond_database.with_suffix("")
     log.info(f"Constructing DIAMOND database {settings.files.diamond_database} "
              f"from {settings.db_fasta} using {settings.threads} cores.")
-    command = [
-        str(settings.diamond), "makedb",
-        "--in", str(settings.db_fasta.resolve()),
-        "-d", str(diamond_database_prefix.resolve()),
-        "-p", str(settings.threads),
-    ]
-    if not settings.verbose:
-        command.append("--quiet")
-    run_tool(command, "DIAMOND")
+    run_tool(settings.diamond.get_command(), "DIAMOND")
 
 
 def make_mmseqs2_database(settings: PrepareSettings) -> None:
-    mmseqs2_database = settings.files.mmseqs2_database
-    log.info(f"Constructing MMseqs2 database {mmseqs2_database} from {settings.db_fasta} using {settings.threads} cores.")
-
-    command = [
-        str(settings.mmseqs), "createdb",
-        str(settings.db_fasta.resolve()), str(mmseqs2_database.resolve()),
-        "--threads", str(settings.threads),
-        "--compressed", "1",
-    ]
-
-    if not settings.verbose:
-        command.extend(["-v", "0"])
-    run_tool(command, "MMseqs2")
+    log.info(f"Constructing MMseqs2 database {settings.files.mmseqs2_database} "
+             f"from {settings.db_fasta} using {settings.threads} cores.")
+    run_tool(settings.mmseqs.get_command(), "MMseqs2")
 
 
 def copy_taxonomy(settings: PrepareSettings) -> None:

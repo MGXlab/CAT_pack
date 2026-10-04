@@ -128,6 +128,46 @@ class BatSettings(ExecutionSettings, ClassificationSettings):
 
 # Database preparation settings and outputs.
 @dataclass(frozen=True)
+class DiamondPrepareSettings:
+    diamond: Path
+    db_fasta: Path
+    database: Path
+    threads: int
+    verbose: bool
+
+    def get_command(self) -> list[str]:
+        command = [
+            str(self.diamond), "makedb",
+            "--in", str(self.db_fasta.resolve()),
+            "-d", str(self.database.with_suffix("").resolve()),
+            "-p", str(self.threads),
+        ]
+        if not self.verbose:
+            command.append("--quiet")
+        return command
+
+
+@dataclass(frozen=True)
+class MMseqsPrepareSettings:
+    mmseqs: Path
+    db_fasta: Path
+    database: Path
+    threads: int
+    verbose: bool
+
+    def get_command(self) -> list[str]:
+        command = [
+            str(self.mmseqs), "createdb",
+            str(self.db_fasta.resolve()), str(self.database.resolve()),
+            "--threads", str(self.threads),
+            "--compressed", "1",
+        ]
+        if not self.verbose:
+            command.extend(["-v", "0"])
+        return command
+
+
+@dataclass(frozen=True)
 class PrepareOutputs:
     prefix: str
     data_folder: Path
@@ -147,5 +187,5 @@ class PrepareSettings(ExecutionSettings):
     names: Path
     nodes: Path
     acc2tax: Path
-    diamond: Path | None
-    mmseqs: Path | None = None
+    diamond: DiamondPrepareSettings | None
+    mmseqs: MMseqsPrepareSettings | None = None
