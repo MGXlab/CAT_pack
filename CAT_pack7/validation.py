@@ -10,7 +10,8 @@ from .options import AlignerName, BatOptions, CatOptions, ExecutionOptions, Diam
 from .parsers import BinParser
 from .settings import (
     BatFiles, BatSettings, CatFiles, CatSettings, ClassificationSettings, DatabaseFiles, DiamondParameters,
-    DiamondSettings, ExecutionSettings, PrepareOutputs, PrepareSettings, TaxonomyFiles,
+    DiamondPrepareSettings, DiamondSettings, ExecutionSettings, MMseqsPrepareSettings,
+    PrepareOutputs, PrepareSettings, TaxonomyFiles,
 )
 from .utils.check import (
     check_db_file, check_diamond, check_file, check_folder, check_integer, check_number,
@@ -154,8 +155,11 @@ def validate_prepare(args: PrepareOptions, files: PrepareOutputs | None = None) 
         threads=threads, quiet=execution.quiet,
         verbose=execution.verbose, debug=execution.debug,
         files=files, db_fasta=db_fasta, names=taxonomy.names,
-        nodes=taxonomy.nodes, acc2tax=acc2tax, diamond=diamond,
-        mmseqs=mmseqs,
+        nodes=taxonomy.nodes, acc2tax=acc2tax,
+        diamond=(DiamondPrepareSettings(diamond, db_fasta, files.diamond_database,
+                                       threads, execution.verbose) if diamond is not None else None),
+        mmseqs=(MMseqsPrepareSettings(mmseqs, db_fasta, files.mmseqs2_database,
+                                     threads, execution.verbose) if mmseqs is not None else None),
     )
 
 
