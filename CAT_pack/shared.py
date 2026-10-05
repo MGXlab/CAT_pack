@@ -1337,13 +1337,13 @@ def run_CAT(
                 "-f", str(fraction),
                 "-r", str(CAT_range)
                 ]
-        if args.path_to_prodigal!="prodigal":
-            command.extend(["--path_to_prodigal", args.path_to_prodigal])
-        if args.path_to_diamond!="diamond":
-            command.extend(["--path_to_diamond", args.path_to_diamond])
+        #if args.path_to_prodigal!="prodigal":
+        #    command.extend(["--path_to_prodigal", args.path_to_prodigal])
+        #if args.path_to_diamond!="diamond":
+        #    command.extend(["--path_to_diamond", args.path_to_diamond])
         
-        if args.force:
-            command.append("--force")
+        #if args.force:
+        #    command.append("--force")
         subprocess.check_call(command)
     except:
         message = "CAT finished abnormally."
