@@ -11,7 +11,7 @@ from .parsers import BinParser
 from .settings import (
     BatFiles, BatSettings, CatFiles, CatSettings, ClassificationSettings, DatabaseFiles, DiamondParameters,
     DiamondPrepareSettings, DiamondSettings, ExecutionSettings, MMseqsPrepareSettings,
-    PrepareOutputs, PrepareSettings, TaxonomyFiles,
+    PrepareOutputs, PrepareSettings, TaxonomyFiles, PyrodigalSettings
 )
 from .utils.check import (
     check_db_file, check_diamond, check_file, check_folder, check_integer, check_number,
@@ -35,8 +35,9 @@ def validate_classification(range_, fraction) -> ClassificationSettings:
     checks = ValErrorCollector()
     range_ = checks.check(check_number, range_, "Range", 0, 100)
     fraction = checks.check(check_number, fraction, "Fraction", 0, Decimal("0.99"))
+    pyrodigal = PyrodigalSettings()
     checks.finish()
-    return ClassificationSettings(range_, fraction)
+    return ClassificationSettings(range_, fraction, pyrodigal)
 
 
 def validate_taxonomy(names: Path, nodes: Path) -> TaxonomyFiles:
@@ -259,7 +260,7 @@ def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
         return BatSettings(
             threads=execution.threads, quiet=execution.quiet,
             verbose=execution.verbose, debug=execution.debug,
-            files=files, aligner=aligner,
+            files=files, aligner=aligner, pyrodigal=classification.pyrodigal,
             range_=classification.range_, fraction=classification.fraction,
             log_file=args.log_path, no_stars=args.no_stars,
         )
@@ -267,7 +268,7 @@ def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
         return CatSettings(
             threads=execution.threads, quiet=execution.quiet,
             verbose=execution.verbose, debug=execution.debug,
-            files=files, aligner=aligner,
+            files=files, aligner=aligner, pyrodigal=classification.pyrodigal,
             range_=classification.range_, fraction=classification.fraction,
             log_file=args.log_path #TODO: Add no stars compatibility
         )
