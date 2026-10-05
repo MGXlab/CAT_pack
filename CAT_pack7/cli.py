@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""
-Testrun with this: python CAT_pack cat -c tests/data/contigs/small_contigs.fa \
-                    -d output2/db   -t output2/tax
-
-"""
 import shlex
 import sys
 from decimal import Decimal
@@ -14,16 +9,17 @@ from typing import Annotated
 import typer
 from rich.console import Console, Group
 from rich.panel import Panel
-from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
+from rich.progress import Progress, ProgressColumn, BarColumn, TextColumn, TimeElapsedColumn
 from rich.table import Table
 from rich.text import Text
 from typer import Option
 from typer_di import Depends, TyperDI
 
 from .options import BatOptions, CatOptions, ExecutionOptions, DiamondOptions, MMseqsOptions, PrepareOptions
-from .pipeline import run_bat, run_cat, build_plan, Status, run_prepare
+from .pipeline import run_annotation, build_plan, Status, run_prepare
 from .utils.errors import CatError, show_error
 from .utils.logging import init_logging
+from .validation import get_file_names, make_prefix
 
 app = TyperDI()
 
@@ -33,19 +29,6 @@ console = Console(stderr=True)
 def main():
     """Ah oh"""
 
-
-
-# def show_progress() -> Progress:
-#     return Progress(
-#         TextColumn("[bold]{task.description:<20}"),
-#         BarColumn(bar_width=28, pulse_style="bar.back"),
-#         MofNCompleteColumn(separator=" of "),
-#         TextColumn("[cyan]{task.fields[status]}"),
-#         TimeElapsedColumn(),
-#         console=console
-# )
-
-
 class StaticBarColumn(BarColumn):
     def render(self, task):
         bar = super().render(task)
@@ -53,13 +36,23 @@ class StaticBarColumn(BarColumn):
         return bar
 
 
-def make_progress(stages):
+class ProcessingSpeedColumn(ProgressColumn):
+    def render(self, task):
+        unit = task.fields.get("unit")
+        if not unit or not task.started:
+            return Text("")
+        return Text(f"{task.speed or 0:,.1f} {unit}/s", style="cyan")
+
+
+def make_progress(stages, unit=None):
     progress = Progress(
         TextColumn("[bold]{task.description:<20}"),
         StaticBarColumn(bar_width=28),
         TextColumn("{task.fields[status]}"),
         TimeElapsedColumn(),
+        ProcessingSpeedColumn(),
         console=console,
+        refresh_per_second=1
     )
 
     tasks = {
@@ -68,6 +61,7 @@ def make_progress(stages):
             total=1,
             start=False,
             status="[dim]waiting[/dim]",
+            unit=unit if stage == "Classify" else None, # a bit ductaped for now, but for the idea
         )
         for stage in stages
     }
@@ -97,8 +91,10 @@ def update_progress(progress, tasks, step, status, completed=0, total=None):
             if total is not None:
                 progress.update(task_id, total=total, completed=completed)
         case Status.COMPLETE:
+            task = next(task for task in progress.tasks if task.id == task_id)
+            progress.stop_task(task_id)
             progress.update(task_id, status=f"[{style}]{status}[/{style}]",
-                            refresh=True, total=total, completed=completed)
+                            refresh=True, completed=task.total)
         case Status.SUPPLIED:
             progress.update(task_id, status=f"[{style}]{status}[/{style}]")
         case Status.SKIPPED:
@@ -163,9 +159,10 @@ def prepare(
                 help="Prefix for all files that will be created",
                 show_default="<date>_CAT_pack",
             ),] = PrepareOptions.common_prefix,
-        cleanup: Annotated[bool, Option("--cleanup",
-                    help="Remove unnecessary files after all data have been "
-                    "processed")] = PrepareOptions.cleanup,
+        build_mmseqs2: Annotated[bool, Option("--build-mmseqs2",
+                    help="Also create an MMseqs2 sequence database.")] = PrepareOptions.build_mmseqs2,
+        path_to_mmseqs: Annotated[Path | None, Option("--path-to-mmseqs",
+                    help="Path to MMseqs2, used with --build-mmseqs2.")] = PrepareOptions.path_to_mmseqs,
         options: ExecutionOptions = Depends(execution_options),
 
 ):
@@ -177,13 +174,16 @@ def prepare(
         db_dir=db_dir,
         path_to_diamond=path_to_diamond,
         common_prefix=common_prefix,
-        cleanup=cleanup,
+        build_mmseqs2=build_mmseqs2,
+        path_to_mmseqs=path_to_mmseqs,
         threads=options.threads,
         quiet=options.quiet,
         verbose=options.verbose,
         debug=options.debug,
     )
+    args = make_prefix(args)
     progress, tasks = make_progress([step.name for step in build_plan(args)])
+    progress.disable = options.quiet
     report = partial(update_progress, progress, tasks)
     try:
         with progress:
@@ -194,6 +194,24 @@ def prepare(
     except CatError as error:
         show_error(error, console)
         raise typer.Exit(code=1)
+
+    if not options.quiet:
+        files = get_file_names(args)
+        table = Table(title="Prepared database")
+        table.add_column("File")
+        table.add_column("Location")
+        for label, path in (
+            ("DIAMOND", files.diamond_database),
+            ("Protein taxonomy", files.fastaid2LCAtaxid),
+            ("Branching taxids", files.taxids_with_multiple_offspring),
+            ("Taxonomy names", files.names), ("Taxonomy nodes", files.nodes),
+            ("Log", files.log_file),
+        ):
+            table.add_row(label, str(path))
+        if args.build_mmseqs2:
+            table.add_row("MMseqs2", str(files.mmseqs2_database))
+        console.print(table)
+        console.print(f"Use -d {files.data_folder} with CAT_pack7 CAT or BAT.")
 
 
 
@@ -527,11 +545,14 @@ def run_annotation_cli(arguments: CatOptions | BatOptions):
 
     console.print(f"Preparing for {tool} run\n\n")
     log.info(f"Preparing for {tool} run")
-    progress, tasks = make_progress([step.name for step in build_plan(arguments)])
+    progress, tasks = make_progress(
+        [step.name for step in build_plan(arguments)],
+        unit="bins" if is_bat else "contigs",
+    )
     report = partial(update_progress, progress, tasks)
     try:
         with progress:
-            outputs = (run_bat if is_bat else run_cat)(arguments, report)
+            outputs = run_annotation(arguments, report)
     except KeyboardInterrupt:
         console.print("\nRun cancelled :(")
         raise typer.Exit(code=130)
@@ -544,7 +565,7 @@ def run_annotation_cli(arguments: CatOptions | BatOptions):
         log.exception("Unexpected error", exc_info=False)
         log.error("Check the run log or use --debug for a full traceback")
         if arguments.debug:
-            console.print_exception(show_locals=False) # TODO: before release back to False
+            console.print_exception(show_locals=True) # TODO: before release back to False
         raise typer.Exit(code=1)
 
 

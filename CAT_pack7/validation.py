@@ -1,4 +1,6 @@
 import logging
+import shutil
+import sys
 from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal
@@ -8,13 +10,14 @@ from .options import AlignerName, BatOptions, CatOptions, ExecutionOptions, Diam
 from .parsers import BinParser
 from .settings import (
     BatFiles, BatSettings, CatFiles, CatSettings, ClassificationSettings, DatabaseFiles, DiamondParameters,
-    DiamondSettings, ExecutionSettings, PrepareOutputs, PrepareSettings, TaxonomyFiles,
+    DiamondPrepareSettings, DiamondSettings, ExecutionSettings, MMseqsPrepareSettings,
+    PrepareOutputs, PrepareSettings, TaxonomyFiles, PyrodigalSettings
 )
 from .utils.check import (
     check_db_file, check_diamond, check_file, check_folder, check_integer, check_number,
     check_output_prefix, check_outputs, check_pyrodigal,
 )
-from .utils.errors import InputError, ValErrorCollector
+from .utils.errors import ExternalToolError, InputError, ValErrorCollector
 
 log = logging.getLogger("CAT_pack")
 
@@ -32,8 +35,9 @@ def validate_classification(range_, fraction) -> ClassificationSettings:
     checks = ValErrorCollector()
     range_ = checks.check(check_number, range_, "Range", 0, 100)
     fraction = checks.check(check_number, fraction, "Fraction", 0, Decimal("0.99"))
+    pyrodigal = PyrodigalSettings()
     checks.finish()
-    return ClassificationSettings(range_, fraction)
+    return ClassificationSettings(range_, fraction, pyrodigal)
 
 
 def validate_taxonomy(names: Path, nodes: Path) -> TaxonomyFiles:
@@ -113,25 +117,50 @@ def get_file_names(args: PrepareOptions) -> PrepareOutputs:
     )
 
 
-def validate_prepare(args: PrepareOptions) -> PrepareSettings:
+def validate_prepare(args: PrepareOptions, files: PrepareOutputs | None = None) -> PrepareSettings:
     args = make_prefix(args)
     checks = ValErrorCollector()
     execution = checks.check(validate_execution, args)
     db_fasta = checks.check(check_file, args.db_fasta, "Database FASTA")
     taxonomy = checks.check(validate_taxonomy, args.names, args.nodes)
     acc2tax = checks.check(check_file, args.acc2tax, "Accession-to-taxid file")
-    files = get_file_names(args)
+    files = files or get_file_names(args)
+    threads = checks.check(check_integer, args.threads, "Threads", 1, sys.maxsize)
+    if not files.prefix or files.prefix in {".", ".."} or any(c in files.prefix for c in '/\\:'):
+        checks.add(InputError("The prefix contains directory separators",
+                              hint="The prefix must be a filename without directory separators."))
+    if files.data_folder.exists() and not files.data_folder.is_dir():
+        checks.add(InputError("Database output location must be a directory.", path=files.data_folder))
+    for output in (files.names, files.nodes, files.log_file, files.diamond_database,
+                   files.mmseqs2_database, files.fastaid2LCAtaxid,
+                   files.taxids_with_multiple_offspring):
+        if output.exists() and not output.is_file():
+            checks.add(InputError("Expected a file at the output location.", path=output))
 
     diamond = None
     if not files.diamond_database.is_file():
         diamond = checks.check(check_diamond, args.path_to_diamond)
 
+    # Keeps mmseq2 use optional
+    mmseqs = None
+    if args.build_mmseqs2 and not files.mmseqs2_database.is_file():
+        command = str(args.path_to_mmseqs.resolve()) if args.path_to_mmseqs else "mmseqs"
+        found = shutil.which(command)
+        if found is None:
+            checks.add(ExternalToolError("MMseqs2", "was not found", hint="Supply --path-to-mmseqs."))
+        else:
+            mmseqs = Path(found)
+
     checks.finish()
     return PrepareSettings(
-        threads=execution.threads, quiet=execution.quiet,
+        threads=threads, quiet=execution.quiet,
         verbose=execution.verbose, debug=execution.debug,
         files=files, db_fasta=db_fasta, names=taxonomy.names,
-        nodes=taxonomy.nodes, acc2tax=acc2tax, diamond=diamond, cleanup=args.cleanup,
+        nodes=taxonomy.nodes, acc2tax=acc2tax,
+        diamond=(DiamondPrepareSettings(diamond, db_fasta, files.diamond_database,
+                                       threads, execution.verbose) if diamond is not None else None),
+        mmseqs=(MMseqsPrepareSettings(mmseqs, db_fasta, files.mmseqs2_database,
+                                     threads, execution.verbose) if mmseqs is not None else None),
     )
 
 
@@ -140,7 +169,7 @@ def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | Non
 
     is_bat = isinstance(args, BatOptions)
     bins = checks.check(BinParser(args.bins, args.bin_suffix).parse) if is_bat else None
-    contigs = (Path(f"{args.output_prefix}.concatenated.fasta") if is_bat
+    contigs = (None if is_bat
                else checks.check(check_file, args.contigs, "Contigs file"))
 
     proteins = None
@@ -164,17 +193,15 @@ def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | Non
     prefix = args.output_prefix
     checks.check(check_output_prefix, prefix)
     orf_report = Path(f"{prefix}.ORF2LCA.txt")
-    contig_report = Path(f"{prefix}.{'bin' if is_bat else 'contig'}2classification.txt")
+    report = Path(f"{prefix}.{'bin' if is_bat else 'contig'}2classification.txt")
 
-    outputs = [orf_report, contig_report]
+    outputs = [orf_report, report]
     proteins_gff = None
     intermediate_prefix = f"{prefix}.concatenated" if is_bat else str(prefix)
     if args.proteins is None:
         proteins = Path(f"{intermediate_prefix}.predicted_proteins.faa")
         proteins_gff = Path(f"{intermediate_prefix}.predicted_proteins.gff")
         outputs.extend((proteins, proteins_gff))
-        if is_bat:
-            outputs.append(contigs)
     if args.alignment is None:
         suffix = ".gz" if args.compress else ""
         alignment = Path(f"{intermediate_prefix}.alignment.{aligner or args.aligner}{suffix}")
@@ -184,15 +211,15 @@ def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | Non
 
     checks.finish()
 
-    report_fields = (dict(bin_report=contig_report, bin2contigs=bins.bin2contigs, bin_paths=bins.bin_paths)
-                     if is_bat else dict(contig_report=contig_report))
+    report_fields = (dict(bin2contigs=bins.bin2contigs, bin_paths=bins.bin_paths)
+                     if is_bat else dict(contigs=contigs))
     files_type = BatFiles if is_bat else CatFiles
     return files_type(
-        contigs=contigs, proteins_fasta=proteins, proteins_gff=proteins_gff,
+        proteins_fasta=proteins, proteins_gff=proteins_gff,
         alignment=alignment, fastaid2LCA=database.fastaid2LCA, branches=database.branches,
         names=database.names, nodes=database.nodes,
-        orf_report=orf_report, **report_fields,
-        diamond_database=database.diamond,
+        orf_report=orf_report, report=report,
+        **report_fields, diamond_database=database.diamond,
     )
 
 
@@ -233,7 +260,7 @@ def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
         return BatSettings(
             threads=execution.threads, quiet=execution.quiet,
             verbose=execution.verbose, debug=execution.debug,
-            files=files, aligner=aligner,
+            files=files, aligner=aligner, pyrodigal=classification.pyrodigal,
             range_=classification.range_, fraction=classification.fraction,
             log_file=args.log_path, no_stars=args.no_stars,
         )
@@ -241,7 +268,7 @@ def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
         return CatSettings(
             threads=execution.threads, quiet=execution.quiet,
             verbose=execution.verbose, debug=execution.debug,
-            files=files, aligner=aligner,
+            files=files, aligner=aligner, pyrodigal=classification.pyrodigal,
             range_=classification.range_, fraction=classification.fraction,
             log_file=args.log_path #TODO: Add no stars compatibility
         )

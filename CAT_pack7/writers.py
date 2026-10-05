@@ -1,22 +1,8 @@
 """Write the shared CAT/BAT classification report format."""
-import logging
 from decimal import Decimal
-from pathlib import Path
-from typing import Iterable, TextIO
+from typing import TextIO
 
-from .parsers import FastaRecord
 from .results import ClassificationResult, Lineage, ORFClassification, ORFStatus
-
-
-class FastaWriter:
-    def __init__(self, path: Path) -> None:
-        self.path = path
-
-    def write(self, records: Iterable[FastaRecord]) -> None:
-        logging.getLogger("CAT_pack").info(f"Writing {self.path}.")
-        with self.path.open("w", encoding="utf-8") as output:
-            for record in records:
-                output.write(f">{record.name}\n{record.sequence}\n")
 
 
 class ClassificationWriter:

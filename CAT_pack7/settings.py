@@ -18,10 +18,18 @@ class ExecutionSettings:
     debug: bool
 
 
+# @Bastiaan know any better descriptive variable names?
+@dataclass(frozen=True)
+class PyrodigalSettings:
+    max_n_contigs_p_batch: int = 1000
+    max_n_bases_p_batch: int = 5000000
+
+
 @dataclass(frozen=True)
 class ClassificationSettings:
     range_: Decimal
     fraction: Decimal
+    pyrodigal: PyrodigalSettings
 
 
 @dataclass(frozen=True)
@@ -88,7 +96,7 @@ class MMseqsSettings:
 
 @dataclass(frozen=True)
 class AnnotationFiles:
-    contigs: Path
+    report: Path
     proteins_fasta: Path
     proteins_gff: Path | None
     alignment: Path
@@ -102,12 +110,11 @@ class AnnotationFiles:
 
 @dataclass(frozen=True)
 class CatFiles(AnnotationFiles):
-    contig_report: Path
+    contigs: Path
 
 
 @dataclass(frozen=True)
 class BatFiles(AnnotationFiles):
-    bin_report: Path
     bin2contigs: dict[str, list[str]]
     bin_paths: tuple[Path, ...]
 
@@ -129,6 +136,46 @@ class BatSettings(ExecutionSettings, ClassificationSettings):
 
 # Database preparation settings and outputs.
 @dataclass(frozen=True)
+class DiamondPrepareSettings:
+    diamond: Path
+    db_fasta: Path
+    database: Path
+    threads: int
+    verbose: bool
+
+    def get_command(self) -> list[str]:
+        command = [
+            str(self.diamond), "makedb",
+            "--in", str(self.db_fasta.resolve()),
+            "-d", str(self.database.with_suffix("").resolve()),
+            "-p", str(self.threads),
+        ]
+        if not self.verbose:
+            command.append("--quiet")
+        return command
+
+
+@dataclass(frozen=True)
+class MMseqsPrepareSettings:
+    mmseqs: Path
+    db_fasta: Path
+    database: Path
+    threads: int
+    verbose: bool
+
+    def get_command(self) -> list[str]:
+        command = [
+            str(self.mmseqs), "createdb",
+            str(self.db_fasta.resolve()), str(self.database.resolve()),
+            "--threads", str(self.threads),
+            "--compressed", "1",
+        ]
+        if not self.verbose:
+            command.extend(["-v", "0"])
+        return command
+
+
+@dataclass(frozen=True)
 class PrepareOutputs:
     prefix: str
     data_folder: Path
@@ -148,5 +195,5 @@ class PrepareSettings(ExecutionSettings):
     names: Path
     nodes: Path
     acc2tax: Path
-    diamond: Path | None
-    cleanup: bool
+    diamond: DiamondPrepareSettings | None
+    mmseqs: MMseqsPrepareSettings | None = None
