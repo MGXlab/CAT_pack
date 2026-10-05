@@ -16,7 +16,7 @@ from typer import Option
 from typer_di import Depends, TyperDI
 
 from .options import BatOptions, CatOptions, ExecutionOptions, DiamondOptions, MMseqsOptions, PrepareOptions
-from .pipeline import run_bat, run_cat, build_plan, Status, run_prepare
+from .pipeline import run_annotation, build_plan, Status, run_prepare
 from .utils.errors import CatError, show_error
 from .utils.logging import init_logging
 from .validation import get_file_names, make_prefix
@@ -552,7 +552,7 @@ def run_annotation_cli(arguments: CatOptions | BatOptions):
     report = partial(update_progress, progress, tasks)
     try:
         with progress:
-            outputs = (run_bat if is_bat else run_cat)(arguments, report)
+            outputs = run_annotation(arguments, report)
     except KeyboardInterrupt:
         console.print("\nRun cancelled :(")
         raise typer.Exit(code=130)
@@ -565,7 +565,7 @@ def run_annotation_cli(arguments: CatOptions | BatOptions):
         log.exception("Unexpected error", exc_info=False)
         log.error("Check the run log or use --debug for a full traceback")
         if arguments.debug:
-            console.print_exception(show_locals=False) # TODO: before release back to False
+            console.print_exception(show_locals=True) # TODO: before release back to False
         raise typer.Exit(code=1)
 
 

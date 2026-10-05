@@ -59,18 +59,8 @@ def build_plan(args: CatOptions | BatOptions | PrepareOptions, files=None) -> li
         ]
     raise CatError("I haven't figured out how to build that specific plan")
 
-
-def run_cat(args: CatOptions, report: Report) -> dict[str, Path]:
-    """Contig annotation tool (CAT) run"""
-    return _run_annotation(args, report)
-
-
-def run_bat(args: BatOptions, report: Report) -> dict[str, Path]:
-    """Run Bin Annotation Tool (BAT) run"""
-    return _run_annotation(args, report)
-
-
-def _run_annotation(args: CatOptions | BatOptions, report: Report) -> dict[str, Path]:
+def run_annotation(args: CatOptions | BatOptions, report: Report) -> dict[str, Path]:
+    """Bin/Contig annotation tool (BAT/CAT) run"""
     is_bat = isinstance(args, BatOptions)
 
     plan = build_plan(args)
