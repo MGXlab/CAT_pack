@@ -52,6 +52,7 @@ def make_progress(stages, unit=None):
         TimeElapsedColumn(),
         ProcessingSpeedColumn(),
         console=console,
+        refresh_per_second=1
     )
 
     tasks = {
