@@ -87,7 +87,7 @@ class MMseqsSettings:
 
 
 @dataclass(frozen=True)
-class CatFiles:
+class AnnotationFiles:
     contigs: Path
     proteins_fasta: Path
     proteins_gff: Path | None
@@ -97,8 +97,19 @@ class CatFiles:
     names: Path
     nodes: Path
     orf_report: Path
-    contig_report: Path
     diamond_database: Path | None
+
+
+@dataclass(frozen=True)
+class CatFiles(AnnotationFiles):
+    contig_report: Path
+
+
+@dataclass(frozen=True)
+class BatFiles(AnnotationFiles):
+    bin_report: Path
+    bin2contigs: dict[str, list[str]]
+    bin_paths: tuple[Path, ...]
 
 
 @dataclass(frozen=True)
@@ -106,6 +117,14 @@ class CatSettings(ExecutionSettings, ClassificationSettings):
     files: CatFiles
     aligner: DiamondSettings | None
     log_file: Path
+
+
+@dataclass(frozen=True)
+class BatSettings(ExecutionSettings, ClassificationSettings):
+    files: BatFiles
+    aligner: DiamondSettings | None
+    log_file: Path
+    no_stars: bool
 
 
 # Database preparation settings and outputs.
