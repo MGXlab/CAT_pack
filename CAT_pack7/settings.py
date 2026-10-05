@@ -18,10 +18,18 @@ class ExecutionSettings:
     debug: bool
 
 
+# @Bastiaan know any better descriptive variable names?
+@dataclass(frozen=True)
+class PyrodigalSettings:
+    max_n_contigs_p_batch: int = 1000
+    max_n_bases_p_batch: int = 5000000
+
+
 @dataclass(frozen=True)
 class ClassificationSettings:
     range_: Decimal
     fraction: Decimal
+    pyrodigal: PyrodigalSettings
 
 
 @dataclass(frozen=True)
