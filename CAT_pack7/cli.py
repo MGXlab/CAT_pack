@@ -539,16 +539,19 @@ def run_annotation_cli(arguments: CatOptions | BatOptions):
     log.info(f"{arguments!r}")
 
     # print the group in a panel
-    console.print(Panel(content, title="[bold]Rarw![/bold]",
-                        border_style="blue",), "\n")
+    if not arguments.quiet:
+        console.print(Panel(content, title="[bold]Rarw![/bold]",
+                            border_style="blue",), "\n")
 
 
-    console.print(f"Preparing for {tool} run\n\n")
+    if not arguments.quiet:
+        console.print(f"Preparing for {tool} run\n\n")
     log.info(f"Preparing for {tool} run")
     progress, tasks = make_progress(
         [step.name for step in build_plan(arguments)],
         unit="bins" if is_bat else "contigs",
     )
+    progress.disable = arguments.quiet
     report = partial(update_progress, progress, tasks)
     try:
         with progress:
@@ -571,10 +574,39 @@ def run_annotation_cli(arguments: CatOptions | BatOptions):
 
 
     else:
-        log.info(f"{tool} ran successful!!")
-        results = Table(title=f"{tool} completed")
+        log.info(f"{tool} ran successfully!")
+        if arguments.quiet:
+            return
+
+        n_classified, total, entity_type, fraction = outputs["Results"]
+        percent = n_classified / total * 100 if total else 0.0
+        summary = Text(
+            f"{n_classified:,} of {total:,} {entity_type}s "
+            f"({percent:.2f}%) have taxonomy assigned.",
+            style="bold green",
+        )
+        results = Table(box=None, padding=(0, 2), expand=True)
         results.add_column("Result", style="green")
-        results.add_column("Location")
+        results.add_column("Location", overflow="fold")
         for label, path in outputs.items():
-            results.add_row(label, Text(str(path)))
-        console.print(results)
+            if isinstance(path, Path):
+                results.add_row(Text(label), Text(str(path)))
+
+        content = [summary]
+        if fraction < Decimal("0.5"):
+            content.append(Text(
+                f"Since fraction is set to smaller than 0.5, one {entity_type} "
+                f"may have multiple classifications.",
+                style="yellow",
+            ))
+        content.extend([Text("Results are saved at:"), results])
+        citation_notes = [step.citation for step in outputs["Steps"] if step.citation]
+        if citation_notes:
+            content.extend([Text(""), Text("Citation notes", style="bold cyan")])
+            content.extend(Text(note) for note in citation_notes)
+
+        console.print(Panel(
+            Group(*content),
+            title=f"{tool} completed",
+            border_style="green",
+        ))

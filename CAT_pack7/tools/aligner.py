@@ -9,10 +9,7 @@ log = logging.getLogger("CAT_pack")
 
 
 def run_diamond(diamond: DiamondSettings, report):
-    log.warning(
-        "Homology search with DIAMOND is starting. Please be patient. Do not "
-        "forget to cite DIAMOND when using CAT or BAT in your publication.\n"
-    )
+    log.info("Homology search with DIAMOND is starting. Please be patient.")
 
     if not diamond.tmpdir.is_dir():
         log.info(f"making tmp dir: {diamond.tmpdir}")
