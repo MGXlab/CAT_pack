@@ -12,7 +12,7 @@ from .prepare import (
     make_fastaid2LCAtaxid_file, make_mmseqs2_database,
     write_taxids_with_multiple_offspring_file,
 )
-from .settings import BatFiles, BatSettings, CatFiles, CatSettings
+from .settings import BatFiles, BatSettings, CatFiles, CatSettings, DiamondSettings
 from .tools.aligner import run_aligner
 from .tools.pyrodigal import run_protein_prediction
 from .utils.errors import CatError
@@ -30,7 +30,7 @@ class Step:
 
     name: str
     supplied: bool = False
-    citation_message: bool = False
+    citation: str | None = None
 
 
     def __str__(self) -> str:
@@ -53,17 +53,23 @@ def build_plan(args: CatOptions | BatOptions | PrepareOptions, files=None) -> li
     if isinstance(args, (CatOptions, BatOptions)):
         return [
             Step("Input validation"),
-            Step("Protein prediction", supplied=args.proteins is not None),
+            Step(
+                "Protein prediction", supplied=args.proteins is not None,
+                citation="Please cite Pyrodigal and Prodigal when using CAT or BAT in your publication.",
+            ),
             Step("Alignment", supplied=args.alignment is not None),
             Step("Classify"),
         ]
     raise CatError("I haven't figured out how to build that specific plan")
 
-def run_annotation(args: CatOptions | BatOptions, report: Report) -> dict[str, Path]:
+def run_annotation(
+    args: CatOptions | BatOptions, report: Report,
+) -> dict[str, Path | tuple[int, int, str, Decimal] | list[Step]]:
     """Bin/Contig annotation tool (BAT/CAT) run"""
     is_bat = isinstance(args, BatOptions)
 
     plan = build_plan(args)
+    completed_steps: list[Step] = []
     step_index = 0
     current_step = plan[step_index]
     log = logging.getLogger("CAT_pack")
@@ -79,6 +85,7 @@ def run_annotation(args: CatOptions | BatOptions, report: Report) -> dict[str, P
         settings = get_validated_settings(args)
         report(current_step.name, Status.COMPLETE, 1, 1)
         log.info(f"Completed: {current_step.name}")
+        completed_steps.append(current_step)
         if is_bat:
             log.info("Ready to fly!\n\n-----------------\n")
 
@@ -94,8 +101,12 @@ def run_annotation(args: CatOptions | BatOptions, report: Report) -> dict[str, P
                 run_protein_prediction(settings, report, "pyrodigal")
             elif current_step.name == "Alignment":
                 run_aligner(settings.aligner, report)
+                if isinstance(settings.aligner, DiamondSettings):
+                    current_step.citation = (
+                        "Please cite DIAMOND when using CAT or BAT in your publication."
+                    )
             elif current_step.name == "Classify":
-                run_classification(settings, settings.files, report)
+                results = run_classification(settings, settings.files, report)
             else:
                 log.error(f"Can't spell that well, my misspelling:"
                           f"{current_step.name}")
@@ -105,8 +116,11 @@ def run_annotation(args: CatOptions | BatOptions, report: Report) -> dict[str, P
             # an exception.
             report(current_step.name, Status.COMPLETE, 1, 1)
             log.info(f"Completed: {current_step.name}")
+            completed_steps.append(current_step)
 
         return {
+            "Results": results,
+            "Steps": completed_steps,
             f"{'Bin' if is_bat else 'Contig'} Classifications": settings.files.report,
             "ORF classifications": settings.files.orf_report,
             "Log": settings.log_file,
@@ -139,7 +153,7 @@ def run_classification(
     settings: CatSettings | BatSettings,
     files: CatFiles | BatFiles,
     report: Report,
-) -> None:
+) -> tuple[int, int, str, Decimal]:
     """Load and validate inputs, then classify and write the results."""
     log = logging.getLogger("CAT_pack")
     inputs = ClassificationParser(files, settings.range_).parse()
@@ -184,6 +198,7 @@ def run_classification(
                 n_classified += 1
             report("Classify", Status.RUNNING, index, total)
     classification_summary(n_classified, total, inputs.entity_type, settings.fraction)
+    return n_classified, total, inputs.entity_type, settings.fraction
 
 
 def classification_summary(
