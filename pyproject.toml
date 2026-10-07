@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "CAT-pack"
+version = "7.0.0.alpha"
+description = "CAT, BAT, RAT package"
+requires-python = ">=3.10"
+dependencies = ["typer", "rich", "pyrodigal"]
+
+[project.scripts]
+cat_pack7 = "CAT_pack7.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["CAT_pack7", "CAT_pack7.*"]
+namespaces = true
