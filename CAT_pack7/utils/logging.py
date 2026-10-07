@@ -38,9 +38,9 @@ def add_handler(
     logger: logging.Logger, log_file: Path, debug: bool = False,
 ) -> logging.FileHandler:
     handler = logging.FileHandler(log_file, mode="a", encoding="utf-8")
-    handler.setLevel(logging.DEBUG if debug else logging.INFO)
+    handler.setLevel(logging.NOTSET if debug else logging.INFO)
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s\t%(message)s"))
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
     logger.addHandler(handler)
     return handler
 
