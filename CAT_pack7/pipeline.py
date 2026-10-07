@@ -6,21 +6,22 @@ from pathlib import Path
 
 from . import tax
 from .classification import ClassificationEngine
-from .options import BatOptions, CatOptions, PrepareOptions
-from .parsers import ClassificationParser
+from .config.options import BatOptions, CatOptions, PrepareOptions
+from .config.settings import BatFiles, BatSettings, CatFiles, CatSettings, DiamondSettings
+from .config.validation import check_orfs_match_contigs, get_file_names, get_validated_settings, make_prefix, \
+    validate_prepare
+from .io.parsers import ClassificationParser
+from .io.writers import ClassificationWriter
 from .prepare import (
     copy_taxonomy, find_offspring, make_diamond_database,
     make_fastaid2LCAtaxid_file, make_mmseqs2_database,
     write_taxids_with_multiple_offspring_file,
 )
-from .settings import BatFiles, BatSettings, CatFiles, CatSettings, DiamondSettings
 from .tools.aligner import run_aligner
 from .tools.pyrodigal import run_protein_prediction
 from .utils.errors import CatError
 from .utils.locking import lock_outputs
 from .utils.logging import Status, Report, file_logging
-from .validation import check_orfs_match_contigs, get_file_names, get_validated_settings, make_prefix, validate_prepare
-from .writers import ClassificationWriter
 
 
 @dataclass()

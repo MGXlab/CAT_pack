@@ -2,7 +2,7 @@
 from decimal import Decimal
 from typing import TextIO
 
-from .results import ClassificationResult, Lineage, ORFClassification, ORFStatus
+from ..results import ClassificationResult, Lineage, ORFClassification, ORFStatus
 
 
 class ClassificationWriter:

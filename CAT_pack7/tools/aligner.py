@@ -3,7 +3,7 @@ import logging
 import shutil
 
 from .tool_runner import run_tool
-from ..settings import DiamondSettings, MMseqsSettings
+from ..config.settings import DiamondSettings, MMseqsSettings
 
 log = logging.getLogger("CAT_pack")
 

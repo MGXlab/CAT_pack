@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import importlib
+import os
 import shutil
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -25,6 +26,11 @@ def check_file(path: Path, label: str) -> Path:
             path=path,
         )
     return path
+
+def check_fasta_file(path: Path, label: str) -> Path:
+    path = check_file(path, label)
+    # check if fasta file is empty
+    os.lockf(path)
 
 
 def check_db_file(folder: Path, suffix: str, label: str) -> Path:

@@ -7,17 +7,17 @@ from decimal import Decimal
 from pathlib import Path
 
 from .options import AlignerName, BatOptions, CatOptions, ExecutionOptions, DiamondOptions, PrepareOptions
-from .parsers import BinParser
 from .settings import (
     BatFiles, BatSettings, CatFiles, CatSettings, ClassificationSettings, DatabaseFiles, DiamondParameters,
     DiamondPrepareSettings, DiamondSettings, ExecutionSettings, MMseqsPrepareSettings,
     PrepareOutputs, PrepareSettings, TaxonomyFiles, PyrodigalSettings
 )
-from .utils.check import (
+from ..io.parsers import BinParser
+from ..utils.check import (
     check_db_file, check_diamond, check_file, check_folder, check_integer, check_number,
     check_output_prefix, check_outputs, check_pyrodigal,
 )
-from .utils.errors import ExternalToolError, InputError, ValErrorCollector
+from ..utils.errors import ExternalToolError, InputError, ValErrorCollector
 
 log = logging.getLogger("CAT_pack")
 
