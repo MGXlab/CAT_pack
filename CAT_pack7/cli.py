@@ -509,7 +509,7 @@ def bat(
 
 def run_annotation_cli(arguments: CatOptions | BatOptions):
     log = init_logging(arguments.debug, quiet=arguments.quiet,
-                       log_file=arguments.log_path, console=console)
+                       console=console)
     log.info("Loaded all arguments")
 
     info = Table.grid(padding=(0, 2))
