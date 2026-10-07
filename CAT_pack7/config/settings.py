@@ -22,7 +22,7 @@ class ExecutionSettings:
 @dataclass(frozen=True)
 class PyrodigalSettings:
     max_n_contigs_p_batch: int = 1000
-    max_n_bases_p_batch: int = 5000000
+    max_n_bases_p_batch: int = 5_000_000
 
 
 @dataclass(frozen=True)
