@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
+import bz2
+import gzip
 import importlib
-import os
 import shutil
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -29,9 +30,14 @@ def check_file(path: Path, label: str) -> Path:
 
 def check_fasta_file(path: Path, label: str) -> Path:
     path = check_file(path, label)
-    # check if fasta file is empty
-    os.lockf(path)
-
+    opener = gzip.open if path.suffix == ".gz" else bz2.open if path.suffix == ".bz2" else open
+    with opener(path, "rb") as fasta_file:
+        first_character = fasta_file.read(1)
+    if not first_character:
+        raise InputError(f"{label} is empty.", path=path)
+    if first_character != b">":
+        raise InputError(f"{label} must start with a FASTA header (>).", path=path)
+    return path
 
 def check_db_file(folder: Path, suffix: str, label: str) -> Path:
     matches = sorted(

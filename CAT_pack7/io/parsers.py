@@ -9,7 +9,6 @@ from typing import Iterator
 
 from .. import tax
 from ..config.settings import BatFiles, CatFiles
-from ..utils.check import check_file
 from ..utils.errors import InputError
 
 log = logging.getLogger("CAT_pack")
@@ -32,7 +31,8 @@ class FastaParser:
         # https://github.com/idptools/sparrow/blob/03aa232abcbe191d96daf55ee28e1f7881979a68/sparrow/sequence_analysis/plaac/plaac.py#L318-L350
         record_name = None
         sequence_lines: list[str] = []
-        with self.path.open(encoding="utf-8") as source:
+        opener = gzip.open if self.path.suffix == ".gz" else bz2.open if self.path.suffix == ".bz2" else open
+        with opener(self.path, "rt", encoding="utf-8") as source:
             for line in source:
                 line = line.strip()
                 if not line:
@@ -50,7 +50,8 @@ class FastaParser:
             yield FastaRecord(record_name, "".join(sequence_lines))
 
     def iter_headers(self) -> Iterator[str]:
-        with self.path.open(encoding="utf-8") as source:
+        opener = gzip.open if self.path.suffix == ".gz" else bz2.open if self.path.suffix == ".bz2" else open
+        with opener(self.path, "rt", encoding="utf-8") as source:
             for line in source:
                 line = line.strip()
                 if line.startswith(">"):
@@ -106,8 +107,8 @@ class BinParser:
         self.path = path
         self.suffix = suffix
 
-    def parse(self) -> BinInput:
-        paths = self._find_bin_paths()
+    def parse(self, paths=None) -> BinInput:
+        paths = self.find_bin_paths() if paths is None else paths
         bin2contigs: dict[str, list[str]] = {}
         contig2bin: dict[str, str] = {}
 
@@ -136,9 +137,9 @@ class BinParser:
             log.info(f"{len(paths):,d} bins found!")
         return BinInput(bin2contigs=bin2contigs, bin_paths=paths)
 
-    def _find_bin_paths(self) -> tuple[Path, ...]:
+    def find_bin_paths(self) -> tuple[Path, ...]:
         if not self.path.is_dir():
-            return (check_file(self.path, "Bin fasta"),)
+            return (self.path,)
 
         log.info(f"Importing bins from {self.path}.")
         paths = []
@@ -147,7 +148,7 @@ class BinParser:
                 continue
             if path.name.startswith(".") or ".concatenated." in path.name:
                 continue
-            if path.name.endswith(self.suffix):
+            if path.name.endswith((self.suffix, f"{self.suffix}.gz", f"{self.suffix}.bz2")):
                 paths.append(path)
 
         if not paths:
