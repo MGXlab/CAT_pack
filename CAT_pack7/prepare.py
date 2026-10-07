@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import TextIO
 
 from . import tax
-from .settings import PrepareSettings
+from .config.settings import PrepareSettings
 from .tools.tool_runner import run_tool
 from .utils.errors import InputError
 from .utils.logging import Report, Status

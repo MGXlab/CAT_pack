@@ -3,8 +3,8 @@ import multiprocessing
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from ..parsers import FastaParser
-from ..settings import BatFiles
+from ..config.settings import BatFiles
+from ..io.parsers import FastaParser
 from ..utils.logging import Status
 
 log = logging.getLogger("CAT_pack")

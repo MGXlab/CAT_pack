@@ -6,10 +6,10 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Iterator
 
-from . import tax
-from .settings import BatFiles, CatFiles
-from .utils.check import check_file
-from .utils.errors import InputError
+from .. import tax
+from ..config.settings import BatFiles, CatFiles
+from ..utils.check import check_file
+from ..utils.errors import InputError
 
 log = logging.getLogger("CAT_pack")
 

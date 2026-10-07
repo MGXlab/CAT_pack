@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from CAT_pack7.options import CatOptions
+from CAT_pack7.config.options import CatOptions
 from CAT_pack7.pipeline import run_annotation
 from CAT_pack7.utils.errors import InputError
 from CAT_pack7.utils.locking import lock_outputs
