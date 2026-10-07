@@ -122,7 +122,7 @@ def prepare(
         nodes_dmp: Annotated[Path, Option("--nodes",
                                           help="Nodes.dmp", metavar="<FILE>")],
         acc2tax: Annotated[Path, Option("--acc2tax", help="Accession2taxid.txt file. Can be gzipped.",
-                                        metavar="<FILE[.gz]>")],
+                                        metavar="<FILE[.gz|.bz2]>")],
         # Added --database here but kept db_dir for now too
         db_dir: Annotated[Path,
             Option("--database", "--db_dir", "-d", help="Directory where CAT/BAT/RAT "
@@ -201,7 +201,7 @@ def cat(
         contigs: Annotated[
             Path,
             Option("--contigs", "-c" ,
-                   help="Input contig FASTA file", metavar="<file>")
+                   help="Input contig FASTA file", metavar="<FILE[.gz|.bz2]>")
         ],
         database: Annotated[
             Path,
@@ -303,7 +303,7 @@ def bat(
         bins: Annotated[
             Path,
             Option("--bin_fasta", "--bin_folder", "-b",
-                   help="Bin fasta file or directory containing bins.", metavar="<FILE|DIR>")
+                   help="Bin fasta file or directory containing bins.", metavar="<FILE[.gz|.bz2]|DIR>")
         ],
         database: Annotated[
             Path,
