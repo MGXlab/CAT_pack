@@ -1,4 +1,5 @@
 """input parsers"""
+import bz2
 import gzip
 import logging
 from dataclasses import dataclass
@@ -176,7 +177,7 @@ class AlignmentParser:
 
     def parse(self) -> AlignmentInput:
         log.info(f"Parsing alignment file {self.path}.")
-        opener = gzip.open if self.path.suffix == ".gz" else open
+        opener = gzip.open if self.path.suffix == ".gz" else bz2.open if self.path.suffix == ".bz2" else open
         orf2hits: dict[str, list[tuple[str, Decimal]]] = {}
         all_hits: set[str] = set()
         current_orf = None
