@@ -36,6 +36,13 @@ class MMseqsOptions:
     executable: Path | None = None
 
 
+@dataclass(frozen=True)
+class MemoryOptions:
+    low_memory: bool = False
+    high_memory: bool = False
+    available_memory: int | None = None
+
+
 @dataclass(frozen=True, kw_only=True)
 class AnnotationOptions(ExecutionOptions):
     database: Path
@@ -51,6 +58,7 @@ class AnnotationOptions(ExecutionOptions):
     top: int = 11
     tmpdir: Path | None = None
     compress: bool = False
+    memory: MemoryOptions = field(default_factory=MemoryOptions)
 
     @property
     def log_path(self) -> Path:

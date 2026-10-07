@@ -15,9 +15,10 @@ from rich.text import Text
 from typer import Option
 
 from .cli_options import (
-    DiamondPathOption, diamond_options, execution_options, mmseqs_options, with_option_groups,
+    DiamondPathOption, diamond_options, execution_options, mmseqs_options, memory_options, with_option_groups,
 )
-from .config.options import BatOptions, CatOptions, ExecutionOptions, DiamondOptions, MMseqsOptions, PrepareOptions
+from .config.options import BatOptions, CatOptions, ExecutionOptions, DiamondOptions, MMseqsOptions, PrepareOptions, \
+    MemoryOptions
 from .config.validation import get_file_names, make_prefix
 from .pipeline import run_annotation, build_plan, Status, run_prepare
 from .utils.errors import CatError, show_error
@@ -39,7 +40,7 @@ class StaticBarColumn(BarColumn):
 
 
 class ProcessingSpeedColumn(ProgressColumn):
-    def render(self, task):
+    def render(self, task) -> Text:
         unit = task.fields.get("unit")
         if not unit or not task.started:
             return Text("")
@@ -120,9 +121,6 @@ def prepare(
                                           help="Names.dmp", metavar="<FILE>")],
         nodes_dmp: Annotated[Path, Option("--nodes",
                                           help="Nodes.dmp", metavar="<FILE>")],
-        # https://github.com/soedinglab/MMseqs2/blob/master/src/MMseqsBase.cpp#L25-L26
-        # MMseqs2 does use this notation of metavar as well, should we look into
-        # using this as well?
         acc2tax: Annotated[Path, Option("--acc2tax", help="Accession2taxid.txt file. Can be gzipped.",
                                         metavar="<FILE[.gz]>")],
         # Added --database here but kept db_dir for now too
@@ -191,12 +189,13 @@ def prepare(
 
 
 
-
+@app.command("contig", hidden=True)
 @app.command()
 @with_option_groups(
     execution=execution_options,
     diamond=diamond_options,
     mmseqs=mmseqs_options,
+    memory=memory_options,
 )
 def cat(
         contigs: Annotated[
@@ -266,6 +265,7 @@ def cat(
         *, execution: ExecutionOptions,
         diamond: DiamondOptions,
         mmseqs: MMseqsOptions,
+        memory: MemoryOptions,
 ):
 
     arguments = CatOptions(
@@ -280,6 +280,7 @@ def cat(
         aligner=aligner,
         diamond=diamond,
         mmseqs=mmseqs,
+        memory=memory,
         top=top,
         tmpdir=tmpdir,
         compress=compress,
@@ -291,13 +292,12 @@ def cat(
 
     run_annotation_cli(arguments)
 
-# @bastiaan and @tina, something I found on stackoverflow, for a bit of backwards
-# compatibility, we can still let users call CAT_pack bins [OPTIONS] but hide
-# it from the --help interface. Yay or Nay?
+
 @app.command("bins", hidden=True)
 @app.command()
 @with_option_groups(
     execution=execution_options, diamond=diamond_options, mmseqs=mmseqs_options,
+    memory=memory_options,
 )
 def bat(
         bins: Annotated[
@@ -375,6 +375,7 @@ def bat(
         *, execution: ExecutionOptions,
         diamond: DiamondOptions,
         mmseqs: MMseqsOptions,
+        memory: MemoryOptions,
 ):
     """Run Bin Annotation Tool (BAT)."""
     arguments = BatOptions(
@@ -391,6 +392,7 @@ def bat(
         aligner=aligner,
         diamond=diamond,
         mmseqs=mmseqs,
+        memory=memory,
         top=top,
         tmpdir=tmpdir,
         compress=compress,
