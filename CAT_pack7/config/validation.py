@@ -6,11 +6,12 @@ from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
-from .options import AlignerName, BatOptions, CatOptions, ExecutionOptions, DiamondOptions, PrepareOptions
+from .options import AlignerName, BatOptions, CatOptions, ExecutionOptions, DiamondOptions, PrepareOptions, \
+    MemoryOptions
 from .settings import (
     BatFiles, BatSettings, CatFiles, CatSettings, ClassificationSettings, DatabaseFiles, DiamondParameters,
     DiamondPrepareSettings, DiamondSettings, ExecutionSettings, MMseqsPrepareSettings,
-    PrepareOutputs, PrepareSettings, TaxonomyFiles, PyrodigalSettings
+    PrepareOutputs, PrepareSettings, TaxonomyFiles, MemorySettings
 )
 from ..io.parsers import BinParser
 from ..utils.check import (
@@ -18,6 +19,7 @@ from ..utils.check import (
     check_output_prefix, check_outputs, check_pyrodigal,
 )
 from ..utils.errors import ExternalToolError, InputError, ValErrorCollector
+from ..utils.memory import GIB
 
 log = logging.getLogger("CAT_pack")
 
@@ -28,16 +30,32 @@ DIAMOND_MODES = {
 
 
 def validate_execution(options: ExecutionOptions) -> ExecutionSettings:
-    return ExecutionSettings(options.threads, options.quiet, options.verbose, options.debug)
+    memory = validate_memory(options.memory) if isinstance(options, (CatOptions, BatOptions)) else MemorySettings()
+    if memory.available_memory_bytes is not None:
+        log.info(f"[red]Memory mode[/red]: custom ({memory.available_memory_bytes / GIB:g} GiB)")
+    elif memory.low_memory:
+        log.info("Memory mode: low")
+    else:
+        log.info("[red]Memory mode[/red]: automatic")
+    return ExecutionSettings(options.threads, options.quiet, options.verbose, options.debug, memory=memory)
 
 
 def validate_classification(range_, fraction) -> ClassificationSettings:
     checks = ValErrorCollector()
     range_ = checks.check(check_number, range_, "Range", 0, 100)
     fraction = checks.check(check_number, fraction, "Fraction", 0, Decimal("0.99"))
-    pyrodigal = PyrodigalSettings()
     checks.finish()
-    return ClassificationSettings(range_, fraction, pyrodigal)
+    return ClassificationSettings(range_, fraction)
+
+
+def validate_memory(options: MemoryOptions) -> MemorySettings:
+    if sum((options.low_memory, options.high_memory, options.available_memory is not None)) > 1:
+        raise InputError("Woah, too many memories",
+                         hint="Choose only one of --low-memory, --high-memory, --available-memory.")
+    budget = None
+    if options.available_memory is not None:
+        budget = check_integer(options.available_memory, "Available memory (GiB)", 1, sys.maxsize) * GIB
+    return MemorySettings(low_memory=options.low_memory, available_memory_bytes=budget)
 
 
 def validate_taxonomy(names: Path, nodes: Path) -> TaxonomyFiles:
@@ -260,7 +278,8 @@ def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
         return BatSettings(
             threads=execution.threads, quiet=execution.quiet,
             verbose=execution.verbose, debug=execution.debug,
-            files=files, aligner=aligner, pyrodigal=classification.pyrodigal,
+            files=files, aligner=aligner,
+            memory=execution.memory,
             range_=classification.range_, fraction=classification.fraction,
             log_file=args.log_path, no_stars=args.no_stars,
         )
@@ -268,7 +287,8 @@ def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
         return CatSettings(
             threads=execution.threads, quiet=execution.quiet,
             verbose=execution.verbose, debug=execution.debug,
-            files=files, aligner=aligner, pyrodigal=classification.pyrodigal,
+            files=files, aligner=aligner,
+            memory=execution.memory,
             range_=classification.range_, fraction=classification.fraction,
             log_file=args.log_path #TODO: Add no stars compatibility
         )

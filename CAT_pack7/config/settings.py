@@ -5,9 +5,22 @@ DO NOT SET END USER EDITABLE DEFAULTS HERE! only "internal defaults" are allowed
 Validation will set these objects after validation has been done. Therefore,
 settings.py will not import any validation methods or functions
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
+
+
+@dataclass(frozen=True)
+class MemorySettings:
+    low_memory: bool = False
+    available_memory_bytes: int | None = None
+
+
+@dataclass(frozen=True)
+class MemoryBudget:
+    total_bytes: int
+    workers: int
+    batch_bytes: int
 
 
 @dataclass(frozen=True)
@@ -16,20 +29,13 @@ class ExecutionSettings:
     quiet: bool
     verbose: bool
     debug: bool
-
-
-# @Bastiaan know any better descriptive variable names?
-@dataclass(frozen=True)
-class PyrodigalSettings:
-    max_n_contigs_p_batch: int = 1000
-    max_n_bases_p_batch: int = 5_000_000
+    memory: MemorySettings = field(default_factory=MemorySettings, kw_only=True)
 
 
 @dataclass(frozen=True)
 class ClassificationSettings:
     range_: Decimal
     fraction: Decimal
-    pyrodigal: PyrodigalSettings
 
 
 @dataclass(frozen=True)
