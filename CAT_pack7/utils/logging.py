@@ -1,7 +1,8 @@
 import logging
+from contextlib import contextmanager
 from enum import Enum
 from pathlib import Path
-from typing import Protocol
+from typing import Iterator, Protocol
 
 from rich.console import Console
 from rich.logging import RichHandler
@@ -33,6 +34,27 @@ class Report(Protocol):
                  total: int | None) -> None: ...
 
 
+def add_handler(
+    logger: logging.Logger, log_file: Path, debug: bool = False,
+) -> logging.FileHandler:
+    handler = logging.FileHandler(log_file, mode="a", encoding="utf-8")
+    handler.setLevel(logging.DEBUG if debug else logging.INFO)
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s\t%(message)s"))
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler)
+    return handler
+
+
+@contextmanager
+def file_logging(logger: logging.Logger, log_file: Path, debug: bool = False) -> Iterator[None]:
+    handler = add_handler(logger, log_file, debug)
+    try:
+        yield
+    finally:
+        logger.removeHandler(handler)
+        handler.close()
+
+
 def init_logging(debug: bool = False,quiet: bool = False,
                  log_file: Path | None = None,
                  console: Console | None = None) -> logging.Logger:
@@ -55,10 +77,7 @@ def init_logging(debug: bool = False,quiet: bool = False,
         logger.addHandler(rich_handler)
 
     if log_file is not None:
-        file_handler = logging.FileHandler(log_file, mode="a", encoding="utf-8")
-        file_handler.setLevel(logging.DEBUG if debug else logging.INFO)
-        file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s\t%(message)s"))
-        logger.addHandler(file_handler)
+        add_handler(logger, log_file, debug)
 
     return logger
 

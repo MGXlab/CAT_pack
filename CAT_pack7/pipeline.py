@@ -1,4 +1,5 @@
 import logging
+from contextlib import ExitStack
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -16,7 +17,8 @@ from .settings import BatFiles, BatSettings, CatFiles, CatSettings, DiamondSetti
 from .tools.aligner import run_aligner
 from .tools.pyrodigal import run_protein_prediction
 from .utils.errors import CatError
-from .utils.logging import Status, Report
+from .utils.locking import lock_outputs
+from .utils.logging import Status, Report, file_logging
 from .validation import check_orfs_match_contigs, get_file_names, get_validated_settings, make_prefix, validate_prepare
 from .writers import ClassificationWriter
 
@@ -73,13 +75,20 @@ def run_annotation(
     step_index = 0
     current_step = plan[step_index]
     log = logging.getLogger("CAT_pack")
-
-
-    planned_steps = ", ".join(step.name for step in plan[1:] if not step.supplied)
-    log.info(f"{'BAT' if is_bat else 'CAT'} is running. Planned steps: {planned_steps}.")
-    log.info("Doing some pre-flight checks first.")
+    locks = ExitStack()
 
     try:
+        locks.enter_context(lock_outputs([args.output_prefix, args.log_path]))
+        if args.alignment is None:
+            tmpdir = args.tmpdir if args.tmpdir is not None else args.output_prefix.parent / "tmp"
+            tmpdir.parent.mkdir(parents=True, exist_ok=True)
+            locks.enter_context(lock_outputs([tmpdir]))
+
+        locks.enter_context(file_logging(log, args.log_path, args.debug))
+
+        planned_steps = ", ".join(step.name for step in plan[1:] if not step.supplied)
+        log.info(f"{'BAT' if is_bat else 'CAT'} is running. Planned steps: {planned_steps}.")
+        log.info("Doing some pre-flight checks first.")
         report(current_step.name, Status.RUNNING, 0, 1)
         log.info(f"Starting: {current_step.name}")
         settings = get_validated_settings(args)
@@ -140,13 +149,17 @@ def run_annotation(
         for remaining_step in plan[step_index + 1:]:
             report(remaining_step.name, Status.SKIPPED, 0, None)
 
+        if isinstance(error, OSError):
+            error = CatError(str(error), path=args.output_prefix)
         if isinstance(error, CatError):
             error.step = current_step.name
             error.log_file = args.log_path if args.log_path.is_file() else None
-            raise
+            raise error
 
         # Catch all other exceptions
         raise
+    finally:
+        locks.close()
 
 
 def run_classification(
@@ -231,10 +244,13 @@ def run_prepare(args: PrepareOptions, report: Report):
     step_index = 0
     current_step = plan[step_index]
     log = logging.getLogger("CAT_pack")
-    handler = None
+    locks = ExitStack()
     taxid2parent = None
 
     try:
+        files.data_folder.parent.mkdir(parents=True, exist_ok=True)
+        locks.enter_context(lock_outputs([files.data_folder]))
+        plan = build_plan(args, files)
         for step_index, current_step in enumerate(plan):
             if current_step.name == "Make MMseqs2 database" and not args.build_mmseqs2:
                 report(current_step.name, Status.SKIPPED, 0, None)
@@ -250,10 +266,7 @@ def run_prepare(args: PrepareOptions, report: Report):
             if step_index == 0:
                 settings = validate_prepare(args, files)
                 files.data_folder.mkdir(parents=True, exist_ok=True)
-                handler = logging.FileHandler(files.log_file, encoding="utf-8")
-                handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s\t%(message)s"))
-                log.addHandler(handler)
-                log.setLevel(logging.INFO)
+                locks.enter_context(file_logging(log, files.log_file, args.debug))
                 copy_taxonomy(settings)
             elif current_step.name == "Make DIAMOND database":
                 make_diamond_database(settings)
@@ -299,6 +312,4 @@ def run_prepare(args: PrepareOptions, report: Report):
             raise error
         raise
     finally:
-        if handler is not None:
-            log.removeHandler(handler)
-            handler.close()
+        locks.close()
