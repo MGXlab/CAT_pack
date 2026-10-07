@@ -48,40 +48,47 @@ class FastaParser:
         if record_name is not None:
             yield FastaRecord(record_name, "".join(sequence_lines))
 
+    def iter_headers(self) -> Iterator[str]:
+        with self.path.open(encoding="utf-8") as source:
+            for line in source:
+                line = line.strip()
+                if line.startswith(">"):
+                    yield self._parse_header(line)
+
     def _parse_header(self, header: str) -> str:
-        fields = header[1:].split()
-        if not fields:
+        name = header[1:].split(" ", 1)[0]
+        if not name:
             raise InputError(
                 "Fasta header is empty",
                 path=self.path,
-                hint="Please make sure every header has a unique name.",
+                hint="Please provide a non-empty name immediately after '>'.",
             )
-        return fields[0]
+        return name
 
     def parse_contig_names(self) -> set[str]:
         """Read unique contig identifiers. Checks also for duplicate contig names"""
         log.info(f"Importing contig names from {self.path}.")
         contig_names: set[str] = set()
-        for record in self:
-            if record.name in contig_names:
+        for name in self.iter_headers():
+            if name in contig_names:
                 raise InputError(
                     "your fasta file contains duplicate headers (the "
                     "part before the first space in the >line). The "
-                    f"first duplicate encountered is {record.name}, but there "
+                    f"first duplicate encountered is {name}, but there "
                     "might be more...", path=self.path,
                 )
-            contig_names.add(record.name)
+            contig_names.add(name)
         return contig_names
 
     def parse_ORFs(self) -> dict[str, list[str]]:
         """Group ORF identifiers by their contig_name_# prefix."""
         log.info(f"Parsing ORF file {self.path}.")
         contig2ORFs: dict[str, list[str]] = {}
-        for record in self:
-            contig = record.name.rsplit("_", 1)[0]
+        for orf_name in self.iter_headers():
+            contig = orf_name.rsplit("_", 1)[0]
             if contig not in contig2ORFs:
                 contig2ORFs[contig] = []
-            contig2ORFs[contig].append(record.name)
+            contig2ORFs[contig].append(orf_name)
         return contig2ORFs
 
 
@@ -105,8 +112,7 @@ class BinParser:
 
         for path in paths:
             contigs: list[str] = []
-            for record in FastaParser(path):
-                contig_name = record.name
+            for contig_name in FastaParser(path).iter_headers():
                 if contig_name in contig2bin:
                     previous_bin = contig2bin[contig_name]
                     raise InputError(
@@ -161,7 +167,7 @@ class AlignmentInput:
 class AlignmentParser:
     """Keep hits within range_ percent of each ORF's highest bit score.
 
-    Input must be grouped by ORF, with descending bit scores per ORF.
+    Validate that input is grouped by ORF, bitscores must be descending per ORF
     """
 
     def __init__(self, path: Path, range_: Decimal) -> None:
@@ -176,8 +182,9 @@ class AlignmentParser:
         current_orf = None
         minimum_bitscore = Decimal(0)
         below_cutoff = False
+        previous_bitscore = None
         with opener(self.path, "rt", encoding="utf-8") as source:
-            for line in source:
+            for line_number, line in enumerate(source, start=1):
                 if not line.strip():
                     continue
                 fields = line.rstrip().split("\t")
@@ -186,11 +193,26 @@ class AlignmentParser:
                 bitscore = Decimal(fields[11])
 
                 if orf_id != current_orf:
+                    if orf_id in orf2hits:
+                        raise InputError(
+                            f"Alignment hits for ORF {orf_id} are not grouped at line {line_number}.",
+                            path=self.path,
+                            hint="Group alignment rows by ORF, with descending bit scores within each group.",
+                        )
                     # The first row gives this ORF's highest bit score.
                     current_orf = orf_id
                     minimum_bitscore = self.minimum_score_fraction * bitscore
                     orf2hits[orf_id] = []
                     below_cutoff = False
+                    previous_bitscore = None
+
+                if previous_bitscore is not None and bitscore > previous_bitscore:
+                    raise InputError(
+                        f"Alignment bit scores for ORF {orf_id} are not descending at line {line_number}.",
+                        path=self.path,
+                        hint="Sort each ORF's alignment hits by descending bit score.",
+                    )
+                previous_bitscore = bitscore
 
                 if below_cutoff:
                     continue
