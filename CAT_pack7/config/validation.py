@@ -42,8 +42,12 @@ def validate_execution(options: ExecutionOptions) -> ExecutionSettings:
 
 def validate_classification(range_, fraction) -> ClassificationSettings:
     checks = ValErrorCollector()
+    log.debug("Checking range parameter")
     range_ = checks.check(check_number, range_, "Range", 0, 100)
+    log.info(f"Checked Range parameter: {range_}")
+    log.debug("Checking fraction parameter")
     fraction = checks.check(check_number, fraction, "Fraction", 0, Decimal("0.99"))
+    log.info(f"Checked Fraction parameter: {fraction}")
     checks.finish()
     return ClassificationSettings(range_, fraction)
 
@@ -243,20 +247,27 @@ def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | Non
 
 def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
     checks = ValErrorCollector()
+    log.info(f"Validating execution arguments")
     execution = checks.check(validate_execution, args)
+    log.info(f"Validating classification arguments")
     classification = checks.check(validate_classification, args.range_, args.fraction)
+    log.info(f"Validating alignment arguments")
     aligner_name = checks.check(validate_aligner_name, args.aligner)
     top = checks.check(check_integer, args.top, "top", 0, 100)
+    log.info(f"Validating file arguments")
     files = checks.check(validate_cat_files, args, aligner_name)
 
     tmpdir = args.tmpdir if args.tmpdir is not None else args.output_prefix.parent / "tmp"
     diamond = None
     if args.alignment is None:
         if aligner_name == "diamond":
+            log.debug(f"Using diamond")
+            log.info(f"Validating diamond arguments")
             diamond = checks.check(validate_diamond, args.diamond)
             if classification is not None and top is not None and top <= classification.range_:
                 checks.add(InputError("Top must be higher than range."))
         elif aligner_name == "mmseqs2":
+            log.debug(f"Using mmseqs2")
             checks.add(InputError(
                 "MMseqs2 execution is not implemented yet.",
                 hint="Use --aligner diamond or supply an existing alignment and proteins.",
@@ -298,8 +309,10 @@ def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
 
 def get_validated_settings(args: CatOptions | BatOptions | PrepareOptions) -> CatSettings | BatSettings | PrepareSettings:
     if isinstance(args, (CatOptions, BatOptions)):
+        log.debug(f"Starting validation on CatOptions or BatOptions")
         return validate_cat(args)
     if type(args) == PrepareOptions:
+        log.debug(f"Starting validation on PrepareOptions")
         return validate_prepare(args)
     raise TypeError(f"Hmmm, that type of options class I don't know yet")
 
