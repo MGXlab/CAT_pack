@@ -15,7 +15,7 @@ from .settings import (
 )
 from ..io.parsers import BinParser
 from ..utils.check import (
-    check_db_file, check_diamond, check_file, check_folder, check_integer, check_number,
+    check_db_file, check_diamond, check_file, check_fasta_file, check_folder, check_integer, check_number,
     check_output_prefix, check_outputs, check_pyrodigal,
 )
 from ..utils.errors import ExternalToolError, InputError, ValErrorCollector
@@ -143,7 +143,7 @@ def validate_prepare(args: PrepareOptions, files: PrepareOutputs | None = None) 
     args = make_prefix(args)
     checks = ValErrorCollector()
     execution = checks.check(validate_execution, args)
-    db_fasta = checks.check(check_file, args.db_fasta, "Database FASTA")
+    db_fasta = checks.check(check_fasta_file, args.db_fasta, "Database FASTA")
     taxonomy = checks.check(validate_taxonomy, args.names, args.nodes)
     acc2tax = checks.check(check_file, args.acc2tax, "Accession-to-taxid file")
     files = files or get_file_names(args)
@@ -190,14 +190,21 @@ def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | Non
     checks = ValErrorCollector()
 
     is_bat = isinstance(args, BatOptions)
-    bins = checks.check(BinParser(args.bins, args.bin_suffix).parse) if is_bat else None
+    bins = None
+    if is_bat:
+        parser = BinParser(args.bins, args.bin_suffix)
+        bin_paths = checks.check(parser.find_bin_paths)
+        if bin_paths is not None:
+            valid_paths = [checks.check(check_fasta_file, path, "Bin fasta") for path in bin_paths]
+            if all(path is not None for path in valid_paths):
+                bins = checks.check(parser.parse, bin_paths)
     contigs = (None if is_bat
-               else checks.check(check_file, args.contigs, "Contigs file"))
+               else checks.check(check_fasta_file, args.contigs, "Contigs file"))
 
     proteins = None
     alignment = None
     if args.proteins is not None:
-        proteins = checks.check(check_file, args.proteins, "Protein file")
+        proteins = checks.check(check_fasta_file, args.proteins, "Protein file")
     elif args.alignment is None:
         checks.check(check_pyrodigal)
 
