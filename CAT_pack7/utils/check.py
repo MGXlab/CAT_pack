@@ -2,6 +2,7 @@
 import bz2
 import gzip
 import importlib
+import os
 import shutil
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -26,6 +27,14 @@ def check_file(path: Path, label: str) -> Path:
             hint="Double check if the file exists.",
             path=path,
         )
+    return path
+
+def check_file_not_empty(path: Path, label: str) -> Path:
+    path = check_file(path, label)
+    if os.path.getsize(path) == 0:
+        raise InputError(f"{label} is empty",
+                         hint=f"Please make sure the {label} is not empty.",
+                         path=path)
     return path
 
 def check_fasta_file(path: Path, label: str) -> Path:
