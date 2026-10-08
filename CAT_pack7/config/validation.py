@@ -15,8 +15,8 @@ from .settings import (
 )
 from ..io.parsers import BinParser
 from ..utils.check import (
-    check_db_file, check_diamond, check_file, check_fasta_file, check_folder, check_integer, check_number,
-    check_output_prefix, check_outputs, check_pyrodigal,
+    check_db_file, check_diamond, check_fasta_file, check_folder, check_integer, check_number,
+    check_output_prefix, check_outputs, check_pyrodigal, check_file_not_empty,
 )
 from ..utils.errors import ExternalToolError, InputError, ValErrorCollector
 from ..utils.memory import GIB
@@ -64,8 +64,8 @@ def validate_memory(options: MemoryOptions) -> MemorySettings:
 
 def validate_taxonomy(names: Path, nodes: Path) -> TaxonomyFiles:
     checks = ValErrorCollector()
-    names = checks.check(check_file, names, "Taxonomy names file")
-    nodes = checks.check(check_file, nodes, "Taxonomy nodes file")
+    names = checks.check(check_file_not_empty, names, "Taxonomy names file")
+    nodes = checks.check(check_file_not_empty, nodes, "Taxonomy nodes file")
     checks.finish()
     return TaxonomyFiles(names, nodes)
 
@@ -145,7 +145,7 @@ def validate_prepare(args: PrepareOptions, files: PrepareOutputs | None = None) 
     execution = checks.check(validate_execution, args)
     db_fasta = checks.check(check_fasta_file, args.db_fasta, "Database FASTA")
     taxonomy = checks.check(validate_taxonomy, args.names, args.nodes)
-    acc2tax = checks.check(check_file, args.acc2tax, "Accession-to-taxid file")
+    acc2tax = checks.check(check_file_not_empty, args.acc2tax, "Accession-to-taxid file")
     files = files or get_file_names(args)
     threads = checks.check(check_integer, args.threads, "Threads", 1, sys.maxsize)
     if not files.prefix or files.prefix in {".", ".."} or any(c in files.prefix for c in '/\\:'):
@@ -209,7 +209,7 @@ def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | Non
         checks.check(check_pyrodigal)
 
     if args.alignment is not None:
-        alignment = checks.check(check_file, args.alignment, "Alignment file")
+        alignment = checks.check(check_file_not_empty, args.alignment, "Alignment file")
         if args.proteins is None:
             checks.add(InputError(
                 "An existing alignment also requires its protein FASTA.",
