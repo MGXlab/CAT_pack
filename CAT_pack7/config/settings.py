@@ -73,6 +73,7 @@ class DiamondSettings(DiamondParameters):
     blast_flavour: str = "blastp"
     matrix: str = "BLOSUM62"
     evalue: str = "0.001"
+    cat_only = True
 
     def get_command(self):
         command = [
@@ -90,7 +91,8 @@ class DiamondSettings(DiamondParameters):
             "--compress", int(self.compression),
             f"--{self.mode}" if self.mode != 'default' else "",
             "--quiet" if not self.verbose else "",
-            "--no-self-hits" if self.no_self_hits else ""
+            "--no-self-hits" if self.no_self_hits else "",
+            "--outfmt 6 qseqid sseqid bitscore" if self.cat_only else ""
         ]
         return [str(arg) for arg in command if arg != ""]
 

@@ -172,9 +172,10 @@ class AlignmentParser:
     Validate that input is grouped by ORF, bitscores must be descending per ORF
     """
 
-    def __init__(self, path: Path, range_: Decimal) -> None:
+    def __init__(self, path: Path, range_: Decimal, cat_only) -> None:
         self.path = path
         self.minimum_score_fraction = (Decimal(100) - range_) / Decimal(100)
+        self.cat_only = cat_only
 
     def parse(self) -> AlignmentInput:
         log.info(f"Parsing alignment file {self.path}.")
@@ -192,7 +193,7 @@ class AlignmentParser:
                 fields = line.rstrip().split("\t")
                 orf_id = fields[0]
                 hit_id = fields[1]
-                bitscore = Decimal(fields[11])
+                bitscore = Decimal(fields[2] if self.cat_only else fields[11])
 
                 if orf_id != current_orf:
                     if orf_id in orf2hits:
@@ -244,9 +245,10 @@ class ClassificationInputs:
 class ClassificationParser:
     """Load ORF groups, accepted alignment hits, and their taxonomy data."""
 
-    def __init__(self, files: CatFiles | BatFiles, range_: Decimal) -> None:
+    def __init__(self, files: CatFiles | BatFiles, range_: Decimal, cat_only: bool) -> None:
         self.files = files
         self.range_ = range_
+        self.cat_only = cat_only
 
     def parse(self) -> ClassificationInputs:
         contig2ORFs = FastaParser(self.files.proteins_fasta).parse_ORFs()
@@ -263,7 +265,7 @@ class ClassificationParser:
             for contig in contig_names:
                 entity2ORFs[contig] = contig2ORFs.get(contig, [])
 
-        alignment = AlignmentParser(self.files.alignment, self.range_).parse()
+        alignment = AlignmentParser(self.files.alignment, self.range_, cat_only).parse()
         taxid2parent, _ = tax.import_nodes(self.files.nodes)
         fastaid2taxid = tax.import_fastaid2LCAtaxid(self.files.fastaid2LCA, alignment.all_hits)
         branches = tax.import_taxids_with_multiple_offspring(self.files.branches)
