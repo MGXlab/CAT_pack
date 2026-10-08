@@ -135,6 +135,7 @@ def run_annotation(
             "ORF classifications": settings.files.orf_report,
             "Log": settings.log_file,
         }
+    # TODO: Move files from temp to final out
 
     except KeyboardInterrupt:
         report(current_step.name, Status.CANCELLED, 0, None)
@@ -156,7 +157,7 @@ def run_annotation(
             error.step = current_step.name
             error.log_file = args.log_path if args.log_path.is_file() else None
             raise error
-
+        # TODO: REMOVE incomplete files
         # Catch all other exceptions
         raise
     finally:
@@ -170,7 +171,7 @@ def run_classification(
 ) -> tuple[int, int, str, Decimal]:
     """Load and validate inputs, then classify and write the results."""
     log = logging.getLogger("CAT_pack")
-    inputs = ClassificationParser(files, settings.range_).parse()
+    inputs = ClassificationParser(files, settings.range_, settings.aligner.cat_only).parse()
     check_orfs_match_contigs(inputs.contig_names, inputs.contig2ORFs, files.proteins_fasta)
     engine = ClassificationEngine(
         taxid2parent=inputs.taxid2parent,
