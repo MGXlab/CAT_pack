@@ -54,9 +54,9 @@ class FastaParser:
         opener = gzip.open if self.path.suffix == ".gz" else bz2.open if self.path.suffix == ".bz2" else open
         with opener(self.path, "rt", encoding="utf-8") as source:
             for line in source:
-                line = line.strip()
+                line = line.lstrip()
                 if line.startswith(">"):
-                    yield self._parse_header(line)
+                    yield self._parse_header(line.rstrip())
 
     def _parse_header(self, header: str) -> str:
         name = header[1:].split(" ", 1)[0]
@@ -181,37 +181,41 @@ class AlignmentParser:
     def parse(self) -> AlignmentInput:
         log.info(f"Parsing alignment file {self.path}.")
         opener = gzip.open if self.path.suffix == ".gz" else bz2.open if self.path.suffix == ".bz2" else open
-        orf2hits: dict[str, list[tuple[str, Decimal]]] = {}
-        all_hits: set[str] = set()
-        current_orf = None
-        minimum_bitscore = Decimal(0)
-        below_cutoff = False
-        previous_bitscore = None
         with opener(self.path, "rt", encoding="utf-8") as source:
+            orf2hits: dict[str, list[tuple[str, Decimal]]] = {}
+            all_hits: set[str] = set()
+            current_orf = None
+            minimum_bitscore = Decimal(0)
+            bitscore = minimum_bitscore
+            below_cutoff = False
+            previous_bitscore = None
+            last_bitscore_text = None
             lines = enumerate(source, start=1)
             first_row = next((row for row in lines if row[1].strip()), None)
             if first_row is None:
                 return AlignmentInput(orf2hits=orf2hits, all_hits=all_hits)
             if self.cat_only is None:
-                bitscore_index = 2 if len(first_row[1].rstrip().split("\t")) == 3 else 11
+                bitscore_index = 11
             else:
                 bitscore_index = 2 if self.cat_only else 11
 
             for line_number, line in chain((first_row,), lines):
-                if not line.strip():
+                if line.isspace():
                     continue
-                fields = line.rstrip().split("\t")
+                fields = line.split("\t")
                 orf_id = fields[0]
                 hit_id = fields[1]
-                bitscore = Decimal(fields[bitscore_index])
+                bitscore_text = fields[bitscore_index]
+                if bitscore_text != last_bitscore_text:
+                    bitscore = Decimal(bitscore_text)
+                    last_bitscore_text = bitscore_text
 
                 if orf_id != current_orf:
                     if orf_id in orf2hits:
                         raise InputError(
                             f"Alignment hits for ORF {orf_id} are not grouped at line {line_number}.",
                             path=self.path,
-                            hint="Group alignment rows by ORF, with descending bit scores within each group.",
-                        )
+                            hint="Group alignment rows by ORF, with descending bit scores within each group.")
                     # The first row gives this ORF's highest bit score.
                     current_orf = orf_id
                     minimum_bitscore = self.minimum_score_fraction * bitscore
@@ -223,8 +227,7 @@ class AlignmentParser:
                     raise InputError(
                         f"Alignment bit scores for ORF {orf_id} are not descending at line {line_number}.",
                         path=self.path,
-                        hint="Sort each ORF's alignment hits by descending bit score.",
-                    )
+                        hint="Sort each ORF's alignment hits by descending bit score.")
                 previous_bitscore = bitscore
 
                 if below_cutoff:
@@ -237,7 +240,7 @@ class AlignmentParser:
                 orf2hits[orf_id].append((hit_id, bitscore))
                 all_hits.add(hit_id)
 
-        return AlignmentInput(orf2hits=orf2hits, all_hits=all_hits)
+            return AlignmentInput(orf2hits=orf2hits, all_hits=all_hits)
 
 
 @dataclass(frozen=True, slots=True)
@@ -256,10 +259,11 @@ class ClassificationParser:
     """Load ORF groups, accepted alignment hits, and their taxonomy data."""
 
     def __init__(self, files: CatFiles | BatFiles, range_: Decimal,
-                 cat_only: bool | None = None) -> None:
+                 cat_only: bool | None = None, workers: int = 1) -> None:
         self.files = files
         self.range_ = range_
         self.cat_only = cat_only
+        self.workers = workers
 
     def parse(self) -> ClassificationInputs:
         contig2ORFs = FastaParser(self.files.proteins_fasta).parse_ORFs()
@@ -278,7 +282,8 @@ class ClassificationParser:
 
         alignment = AlignmentParser(self.files.alignment, self.range_, self.cat_only).parse()
         taxid2parent, _ = tax.import_nodes(self.files.nodes)
-        fastaid2taxid = tax.import_fastaid2LCAtaxid(self.files.fastaid2LCA, alignment.all_hits)
+        fastaid2taxid = tax.import_fastaid2LCAtaxid(
+            self.files.fastaid2LCA, alignment.all_hits, workers=self.workers)
         branches = tax.import_taxids_with_multiple_offspring(self.files.branches)
 
         return ClassificationInputs(
