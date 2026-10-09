@@ -4,6 +4,8 @@ import logging
 import sys
 from pathlib import Path
 
+from .io.reference_mapping import read_fastaid2LCAtaxid
+
 log = logging.getLogger("CAT_pack")
 
 
@@ -45,20 +47,9 @@ def import_names(names_dmp: Path):
     return taxid2name
 
 
-def import_fastaid2LCAtaxid(fastaid2LCAtaxid_file: Path, all_hits):
+def import_fastaid2LCAtaxid(fastaid2LCAtaxid_file: Path, all_hits, *, workers=1):
     log.info(f"Loading file {fastaid2LCAtaxid_file}.")
-
-    fastaid2LCAtaxid = {}
-
-    with open(fastaid2LCAtaxid_file, "r") as f1:
-        for line in f1:
-            line = line.rstrip().split("\t")
-
-            if line[0] in all_hits:
-                # Only include fastaids that are found in hits.
-                fastaid2LCAtaxid[line[0]] = line[1]
-
-    return fastaid2LCAtaxid
+    return read_fastaid2LCAtaxid(fastaid2LCAtaxid_file, all_hits, workers)
 
 
 def import_taxids_with_multiple_offspring(taxids_with_multiple_offspring_file):
