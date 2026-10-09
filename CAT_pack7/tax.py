@@ -95,7 +95,9 @@ def find_LCA(list_of_lineages):
             return taxid
 
 
-def find_LCA_for_ORF(hits, fastaid2LCAtaxid, taxid2parent):
+def find_LCA_for_ORF(hits, fastaid2LCAtaxid, taxid2parent, *, lineage_lookup=None):
+    if lineage_lookup is None:
+        lineage_lookup = lambda taxid: find_lineage(taxid, taxid2parent)
     list_of_lineages = []
     top_bitscore = 0
 
@@ -105,7 +107,7 @@ def find_LCA_for_ORF(hits, fastaid2LCAtaxid, taxid2parent):
             
         try:
             taxid = fastaid2LCAtaxid[hit]
-            lineage = find_lineage(taxid, taxid2parent)
+            lineage = lineage_lookup(taxid)
 
             list_of_lineages.append(lineage)
         except:
@@ -155,7 +157,9 @@ def star_lineage(lineage, taxids_with_multiple_offspring):
     return starred_lineage
 
 
-def find_weighted_LCA(LCAs_ORFs, taxid2parent, f):
+def find_weighted_LCA(LCAs_ORFs, taxid2parent, f, *, lineage_lookup=None):
+    if lineage_lookup is None:
+        lineage_lookup = lambda taxid: find_lineage(taxid, taxid2parent)
     list_of_lineages = []
     list_of_bitscores = []
     based_on_n_ORFs = 0
@@ -167,7 +171,7 @@ def find_weighted_LCA(LCAs_ORFs, taxid2parent, f):
             # classification of the contig.
             continue
         
-        lineage = find_lineage(taxid, taxid2parent)
+        lineage = lineage_lookup(taxid)
         
         list_of_lineages.append(lineage)
         list_of_bitscores.append(top_bitscore)
@@ -188,10 +192,11 @@ def find_weighted_LCA(LCAs_ORFs, taxid2parent, f):
 
             taxid2bitscore[taxid] += list_of_bitscores[i]
 
+    total_bitscore = sum(list_of_bitscores)
     whitelisted_lineages = []
     for taxid in taxid2bitscore:
-        if taxid2bitscore[taxid] / sum(list_of_bitscores) > f:
-            lineage = find_lineage(taxid, taxid2parent)
+        if taxid2bitscore[taxid] / total_bitscore > f:
+            lineage = lineage_lookup(taxid)
 
             whitelisted_lineages.append(lineage)
 
@@ -211,9 +216,9 @@ def find_weighted_LCA(LCAs_ORFs, taxid2parent, f):
     taxid_trace = set()
     for whitelisted_lineage in whitelisted_lineages:
         if whitelisted_lineage[0] not in taxid_trace:
-            longest_lineages.append(whitelisted_lineage)
+            longest_lineages.append(list(whitelisted_lineage))
 
-            scores = [taxid2bitscore[taxid] / sum(list_of_bitscores) for
+            scores = [taxid2bitscore[taxid] / total_bitscore for
                       taxid in whitelisted_lineage]
             longest_lineages_scores.append(scores)
 
