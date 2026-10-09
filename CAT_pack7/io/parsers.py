@@ -4,6 +4,7 @@ import gzip
 import logging
 from dataclasses import dataclass
 from decimal import Decimal
+from itertools import chain
 from pathlib import Path
 from typing import Iterator
 
@@ -172,7 +173,7 @@ class AlignmentParser:
     Validate that input is grouped by ORF, bitscores must be descending per ORF
     """
 
-    def __init__(self, path: Path, range_: Decimal, cat_only) -> None:
+    def __init__(self, path: Path, range_: Decimal, cat_only: bool | None = None) -> None:
         self.path = path
         self.minimum_score_fraction = (Decimal(100) - range_) / Decimal(100)
         self.cat_only = cat_only
@@ -187,13 +188,22 @@ class AlignmentParser:
         below_cutoff = False
         previous_bitscore = None
         with opener(self.path, "rt", encoding="utf-8") as source:
-            for line_number, line in enumerate(source, start=1):
+            lines = enumerate(source, start=1)
+            first_row = next((row for row in lines if row[1].strip()), None)
+            if first_row is None:
+                return AlignmentInput(orf2hits=orf2hits, all_hits=all_hits)
+            if self.cat_only is None:
+                bitscore_index = 2 if len(first_row[1].rstrip().split("\t")) == 3 else 11
+            else:
+                bitscore_index = 2 if self.cat_only else 11
+
+            for line_number, line in chain((first_row,), lines):
                 if not line.strip():
                     continue
                 fields = line.rstrip().split("\t")
                 orf_id = fields[0]
                 hit_id = fields[1]
-                bitscore = Decimal(fields[2] if self.cat_only else fields[11])
+                bitscore = Decimal(fields[bitscore_index])
 
                 if orf_id != current_orf:
                     if orf_id in orf2hits:
@@ -245,7 +255,8 @@ class ClassificationInputs:
 class ClassificationParser:
     """Load ORF groups, accepted alignment hits, and their taxonomy data."""
 
-    def __init__(self, files: CatFiles | BatFiles, range_: Decimal, cat_only: bool) -> None:
+    def __init__(self, files: CatFiles | BatFiles, range_: Decimal,
+                 cat_only: bool | None = None) -> None:
         self.files = files
         self.range_ = range_
         self.cat_only = cat_only
@@ -265,7 +276,7 @@ class ClassificationParser:
             for contig in contig_names:
                 entity2ORFs[contig] = contig2ORFs.get(contig, [])
 
-        alignment = AlignmentParser(self.files.alignment, self.range_, cat_only).parse()
+        alignment = AlignmentParser(self.files.alignment, self.range_, self.cat_only).parse()
         taxid2parent, _ = tax.import_nodes(self.files.nodes)
         fastaid2taxid = tax.import_fastaid2LCAtaxid(self.files.fastaid2LCA, alignment.all_hits)
         branches = tax.import_taxids_with_multiple_offspring(self.files.branches)

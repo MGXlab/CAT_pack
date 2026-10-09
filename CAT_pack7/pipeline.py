@@ -171,7 +171,7 @@ def run_classification(
 ) -> tuple[int, int, str, Decimal]:
     """Load and validate inputs, then classify and write the results."""
     log = logging.getLogger("CAT_pack")
-    inputs = ClassificationParser(files, settings.range_, settings.aligner.cat_only).parse()
+    inputs = ClassificationParser(files, settings.range_).parse()
     check_orfs_match_contigs(inputs.contig_names, inputs.contig2ORFs, files.proteins_fasta)
     engine = ClassificationEngine(
         taxid2parent=inputs.taxid2parent,
