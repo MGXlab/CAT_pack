@@ -3,8 +3,8 @@ import multiprocessing
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from ..parsers import FastaParser
-from ..settings import BatFiles
+from ..config.settings import BatFiles
+from ..io.parsers import FastaParser
 from ..utils.logging import Status
 
 log = logging.getLogger("CAT_pack")
@@ -47,10 +47,8 @@ def find_genes(sequence):
 def run_pyrodigal(settings, files, report):
     """Predict proteins from the CAT contigs or the BAT bin files."""
 
-    # TODO: move citation to end of run overview
-    log.warning(f"Running Pyrodigal for ORF prediction. Files {files.proteins_fasta}"
-        f" and {files.proteins_gff} will be generated. Do not forget to cite"
-        " Pyrodigal and Prodigal when using CAT or BAT in your publication.")
+    log.info(f"Running Pyrodigal for ORF prediction. Files {files.proteins_fasta}"
+        f" and {files.proteins_gff} will be generated.")
 
     # TODO: find a nicer solution for this
     input_paths = files.bin_paths if isinstance(files, BatFiles) else (files.contigs,)

@@ -1,24 +1,27 @@
 import logging
+from contextlib import ExitStack
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 
 from . import tax
 from .classification import ClassificationEngine
-from .options import BatOptions, CatOptions, PrepareOptions
-from .parsers import ClassificationParser
+from .config.options import BatOptions, CatOptions, PrepareOptions
+from .config.settings import BatFiles, BatSettings, CatFiles, CatSettings, DiamondSettings
+from .config.validation import check_orfs_match_contigs, get_file_names, get_validated_settings, make_prefix, \
+    validate_prepare
+from .io.parsers import ClassificationParser
+from .io.writers import ClassificationWriter
 from .prepare import (
     copy_taxonomy, find_offspring, make_diamond_database,
     make_fastaid2LCAtaxid_file, make_mmseqs2_database,
     write_taxids_with_multiple_offspring_file,
 )
-from .settings import BatFiles, BatSettings, CatFiles, CatSettings
 from .tools.aligner import run_aligner
 from .tools.pyrodigal import run_protein_prediction
 from .utils.errors import CatError
-from .utils.logging import Status, Report
-from .validation import check_orfs_match_contigs, get_file_names, get_validated_settings, make_prefix, validate_prepare
-from .writers import ClassificationWriter
+from .utils.locking import lock_outputs
+from .utils.logging import Status, Report, file_logging
 
 
 @dataclass()
@@ -30,7 +33,7 @@ class Step:
 
     name: str
     supplied: bool = False
-    citation_message: bool = False
+    citation: str | None = None
 
 
     def __str__(self) -> str:
@@ -53,32 +56,46 @@ def build_plan(args: CatOptions | BatOptions | PrepareOptions, files=None) -> li
     if isinstance(args, (CatOptions, BatOptions)):
         return [
             Step("Input validation"),
-            Step("Protein prediction", supplied=args.proteins is not None),
+            Step(
+                "Protein prediction", supplied=args.proteins is not None,
+                citation="Please cite Pyrodigal and Prodigal when using CAT or BAT in your publication.",
+            ),
             Step("Alignment", supplied=args.alignment is not None),
             Step("Classify"),
         ]
     raise CatError("I haven't figured out how to build that specific plan")
 
-def run_annotation(args: CatOptions | BatOptions, report: Report) -> dict[str, Path]:
+def run_annotation(
+    args: CatOptions | BatOptions, report: Report,
+) -> dict[str, Path | tuple[int, int, str, Decimal] | list[Step]]:
     """Bin/Contig annotation tool (BAT/CAT) run"""
     is_bat = isinstance(args, BatOptions)
 
     plan = build_plan(args)
+    completed_steps: list[Step] = []
     step_index = 0
     current_step = plan[step_index]
     log = logging.getLogger("CAT_pack")
-
-
-    planned_steps = ", ".join(step.name for step in plan[1:] if not step.supplied)
-    log.info(f"{'BAT' if is_bat else 'CAT'} is running. Planned steps: {planned_steps}.")
-    log.info("Doing some pre-flight checks first.")
+    locks = ExitStack()
 
     try:
+        locks.enter_context(lock_outputs([args.output_prefix, args.log_path]))
+        if args.alignment is None:
+            tmpdir = args.tmpdir if args.tmpdir is not None else args.output_prefix.parent / "tmp"
+            tmpdir.parent.mkdir(parents=True, exist_ok=True)
+            locks.enter_context(lock_outputs([tmpdir]))
+
+        locks.enter_context(file_logging(log, args.log_path, args.debug))
+
+        planned_steps = ", ".join(step.name for step in plan[1:] if not step.supplied)
+        log.info(f"{'BAT' if is_bat else 'CAT'} is running. Planned steps: {planned_steps}.")
+        log.info("Doing some pre-flight checks first.")
         report(current_step.name, Status.RUNNING, 0, 1)
         log.info(f"Starting: {current_step.name}")
         settings = get_validated_settings(args)
         report(current_step.name, Status.COMPLETE, 1, 1)
         log.info(f"Completed: {current_step.name}")
+        completed_steps.append(current_step)
         if is_bat:
             log.info("Ready to fly!\n\n-----------------\n")
 
@@ -94,8 +111,12 @@ def run_annotation(args: CatOptions | BatOptions, report: Report) -> dict[str, P
                 run_protein_prediction(settings, report, "pyrodigal")
             elif current_step.name == "Alignment":
                 run_aligner(settings.aligner, report)
+                if isinstance(settings.aligner, DiamondSettings):
+                    current_step.citation = (
+                        "Please cite DIAMOND when using CAT or BAT in your publication."
+                    )
             elif current_step.name == "Classify":
-                run_classification(settings, settings.files, report)
+                results = run_classification(settings, settings.files, report)
             else:
                 log.error(f"Can't spell that well, my misspelling:"
                           f"{current_step.name}")
@@ -105,8 +126,11 @@ def run_annotation(args: CatOptions | BatOptions, report: Report) -> dict[str, P
             # an exception.
             report(current_step.name, Status.COMPLETE, 1, 1)
             log.info(f"Completed: {current_step.name}")
+            completed_steps.append(current_step)
 
         return {
+            "Results": results,
+            "Steps": completed_steps,
             f"{'Bin' if is_bat else 'Contig'} Classifications": settings.files.report,
             "ORF classifications": settings.files.orf_report,
             "Log": settings.log_file,
@@ -126,20 +150,24 @@ def run_annotation(args: CatOptions | BatOptions, report: Report) -> dict[str, P
         for remaining_step in plan[step_index + 1:]:
             report(remaining_step.name, Status.SKIPPED, 0, None)
 
+        if isinstance(error, OSError):
+            error = CatError(str(error), path=args.output_prefix)
         if isinstance(error, CatError):
             error.step = current_step.name
             error.log_file = args.log_path if args.log_path.is_file() else None
-            raise
+            raise error
 
         # Catch all other exceptions
         raise
+    finally:
+        locks.close()
 
 
 def run_classification(
     settings: CatSettings | BatSettings,
     files: CatFiles | BatFiles,
     report: Report,
-) -> None:
+) -> tuple[int, int, str, Decimal]:
     """Load and validate inputs, then classify and write the results."""
     log = logging.getLogger("CAT_pack")
     inputs = ClassificationParser(files, settings.range_).parse()
@@ -184,6 +212,7 @@ def run_classification(
                 n_classified += 1
             report("Classify", Status.RUNNING, index, total)
     classification_summary(n_classified, total, inputs.entity_type, settings.fraction)
+    return n_classified, total, inputs.entity_type, settings.fraction
 
 
 def classification_summary(
@@ -216,10 +245,13 @@ def run_prepare(args: PrepareOptions, report: Report):
     step_index = 0
     current_step = plan[step_index]
     log = logging.getLogger("CAT_pack")
-    handler = None
+    locks = ExitStack()
     taxid2parent = None
 
     try:
+        files.data_folder.parent.mkdir(parents=True, exist_ok=True)
+        locks.enter_context(lock_outputs([files.data_folder]))
+        plan = build_plan(args, files)
         for step_index, current_step in enumerate(plan):
             if current_step.name == "Make MMseqs2 database" and not args.build_mmseqs2:
                 report(current_step.name, Status.SKIPPED, 0, None)
@@ -235,10 +267,7 @@ def run_prepare(args: PrepareOptions, report: Report):
             if step_index == 0:
                 settings = validate_prepare(args, files)
                 files.data_folder.mkdir(parents=True, exist_ok=True)
-                handler = logging.FileHandler(files.log_file, encoding="utf-8")
-                handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s\t%(message)s"))
-                log.addHandler(handler)
-                log.setLevel(logging.INFO)
+                locks.enter_context(file_logging(log, files.log_file, args.debug))
                 copy_taxonomy(settings)
             elif current_step.name == "Make DIAMOND database":
                 make_diamond_database(settings)
@@ -284,6 +313,4 @@ def run_prepare(args: PrepareOptions, report: Report):
             raise error
         raise
     finally:
-        if handler is not None:
-            log.removeHandler(handler)
-            handler.close()
+        locks.close()

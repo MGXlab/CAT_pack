@@ -2,9 +2,10 @@ import gzip
 import logging
 import shutil
 from pathlib import Path
+from typing import TextIO
 
 from . import tax
-from .settings import PrepareSettings
+from .config.settings import PrepareSettings
 from .tools.tool_runner import run_tool
 from .utils.errors import InputError
 from .utils.logging import Report, Status
@@ -12,15 +13,15 @@ from .utils.logging import Report, Status
 log = logging.getLogger("CAT_pack")
 
 
-def optionally_compressed_handle(file_path: Path):
+def optionally_compressed_handle(file_path: Path) -> TextIO:
     if file_path.suffix == ".gz":
         return gzip.open(file_path, "rt", encoding="utf-8")
     return file_path.open(encoding="utf-8")
 
 
 def find_lineage(taxid: str, taxid2parent: dict[str, str]) -> list[str]:
-    lineage = []
-    flown_by_taxids = set()
+    lineage: list[str] = []
+    flown_by_taxids: set[str] = set()
     while True:
         if taxid in flown_by_taxids:
             raise InputError(f"Cycle in taxonomy at taxid {taxid}.",
@@ -33,15 +34,15 @@ def find_lineage(taxid: str, taxid2parent: dict[str, str]) -> list[str]:
         taxid = parent
 
 
-def import_fasta_headers(fasta_file: Path, report: Report):
+def import_fasta_headers(fasta_file: Path, report: Report) -> tuple[dict[str, list[str]], set[str]]:
     log.info(f"Loading file {fasta_file}.")
-    fastaid2prot_accessions = {}
-    prot_accessions_whitelist = set()
+    fastaid2prot_accessions: dict[str, list[str]] = {}
+    prot_accessions_whitelist: set[str] = set()
     with optionally_compressed_handle(fasta_file) as f1:
         for line in f1:
             if not line.startswith(">"):
                 continue
-            prot_accessions = []
+            prot_accessions: list[str] = []
             for part in line[1:].strip().split("\x01"):
                 fields = part.split()
                 if not fields:
@@ -60,10 +61,10 @@ def import_fasta_headers(fasta_file: Path, report: Report):
 
 
 def import_prot_accession2taxid(
-    prot_accession2taxid_file: Path, prot_accessions_whitelist: set[str], report: Report,
-):
+    prot_accession2taxid_file: Path, prot_accessions_whitelist: set[str], report: Report
+) -> dict[str, str]:
     log.info(f"Loading file {prot_accession2taxid_file}.")
-    prot_accession2taxid = {}
+    prot_accession2taxid: dict[str, str] = {}
     with optionally_compressed_handle(prot_accession2taxid_file) as f1:
         columns = f1.readline().rstrip().split("\t")
         try:
@@ -87,7 +88,7 @@ def import_prot_accession2taxid(
 
 def make_fastaid2LCAtaxid_file(
     fastaid2LCAtaxid_file: Path, fasta_file: Path, prot_accession2taxid_file: Path,
-    taxid2parent: dict[str, str], report: Report,
+    taxid2parent: dict[str, str], report: Report
 ) -> None:
     fastaid2prot_accessions, prot_accessions_whitelist = import_fasta_headers(fasta_file, report)
     prot_accession2taxid = import_prot_accession2taxid(
@@ -99,7 +100,7 @@ def make_fastaid2LCAtaxid_file(
     total = 0
     with fastaid2LCAtaxid_file.open("w", encoding="utf-8", newline="\n") as outf1:
         for fastaid, prot_accessions in fastaid2prot_accessions.items():
-            list_of_lineages = []
+            list_of_lineages: list[list[str]] = []
             for prot_accession in prot_accessions:
                 try:
                     taxid = prot_accession2taxid[prot_accession]
@@ -124,10 +125,10 @@ def make_fastaid2LCAtaxid_file(
              f"{corrected:,} corrected using secondary accessions; {no_taxid:,} without usable taxonomy.")
 
 
-def find_offspring(fastaid2LCAtaxid_file: Path, taxid2parent: dict[str, str], report: Report):
+def find_offspring(fastaid2LCAtaxid_file: Path, taxid2parent: dict[str, str], report: Report) -> dict[str, set[str]]:
     log.info("Searching database for taxids with multiple offspring.")
-    taxid2offspring = {}
-    visited_taxids = set()
+    taxid2offspring: dict[str, set[str]] = {}
+    visited_taxids: set[str] = set()
     with fastaid2LCAtaxid_file.open(encoding="utf-8") as f1:
         for number, line in enumerate(f1, 1):
             fields = line.rstrip().split("\t")

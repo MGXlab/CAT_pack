@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from CAT_pack7.options import BatOptions
+from CAT_pack7.config.options import BatOptions
 
 
 class OptionsTests(unittest.TestCase):

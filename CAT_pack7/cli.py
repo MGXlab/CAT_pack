@@ -13,15 +13,17 @@ from rich.progress import Progress, ProgressColumn, BarColumn, TextColumn, TimeE
 from rich.table import Table
 from rich.text import Text
 from typer import Option
-from typer_di import Depends, TyperDI
 
-from .options import BatOptions, CatOptions, ExecutionOptions, DiamondOptions, MMseqsOptions, PrepareOptions
+from .cli_options import (
+    DiamondPathOption, diamond_options, execution_options, mmseqs_options, with_option_groups,
+)
+from .config.options import BatOptions, CatOptions, ExecutionOptions, DiamondOptions, MMseqsOptions, PrepareOptions
+from .config.validation import get_file_names, make_prefix
 from .pipeline import run_annotation, build_plan, Status, run_prepare
 from .utils.errors import CatError, show_error
 from .utils.logging import init_logging
-from .validation import get_file_names, make_prefix
 
-app = TyperDI()
+app = typer.Typer()
 
 console = Console(stderr=True)
 
@@ -107,34 +109,8 @@ def update_progress(progress, tasks, step, status, completed=0, total=None):
 
 
 
-def execution_options(
-        threads: Annotated[
-            int,
-            Option("--threads", "-n", min=1)
-        ] = ExecutionOptions.threads,
-        verbose: Annotated[
-            bool,
-            Option("--verbose", help="Show aligner stdout."),
-        ] = ExecutionOptions.verbose,
-        quiet: Annotated[
-            bool,
-            Option("--quiet", help="Turns off logging in the terminal."),
-        ] = ExecutionOptions.quiet,
-        debug: Annotated[
-            bool,
-            Option("--debug", help="Show unexpected-error tracebacks."),
-        ] = ExecutionOptions.debug,
-
-):
-    return ExecutionOptions(quiet=quiet, verbose=verbose, threads=threads, debug=debug)
-
-# this is just a testout, trying to come up with a solution to not depend
-# on typerDI
-DIAMOND_PATH= Annotated[Path | None, Option(
-            "--path-to-diamond", rich_help_panel="DIAMOND",
-            help="Path to DIAMOND. Supply if it is not on PATH.")]
-
 @app.command()
+@with_option_groups(execution=execution_options)
 def prepare(
         db_fasta: Annotated[
             Path, Option("--db_fasta", help="Fasta file containing "
@@ -153,7 +129,7 @@ def prepare(
         db_dir: Annotated[Path,
             Option("--database", "--db_dir", "-d", help="Directory where CAT/BAT/RAT "
                         "database and taxonomy files will be created", metavar="<DIR>")],
-        path_to_diamond: DIAMOND_PATH = PrepareOptions.path_to_diamond,
+        path_to_diamond: DiamondPathOption = PrepareOptions.path_to_diamond,
         common_prefix: Annotated[str | None, Option(
                 "--common-prefix",
                 help="Prefix for all files that will be created",
@@ -163,7 +139,7 @@ def prepare(
                     help="Also create an MMseqs2 sequence database.")] = PrepareOptions.build_mmseqs2,
         path_to_mmseqs: Annotated[Path | None, Option("--path-to-mmseqs",
                     help="Path to MMseqs2, used with --build-mmseqs2.")] = PrepareOptions.path_to_mmseqs,
-        options: ExecutionOptions = Depends(execution_options),
+        *, execution: ExecutionOptions,
 
 ):
     args = PrepareOptions(
@@ -176,14 +152,14 @@ def prepare(
         common_prefix=common_prefix,
         build_mmseqs2=build_mmseqs2,
         path_to_mmseqs=path_to_mmseqs,
-        threads=options.threads,
-        quiet=options.quiet,
-        verbose=options.verbose,
-        debug=options.debug,
+        threads=execution.threads,
+        quiet=execution.quiet,
+        verbose=execution.verbose,
+        debug=execution.debug,
     )
     args = make_prefix(args)
     progress, tasks = make_progress([step.name for step in build_plan(args)])
-    progress.disable = options.quiet
+    progress.disable = execution.quiet
     report = partial(update_progress, progress, tasks)
     try:
         with progress:
@@ -195,7 +171,7 @@ def prepare(
         show_error(error, console)
         raise typer.Exit(code=1)
 
-    if not options.quiet:
+    if not execution.quiet:
         files = get_file_names(args)
         table = Table(title="Prepared database")
         table.add_column("File")
@@ -217,6 +193,11 @@ def prepare(
 
 
 @app.command()
+@with_option_groups(
+    execution=execution_options,
+    diamond=diamond_options,
+    mmseqs=mmseqs_options,
+)
 def cat(
         contigs: Annotated[
             Path,
@@ -282,55 +263,10 @@ def cat(
             Option("--aligner", help="Protein aligner",
                    metavar="<diamond|mmseqs2>", case_sensitive=False)
         ] = CatOptions.aligner,
-        # Seperate Arguments for diamond
-        diamond_mode: Annotated[str, Option("--diamond-mode",
-            rich_help_panel="DIAMOND",
-               help="default, faster, fast, mid-sensitive, sensitive, "
-                    "more-sensitive, very-sensitive, ultra-sensitive"
-        )] = DiamondOptions.mode,
-        block_size: Annotated[float, Option(
-            "--block-size", rich_help_panel="DIAMOND",
-            help="DIAMOND block-size. Lower uses less RAM/tmp.",
-        )] = DiamondOptions.block_size,
-        index_chunks: Annotated[int, Option(
-            "--index-chunks", min=1, rich_help_panel="DIAMOND",
-            help="Set to 4 on low-memory machines.",
-        )] = DiamondOptions.index_chunks,
-        no_self_hits: Annotated[bool, Option(
-            "--no-self-hits", rich_help_panel="DIAMOND",
-            help="Do not report identical self hits by DIAMOND.",
-        )] = DiamondOptions.no_self_hits,
-        path_to_diamond: DIAMOND_PATH = DiamondOptions.path_to_diamond,
-        # Arguments for MMseqs2
-        sensitivity: Annotated[float, Option(
-            "--sensitivity", min=1.0, max=7.5, rich_help_panel="MMseqs2",
-            help="MMseqs2 sensitivity (-s).",
-        )] = MMseqsOptions.sensitivity,
-        split_memory_limit: Annotated[str, Option(
-            "--split-memory-limit", rich_help_panel="MMseqs2",
-            help="MMseqs2 max memory per split, e.g. 10M, 1G. 0 uses all available memory.",
-        )] = MMseqsOptions.split_memory_limit,
-        path_to_mmseqs: Annotated[Path | None, Option(
-            "--path-to-mmseqs", rich_help_panel="MMseqs2",
-            help="Path to MMseqs2. Supply if it is not on PATH.",
-        )] = MMseqsOptions.executable,
-        options: ExecutionOptions = Depends(execution_options),
+        *, execution: ExecutionOptions,
+        diamond: DiamondOptions,
+        mmseqs: MMseqsOptions,
 ):
-
-    diamond = DiamondOptions(
-        mode=diamond_mode,
-        no_self_hits=no_self_hits,
-        block_size=block_size,
-        index_chunks=index_chunks,
-        path_to_diamond=path_to_diamond,
-    )
-
-    mmseqs = MMseqsOptions(
-        sensitivity=sensitivity,
-        split_memory_limit=split_memory_limit,
-        executable=path_to_mmseqs,
-    )
-
 
     arguments = CatOptions(
         contigs=contigs,
@@ -347,10 +283,10 @@ def cat(
         top=top,
         tmpdir=tmpdir,
         compress=compress,
-        threads=options.threads,
-        quiet=options.quiet,
-        verbose=options.verbose, # These two can be place under one name
-        debug=options.debug,     # TODO: merge debug and verbose together
+        threads=execution.threads,
+        quiet=execution.quiet,
+        verbose=execution.verbose, # These two can be place under one name
+        debug=execution.debug,     # TODO: merge debug and verbose together
     )
 
     run_annotation_cli(arguments)
@@ -360,6 +296,9 @@ def cat(
 # it from the --help interface. Yay or Nay?
 @app.command("bins", hidden=True)
 @app.command()
+@with_option_groups(
+    execution=execution_options, diamond=diamond_options, mmseqs=mmseqs_options,
+)
 def bat(
         bins: Annotated[
             Path,
@@ -433,54 +372,11 @@ def bat(
             Option("--aligner", help="Protein aligner",
                    metavar="<diamond|mmseqs2>", case_sensitive=False)
         ] = BatOptions.aligner,
-        diamond_mode: Annotated[str, Option("--diamond-mode",
-            rich_help_panel="DIAMOND",
-               help="default, faster, fast, mid-sensitive, sensitive, "
-                    "more-sensitive, very-sensitive, ultra-sensitive"
-        )] = DiamondOptions.mode,
-        block_size: Annotated[float, Option(
-            "--block-size", rich_help_panel="DIAMOND",
-            help="DIAMOND block-size. Lower uses less RAM/tmp.",
-        )] = DiamondOptions.block_size,
-        index_chunks: Annotated[int, Option(
-            "--index-chunks", min=1, rich_help_panel="DIAMOND",
-            help="Set to 4 on low-memory machines.",
-        )] = DiamondOptions.index_chunks,
-        no_self_hits: Annotated[bool, Option(
-            "--no-self-hits", rich_help_panel="DIAMOND",
-            help="Do not report identical self hits by DIAMOND.",
-        )] = DiamondOptions.no_self_hits,
-        path_to_diamond: DIAMOND_PATH = DiamondOptions.path_to_diamond,
-        sensitivity: Annotated[float, Option(
-            "--sensitivity", min=1.0, max=7.5, rich_help_panel="MMseqs2",
-            help="MMseqs2 sensitivity (-s).",
-        )] = MMseqsOptions.sensitivity,
-        split_memory_limit: Annotated[str, Option(
-            "--split-memory-limit", rich_help_panel="MMseqs2",
-            help="MMseqs2 max memory per split, e.g. 10M, 1G. 0 uses all available memory.",
-        )] = MMseqsOptions.split_memory_limit,
-        path_to_mmseqs: Annotated[Path | None, Option(
-            "--path-to-mmseqs", rich_help_panel="MMseqs2",
-            help="Path to MMseqs2. Supply if it is not on PATH.",
-        )] = MMseqsOptions.executable,
-        options: ExecutionOptions = Depends(execution_options),
+        *, execution: ExecutionOptions,
+        diamond: DiamondOptions,
+        mmseqs: MMseqsOptions,
 ):
     """Run Bin Annotation Tool (BAT)."""
-    diamond = DiamondOptions(
-        mode=diamond_mode,
-        no_self_hits=no_self_hits,
-        block_size=block_size,
-        index_chunks=index_chunks,
-        path_to_diamond=path_to_diamond,
-    )
-
-    mmseqs = MMseqsOptions(
-        sensitivity=sensitivity,
-        split_memory_limit=split_memory_limit,
-        executable=path_to_mmseqs,
-    )
-
-
     arguments = BatOptions(
         bins=bins,
         bin_suffix=bin_suffix,
@@ -498,10 +394,10 @@ def bat(
         top=top,
         tmpdir=tmpdir,
         compress=compress,
-        threads=options.threads,
-        quiet=options.quiet,
-        verbose=options.verbose,
-        debug=options.debug,
+        threads=execution.threads,
+        quiet=execution.quiet,
+        verbose=execution.verbose,
+        debug=execution.debug,
     )
 
     run_annotation_cli(arguments)
@@ -509,7 +405,7 @@ def bat(
 
 def run_annotation_cli(arguments: CatOptions | BatOptions):
     log = init_logging(arguments.debug, quiet=arguments.quiet,
-                       log_file=arguments.log_path, console=console)
+                       console=console)
     log.info("Loaded all arguments")
 
     info = Table.grid(padding=(0, 2))
@@ -539,16 +435,19 @@ def run_annotation_cli(arguments: CatOptions | BatOptions):
     log.info(f"{arguments!r}")
 
     # print the group in a panel
-    console.print(Panel(content, title="[bold]Rarw![/bold]",
-                        border_style="blue",), "\n")
+    if not arguments.quiet:
+        console.print(Panel(content, title="[bold]Rarw![/bold]",
+                            border_style="blue",), "\n")
 
 
-    console.print(f"Preparing for {tool} run\n\n")
+    if not arguments.quiet:
+        console.print(f"Preparing for {tool} run\n\n")
     log.info(f"Preparing for {tool} run")
     progress, tasks = make_progress(
         [step.name for step in build_plan(arguments)],
         unit="bins" if is_bat else "contigs",
     )
+    progress.disable = arguments.quiet
     report = partial(update_progress, progress, tasks)
     try:
         with progress:
@@ -571,10 +470,39 @@ def run_annotation_cli(arguments: CatOptions | BatOptions):
 
 
     else:
-        log.info(f"{tool} ran successful!!")
-        results = Table(title=f"{tool} completed")
+        log.info(f"{tool} ran successfully!")
+        if arguments.quiet:
+            return
+
+        n_classified, total, entity_type, fraction = outputs["Results"]
+        percent = n_classified / total * 100 if total else 0.0
+        summary = Text(
+            f"{n_classified:,} of {total:,} {entity_type}s "
+            f"({percent:.2f}%) have taxonomy assigned.",
+            style="bold green",
+        )
+        results = Table(box=None, padding=(0, 2), expand=True)
         results.add_column("Result", style="green")
-        results.add_column("Location")
+        results.add_column("Location", overflow="fold")
         for label, path in outputs.items():
-            results.add_row(label, Text(str(path)))
-        console.print(results)
+            if isinstance(path, Path):
+                results.add_row(Text(label), Text(str(path)))
+
+        content = [summary]
+        if fraction < Decimal("0.5"):
+            content.append(Text(
+                f"Since fraction is set to smaller than 0.5, one {entity_type} "
+                f"may have multiple classifications.",
+                style="yellow",
+            ))
+        content.extend([Text("Results are saved at:"), results])
+        citation_notes = [step.citation for step in outputs["Steps"] if step.citation]
+        if citation_notes:
+            content.extend([Text(""), Text("Citation notes", style="bold cyan")])
+            content.extend(Text(note) for note in citation_notes)
+
+        console.print(Panel(
+            Group(*content),
+            title=f"{tool} completed",
+            border_style="green",
+        ))
