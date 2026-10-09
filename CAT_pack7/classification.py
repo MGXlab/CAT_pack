@@ -1,5 +1,6 @@
 """Shared taxonomic classification engine for CAT and BAT"""
 from decimal import Decimal
+from functools import lru_cache
 from typing import Mapping, Sequence
 
 from . import tax
@@ -22,6 +23,8 @@ class ClassificationEngine:
         self.taxid2parent = taxid2parent
         self.fastaid2taxid = fastaid2taxid
         self.fraction = fraction
+        self.lineage = lru_cache(maxsize=65_536)(
+            lambda taxid: tuple(tax.find_lineage(taxid, self.taxid2parent)))
 
     def classify_orf(
         self, orf_id: str, hits: Sequence[tuple[str, Decimal]] | None
@@ -30,7 +33,7 @@ class ClassificationEngine:
             return ORFClassification(orf_id=orf_id, status=ORFStatus.NO_HIT)
 
         taxid, top_bitscore = tax.find_LCA_for_ORF(
-            hits, self.fastaid2taxid, self.taxid2parent)
+            hits, self.fastaid2taxid, self.taxid2parent, lineage_lookup=self.lineage)
 
         if taxid.startswith("no taxid found"):
             return ORFClassification(
@@ -41,7 +44,7 @@ class ClassificationEngine:
                 message=taxid,
             )
 
-        lineage = tax.find_lineage(taxid, self.taxid2parent)
+        lineage = self.lineage(taxid)
 
         return ORFClassification(
             orf_id=orf_id,
@@ -93,7 +96,7 @@ class ClassificationEngine:
             )
 
         lineages, lineages_scores, based_on_n_orfs = tax.find_weighted_LCA(
-            lca_ORFs, self.taxid2parent, self.fraction)
+            lca_ORFs, self.taxid2parent, self.fraction, lineage_lookup=self.lineage)
 
         if lineages == "no ORFs with taxids found.":
             return ClassificationResult(
