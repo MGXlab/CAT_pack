@@ -205,3 +205,7 @@ class PrepareSettings(ExecutionSettings):
     acc2tax: Path
     diamond: DiamondPrepareSettings | None
     mmseqs: MMseqsPrepareSettings | None = None
+
+@dataclass()
+class ParserSettings:
+    bit_score_multiplier = 10

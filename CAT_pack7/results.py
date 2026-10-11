@@ -1,6 +1,12 @@
 from dataclasses import dataclass
-from decimal import Decimal
-from enum import Enum, auto
+from enum import auto, IntEnum
+
+import numpy as np
+
+from .io.parsers import AlignmentInput
+from .tax import Taxonomy, WeightedLCA
+
+NO_HIT = -1
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,75 +27,54 @@ class Lineage:
         return ";".join(reversed(taxids))
 
 
-class ORFStatus(Enum):
-    """Classification status of a single predicted ORF.
-
-    ASSIGNED: has taxid and LCA assigned to ORF
-    NO_HIT: ORF has no accepted homology hit
-    NO_TAXID: ORF accepted homology hits but no usable taxid association
-    """
-    NO_HIT = auto()
-    NO_TAXID = auto()
-    ASSIGNED = auto()
-
-
-class ClassificationStatus(Enum):
+class ClassificationStatus(IntEnum):
     ASSIGNED = auto()
     NO_ORFS = auto()
     NO_HITS = auto()
     NO_TAXIDS = auto()
     NO_LINEAGE_SUPPORT = auto()
 
-
-@dataclass(slots=True)
-class ORFClassification:
-    orf_id: str
-    status: ORFStatus
-    n_hits: int = 0
-    taxid: str | None = None  # TODO: replace with int down the line
-    message: str | None = None
-    top_bitscore: Decimal | None = None
-    lineage: tuple[str, ...] = ()  # TODO: update on lineage internal change
-
-
-@dataclass(frozen=True, slots=True)
-class TaxonomicAssignment:
-    """One taxonomic assignment supported for an entity.
-
-    If f < 0.5 this can cause multiple classifications for one contig.
-    """
-    taxid: str
-    lineage: tuple[str, ...]
-    lineage_scores: tuple[Decimal, ...]
-
-
-class TaxonomyNamespace(Enum):
-    """Support for multiple taxonomy namespaces in the future."""
-    NCBI = auto()
-
-
-@dataclass(slots=True)
-class ClassificationResult:
-    """A unified classification result for CAT and BAT."""
-    entity_id: str
-    status: ClassificationStatus
-    taxonomy_namespace: TaxonomyNamespace = TaxonomyNamespace.NCBI
-    assignments: tuple[TaxonomicAssignment, ...] = ()
-    total_n_ORFs: int = 0
-    based_on_n_ORFs: int = 0
-    orf_results: tuple[ORFClassification, ...] = ()
-
-    @property
-    def assigned(self) -> bool:
-        return self.status == ClassificationStatus.ASSIGNED
-
     @property
     def reason(self) -> str:
-        if self.assigned:
-            return f"based on {self.based_on_n_ORFs}/{self.total_n_ORFs} ORFs"
         return {
             ClassificationStatus.NO_ORFS: "no ORFs found",
             ClassificationStatus.NO_HITS: "no hits to database",
             ClassificationStatus.NO_TAXIDS: "hits not found in taxonomy files",
             ClassificationStatus.NO_LINEAGE_SUPPORT: "no lineage reached minimum bit-score support",
-        }[self.status]
+        }[self]
+
+
+@dataclass(frozen=True)
+class Classification:
+    """Classification of all contigs or bins "entities"
+    stored as 1d numpy arrays"""
+    entity_type: str
+    entities: list[str]
+    status: np.ndarray
+    orf_offsets: np.ndarray
+    orf_names: list[str]
+    orf_row: np.ndarray
+    orf_lca: np.ndarray
+    orf_n_hits: np.ndarray
+    orf_top_bitscore: np.ndarray
+    n_orfs_with_taxid: np.ndarray
+    assignment_offsets: np.ndarray
+    weighted: WeightedLCA
+    alignment: AlignmentInput
+    taxonomy: Taxonomy
+
+    def __len__(self) -> int:
+        return len(self.entities)
+
+    def get_status(self, entity: int) -> ClassificationStatus:
+        return ClassificationStatus(int(self.status[entity]))
+
+    def get_orfs(self, entity: int) -> slice:
+        return slice(self.orf_offsets[entity], self.orf_offsets[entity + 1])
+
+    def get_assignments(self, entity: int) -> range:
+        return range(self.assignment_offsets[entity], self.assignment_offsets[entity + 1])
+
+    @property
+    def n_assigned(self) -> int:
+        return int(np.count_nonzero(self.status == ClassificationStatus.ASSIGNED.value))
