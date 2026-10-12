@@ -15,6 +15,8 @@ class Taxonomy:
         self.parents = parents
         self.taxid_index = taxid_index
         self.taxids = taxids
+        self.no_rank = 1
+        self.no_taxid = 0
 
     @classmethod
     def import_nodes(cls, nodes_dmp: Path):
@@ -37,7 +39,17 @@ class Taxonomy:
 
         return cls(parents, taxid_index, taxids)
 
-    def lineage(self, taxid):
+
+    def taxid_of_hits(self, hits, fastaid2taxid):
+        taxids = []
+
+        for hit in hits:
+            # Note, no rank is 1 in the nodes.dmp that's why the fallback is 0
+            taxids.append(self.taxid_index.get(fastaid2taxid.get(hit), self.no_taxid))
+
+        return np.array(taxids, dtype=np.int32)
+
+    def find_lineage(self, taxid):
         lineage = []
         taxid = int(taxid)
 
@@ -50,6 +62,25 @@ class Taxonomy:
             taxid = parent
 
         return np.array(lineage, dtype=np.int32)
+
+    def find_lca(self, taxids):
+        taxids = [int(taxid) for taxid in taxids if taxid != self.no_taxid]
+
+        if not taxids:
+            return self.no_taxid
+
+        lineages = self.find_lineage(taxid for taxid in taxids)
+
+        overlap = set.intersection(*map(set, lineages))
+
+        for taxid in lineages[0]:
+            if taxid in overlap:
+                return int(taxid)
+
+        return self.no_taxid
+
+
+
 
 
 
