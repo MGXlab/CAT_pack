@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 
 from .io.reference_mapping import read_fastaid2LCAtaxid
+from .utils.errors import InputError
 
 log = logging.getLogger("CAT_pack")
 
@@ -372,6 +373,28 @@ def convert_to_official_names(lineage, taxid2rank, taxid2name, scores=None):
     return official_names
 
 
+def read_nodes(path: Path) -> dict[str, str]:
+    log.info(f"Loading file {path}.")
+    parents: dict[str, str] = {}
+    with path.open(encoding="utf-8") as source:
+        for line_number, line in enumerate(source, start=1):
+            fields = line.rstrip("\r\n").split("\t", 3)
+            if len(fields) < 3 or fields[1] != "|" or not fields[0] or not fields[2]:
+                raise InputError(
+                    f"Malformed taxonomy node at line {line_number}.",
+                    path=path,
+                    hint="Use an NCBI nodes.dmp file with tab-separated taxid and parent fields.",
+                )
+            taxid, parent = fields[0], fields[2]
+            if taxid in parents:
+                raise InputError(
+                    f"Duplicate taxonomy taxid {taxid} at line {line_number}.",
+                    path=path,
+                )
+            parents[taxid] = parent
+    return parents
+
+
 def import_fastaid2LCAtaxid(fastaid2LCAtaxid_file: Path, all_hits, *, workers=1):
     log.info(f"Loading file {fastaid2LCAtaxid_file}.")
     return read_fastaid2LCAtaxid(fastaid2LCAtaxid_file, all_hits, workers)
@@ -380,15 +403,8 @@ def import_fastaid2LCAtaxid(fastaid2LCAtaxid_file: Path, all_hits, *, workers=1)
 def import_taxids_with_multiple_offspring(taxids_with_multiple_offspring_file):
     log.info(f"Loading file {taxids_with_multiple_offspring_file}.")
 
-    taxids_with_multiple_offspring = set()
-
-    with open(taxids_with_multiple_offspring_file, "r") as f1:
-        for line in f1:
-            line = line.rstrip()
-
-            taxids_with_multiple_offspring.add(line)
-
-    return taxids_with_multiple_offspring
+    with open(taxids_with_multiple_offspring_file, "r", encoding="utf-8") as f1:
+        return {taxid for line in f1 if (taxid := line.strip())}
 
 
 def find_lineage(taxid, parents):
