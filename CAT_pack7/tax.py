@@ -10,6 +10,8 @@ from .io.reference_mapping import read_fastaid2LCAtaxid
 
 log = logging.getLogger("CAT_pack")
 
+NO_TAXID = 0
+
 class Taxonomy:
     def __init__(self, parents, taxid_index, taxids):
         self.parents = parents
@@ -154,10 +156,50 @@ class Taxonomy:
         return lca_per_orf
 
 
+def sum_bitscores(orf_type, lca_per_orf, top_bitscores, n):
+    taxid_mask = lca_per_orf != NO_TAXID
+    total_bitscore = np.zeros(n, dtype=np.int32)
+    np.add.at(total_bitscore, orf_type[taxid_mask], top_bitscores[taxid_mask])
+    return total_bitscore
 
+def sum_taxid_bitscores(taxonomy, orf_type, lca_per_orf, top_bitscores):
+    orf_pos = np.flatnonzero(lca_per_orf != NO_TAXID)
 
+    orf_ids = orf_type[orf_pos]
+    taxids = lca_per_orf[orf_pos]
+    bitscores = top_bitscores[orf_pos]
 
+    support = [(orf_ids, taxids, bitscores, orf_pos)]
 
+    while True:
+        parent_taxids = taxonomy.parent[taxids]
+        is_not_root = parent_taxids != taxids
+
+        if not np.any(is_not_root):
+            break
+
+        orf_ids = orf_ids[is_not_root]
+        taxids = parent_taxids[is_not_root]
+        bitscores = bitscores[is_not_root]
+        orf = orf[is_not_root]
+
+        support.append((orf_ids, taxids, bitscores, orf))
+
+    orf_ids, taxids, bitscores, orf_pos = (
+        np.concatenate(column) for column in zip(*support))
+
+    pairs, pair_pos = np.unique(
+        np.column_stack((orf_ids, taxids)),
+        axis=0, return_index=True
+    )
+
+    taxid_bitscores = np.zeros(len(pairs), dtype=np.int32)
+    np.add.at(taxid_bitscores, pair_pos, bitscores)
+
+    first_orf = np.full(len(pairs), np.finfo(np.int64).max, dtype=np.int32)
+    np.minimum(first_orf, pair_pos, orf_pos)
+
+    return pairs, taxid_bitscores, first_orf
 
 
 
