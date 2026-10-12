@@ -4,16 +4,45 @@ import logging
 import sys
 from pathlib import Path
 
+import numpy as np
+
 from .io.reference_mapping import read_fastaid2LCAtaxid
 
 log = logging.getLogger("CAT_pack")
+
+class Taxonomy:
+    def __init__(self, parents, taxid_index, taxids):
+        self.parents = parents
+        self.taxid_index = taxid_index
+        self.taxids = taxids
+
+    @classmethod
+    def import_nodes(cls, nodes_dmp: Path):
+        log.info(f"Loading file {nodes_dmp}.")
+
+        taxid2parent = {}
+
+        with open(nodes_dmp, "r") as f1:
+            for line in f1:
+                line = line.split("\t")
+                taxid2parent[line[0]] = line[2]
+
+        taxids = list(taxid2parent)
+
+        # External taxid to internal position index
+        taxid_index = {taxid: index for index, taxid in enumerate(taxids)}
+
+        # internal position to parents internal position
+        parents = np.fromiter((taxid_index[taxid2parent[taxid]] for taxid in taxids), dtype=np.int32, count=len(taxids))
+
+        return cls(parents, taxid_index, taxids)
+
 
 
 def import_nodes(nodes_dmp):
     log.info(f"Loading file {nodes_dmp}.")
 
     taxid2parent = {}
-    taxid2rank = {}
 
     with open(nodes_dmp, "r") as f1:
         for line in f1:
@@ -21,12 +50,20 @@ def import_nodes(nodes_dmp):
 
             taxid = line[0]
             parent = line[2]
-            rank = line[4]
 
             taxid2parent[taxid] = parent
-            taxid2rank[taxid] = rank
 
-    return taxid2parent, taxid2rank
+    taxids = list(taxid2parent)
+
+    # External taxid to internal position index
+    taxid_index = {taxid: index for index, taxid in enumerate(taxids)}
+
+    # internal position to parents internal position
+    parents = np.fromiter((taxid_index[taxid2parent[taxid]] for taxid in taxids), dtype=np.int32, count=len(taxids))
+
+    return parents, taxid_index, taxids
+
+
 
 
 def import_names(names_dmp: Path):
@@ -66,16 +103,21 @@ def import_taxids_with_multiple_offspring(taxids_with_multiple_offspring_file):
     return taxids_with_multiple_offspring
 
 
-def find_lineage(taxid, taxid2parent, lineage=None):
-    if lineage is None:
-        lineage = []
+def find_lineage(taxid, parents):
+    lineage = []
+    taxid = int(taxid)
 
-    lineage.append(taxid)
+    while True:
+        lineage.append(taxid)
 
-    if taxid2parent[taxid] == taxid:
-        return lineage
-    else:
-        return find_lineage(taxid2parent[taxid], taxid2parent, lineage)
+        parent = int(parents[taxid])
+        if parent == taxid:
+            break
+        taxid = parent
+
+    return np.array(lineage, dtype=np.int32)
+
+
     
     
 def find_LCA(list_of_lineages):
