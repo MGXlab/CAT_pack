@@ -223,17 +223,18 @@ def find_weighted_LCA(taxonomy, orf_type, lca_per_orf, top_bitscores, f, n):
     taxid_trace = set()
     previous_orf_id = None
 
-    for canidate in canidates:
+    for canidate in canidates[order]:
         orf_id, taxid = pairs[canidate]
 
         if orf_id != previous_orf_id:
             taxid_trace.clear()
             previous_orf_id = orf_id
 
-        if taxid not in taxid_trace:
+        if taxid in taxid_trace:
             continue
 
         selected_rows.append(canidate)
+        taxid_trace.update(taxonomy.find_taxid(taxid))
 
     selected_rows = np.asarray(selected_rows, dtype=np.int64)
 
