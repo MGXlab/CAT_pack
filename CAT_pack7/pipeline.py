@@ -4,13 +4,13 @@ from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 
+from . import tax
 from .classification import ClassificationEngine
 from .config.options import BatOptions, CatOptions, PrepareOptions
 from .config.settings import BatFiles, BatSettings, CatFiles, CatSettings, DiamondSettings
 from .config.validation import check_orfs_match_contigs, get_file_names, get_validated_settings, make_prefix, \
     validate_prepare
 from .io.parsers import ClassificationParser
-from .io.taxonomy import read_nodes
 from .io.writers import ClassificationWriter
 from .prepare import (
     copy_taxonomy, find_offspring, make_diamond_database,
@@ -277,7 +277,7 @@ def run_prepare(args: PrepareOptions, report: Report):
                 make_mmseqs2_database(settings)
             else:
                 if taxid2parent is None:
-                    taxid2parent = read_nodes(files.nodes)
+                    taxid2parent = tax.read_nodes(files.nodes)
                 if current_step.name == "Make fastaid2LCAtaxid":
                     make_fastaid2LCAtaxid_file(
                         files.fastaid2LCAtaxid, settings.db_fasta, settings.acc2tax,
