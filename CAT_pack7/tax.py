@@ -37,6 +37,20 @@ class Taxonomy:
 
         return cls(parents, taxid_index, taxids)
 
+    def lineage(self, taxid):
+        lineage = []
+        taxid = int(taxid)
+
+        while True:
+            lineage.append(taxid)
+
+            parent = int(self.parents[taxid])
+            if parent == taxid:
+                break
+            taxid = parent
+
+        return np.array(lineage, dtype=np.int32)
+
 
 
 def import_nodes(nodes_dmp):
