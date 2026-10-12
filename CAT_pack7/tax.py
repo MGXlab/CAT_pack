@@ -17,6 +17,7 @@ class Taxonomy:
         self.taxids = taxids
         self.no_rank = 1
         self.no_taxid = 0
+        self.prepare_LCA()
 
     @classmethod
     def import_nodes(cls, nodes_dmp: Path):
@@ -38,6 +39,25 @@ class Taxonomy:
         parents = np.fromiter((taxid_index[taxid2parent[taxid]] for taxid in taxids), dtype=np.int32, count=len(taxids))
 
         return cls(parents, taxid_index, taxids)
+
+    def prepare_LCA(self):
+        parents = self.parents
+        taxids_indents = np.arange(len(parents))
+
+        taxid_depths = (parents != taxids_indents).astype(np.int64)
+        parents_copy = parents.copy()
+
+        for _ in range(len(parents_copy).bit_length()):
+            next_parent = parents_copy[parents_copy]
+
+            if np.array_equal(next_parent, parents_copy):
+                break
+
+            taxid_depths = taxid_depths + taxid_depths[parents_copy]
+            parents_copy = next_parent
+
+        self.depth = taxid_depths
+        self.root = parents_copy
 
 
     def taxid_of_hits(self, hits, fastaid2taxid):
@@ -80,130 +100,51 @@ class Taxonomy:
         return self.no_taxid
 
 
+    def find_LCA(self, taxids_a, taxids_b):
+        taxids_a = np.asarray(taxids_a, dtype=np.int32)
+        taxids_b = np.asarray(taxids_b, dtype=np.int32)
+
+
+        lca_of_taxids = np.full(taxids_a.shape, -1, dtype=np.int32)
+        shared_root = self.root[taxids_a] == self.root[taxids_b]
+
+        taxids_a = taxids_a[shared_root]
+        taxids_b = taxids_b[shared_root]
+
+        while np.any(taxids_a != taxids_b):
+            different_taxids = taxids_a != taxids_b
+            depth_difference = (self.depth[taxids_a] - self.depth[taxids_b])
+            move_taxids_a = different_taxids & (depth_difference >= 0)
+            move_taxids_b = different_taxids & (depth_difference <= 0)
+
+            taxids_a[move_taxids_a] = self.parents[taxids_a[move_taxids_a]]
+            taxids_b[move_taxids_b] = self.parents[taxids_b[move_taxids_b]]
+
+        lca_of_taxids[shared_root] = taxids_a
+        return lca_of_taxids
 
 
 
 
-def import_nodes(nodes_dmp):
-    log.info(f"Loading file {nodes_dmp}.")
 
-    taxid2parent = {}
+    def find_LCA_for_ORF(self, orf_hit_offsets, hits):
+        orf_count = len(orf_hit_offsets) - 1
 
-    with open(nodes_dmp, "r") as f1:
-        for line in f1:
-            line = line.split("\t")
+        lca = np.full(orf_count, self.no_taxid, dtype=np.int32)
 
-            taxid = line[0]
-            parent = line[2]
-
-            taxid2parent[taxid] = parent
-
-    taxids = list(taxid2parent)
-
-    # External taxid to internal position index
-    taxid_index = {taxid: index for index, taxid in enumerate(taxids)}
-
-    # internal position to parents internal position
-    parents = np.fromiter((taxid_index[taxid2parent[taxid]] for taxid in taxids), dtype=np.int32, count=len(taxids))
-
-    return parents, taxid_index, taxids
+        for orf in range(orf_count):
 
 
 
 
-def import_names(names_dmp: Path):
-    log.info(f"Loading file {names_dmp}.")
-
-    taxid2name = {}
-
-    with open(names_dmp, "r") as f1:
-        for line in f1:
-            line = line.split("\t")
-
-            if line[6] == "scientific name":
-                taxid = line[0]
-                name = line[2]
-
-                taxid2name[taxid] = name
-
-    return taxid2name
 
 
-def import_fastaid2LCAtaxid(fastaid2LCAtaxid_file: Path, all_hits, *, workers=1):
-    log.info(f"Loading file {fastaid2LCAtaxid_file}.")
-    return read_fastaid2LCAtaxid(fastaid2LCAtaxid_file, all_hits, workers)
 
 
-def import_taxids_with_multiple_offspring(taxids_with_multiple_offspring_file):
-    log.info(f"Loading file {taxids_with_multiple_offspring_file}.")
-
-    taxids_with_multiple_offspring = set()
-
-    with open(taxids_with_multiple_offspring_file, "r") as f1:
-        for line in f1:
-            line = line.rstrip()
-
-            taxids_with_multiple_offspring.add(line)
-
-    return taxids_with_multiple_offspring
 
 
-def find_lineage(taxid, parents):
-    lineage = []
-    taxid = int(taxid)
-
-    while True:
-        lineage.append(taxid)
-
-        parent = int(parents[taxid])
-        if parent == taxid:
-            break
-        taxid = parent
-
-    return np.array(lineage, dtype=np.int32)
 
 
-    
-    
-def find_LCA(list_of_lineages):
-    overlap = set.intersection(*map(set, list_of_lineages))
-
-    for taxid in list_of_lineages[0]:
-        if taxid in overlap:
-            return taxid
-
-
-def find_LCA_for_ORF(hits, fastaid2LCAtaxid, taxid2parent, *, lineage_lookup=None):
-    if lineage_lookup is None:
-        lineage_lookup = lambda taxid: find_lineage(taxid, taxid2parent)
-    list_of_lineages = []
-    top_bitscore = 0
-
-    for (hit, bitscore) in hits:
-        if bitscore > top_bitscore:
-            top_bitscore = bitscore
-            
-        try:
-            taxid = fastaid2LCAtaxid[hit]
-            lineage = lineage_lookup(taxid)
-
-            list_of_lineages.append(lineage)
-        except:
-            # The fastaid does not have an associated taxid for some reason.
-            pass
-        
-    if len(list_of_lineages) == 0:
-        return (
-                "no taxid found ({0})".format(";".join([i[0] for i in hits])),
-                top_bitscore
-                )
-
-    overlap = set.intersection(*map(set, list_of_lineages))
-
-    for taxid in list_of_lineages[0]:
-        if taxid in overlap:
-            return (taxid, top_bitscore)
-        
         
 def find_questionable_taxids(lineage, taxids_with_multiple_offspring):
     questionable_taxids = []
@@ -377,6 +318,66 @@ def convert_to_official_names(lineage, taxid2rank, taxid2name, scores=None):
 
     return official_names
 
+
+def import_fastaid2LCAtaxid(fastaid2LCAtaxid_file: Path, all_hits, *, workers=1):
+    log.info(f"Loading file {fastaid2LCAtaxid_file}.")
+    return read_fastaid2LCAtaxid(fastaid2LCAtaxid_file, all_hits, workers)
+
+
+def import_taxids_with_multiple_offspring(taxids_with_multiple_offspring_file):
+    log.info(f"Loading file {taxids_with_multiple_offspring_file}.")
+
+    taxids_with_multiple_offspring = set()
+
+    with open(taxids_with_multiple_offspring_file, "r") as f1:
+        for line in f1:
+            line = line.rstrip()
+
+            taxids_with_multiple_offspring.add(line)
+
+    return taxids_with_multiple_offspring
+
+
+def find_lineage(taxid, parents):
+    lineage = []
+    taxid = int(taxid)
+
+    while True:
+        lineage.append(taxid)
+
+        parent = int(parents[taxid])
+        if parent == taxid:
+            break
+        taxid = parent
+
+    return np.array(lineage, dtype=np.int32)
+
+
+def find_LCA(list_of_lineages):
+    overlap = set.intersection(*map(set, list_of_lineages))
+
+    for taxid in list_of_lineages[0]:
+        if taxid in overlap:
+            return taxid
+
+
+
+def import_names(names_dmp: Path):
+    log.info(f"Loading file {names_dmp}.")
+
+    taxid2name = {}
+
+    with open(names_dmp, "r") as f1:
+        for line in f1:
+            line = line.split("\t")
+
+            if line[6] == "scientific name":
+                taxid = line[0]
+                name = line[2]
+
+                taxid2name[taxid] = name
+
+    return taxid2name
 
 if __name__ == "__main__":
     sys.exit("Run \'CAT_pack\' to run CAT, BAT, or RAT.")
