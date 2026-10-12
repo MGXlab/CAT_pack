@@ -85,7 +85,7 @@ class ClassificationEngine:
         hits_start = alignment.orf_offsets[alignment_indices]
         hits_end = alignment.orf_offsets[alignment_indices + 1]
 
-        alignment_ORF_LCAs = self.taxonomy.find_lca_for_orfs(
+        alignment_ORF_LCAs = self.taxonomy.find_LCA_for_ORF(
             alignment.orf_offsets, self.hit2taxon[alignment.hit_ids])
 
         LCA_per_ORF = np.full(n_ORFs, tax.NO_TAXID, dtype=np.int32)

@@ -2,6 +2,7 @@
 
 import logging
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -10,7 +11,7 @@ from .io.reference_mapping import read_fastaid2LCAtaxid
 
 log = logging.getLogger("CAT_pack")
 
-NO_TAXID = 0
+NO_TAXID = -1
 
 class Taxonomy:
     def __init__(self, parents, taxid_index, taxids):
@@ -18,7 +19,7 @@ class Taxonomy:
         self.taxid_index = taxid_index
         self.taxids = taxids
         self.no_rank = 1
-        self.no_taxid = 0
+        self.no_taxid = NO_TAXID
         self.prepare_LCA()
 
     @classmethod
@@ -66,7 +67,7 @@ class Taxonomy:
         taxids = []
 
         for hit in hits:
-            # Note, no rank is 1 in the nodes.dmp that's why the fallback is 0
+            # Missing mappings use a marker outside the internal taxid positions.
             taxids.append(self.taxid_index.get(fastaid2taxid.get(hit), self.no_taxid))
 
         return np.array(taxids, dtype=np.int32)
@@ -91,7 +92,7 @@ class Taxonomy:
         if not taxids:
             return self.no_taxid
 
-        lineages = self.find_lineage(taxid for taxid in taxids)
+        lineages = [self.find_lineage(taxid) for taxid in taxids]
 
         overlap = set.intersection(*map(set, lineages))
 
@@ -107,7 +108,7 @@ class Taxonomy:
         taxids_b = np.asarray(taxids_b, dtype=np.int32)
 
 
-        lca_of_taxids = np.full(taxids_a.shape, -1, dtype=np.int32)
+        lca_of_taxids = np.full(taxids_a.shape, self.no_taxid, dtype=np.int32)
         shared_root = self.root[taxids_a] == self.root[taxids_b]
 
         taxids_a = taxids_a[shared_root]
@@ -156,9 +157,33 @@ class Taxonomy:
         return lca_per_orf
 
 
+@dataclass
+class WeightedLCA:
+    total: np.ndarray
+    assignment_entity: np.ndarray
+    assignment_taxon: np.ndarray
+    lineage_offsets: np.ndarray
+    lineage_taxids: np.ndarray
+    lineage_bitscores: np.ndarray
+
+    @classmethod
+    def find(
+        cls, taxonomy, entity_of_orf, orf_lca,
+        bitscore, fraction, n_entities,
+    ):
+        return find_weighted_LCA(
+            taxonomy, entity_of_orf, orf_lca,
+            bitscore, fraction, n_entities,
+        )
+
+    def lineage_support_of(self, assignment):
+        start, end = self.lineage_offsets[assignment:assignment + 2]
+        return self.lineage_bitscores[start:end].tolist()
+
+
 def sum_bitscores(orf_type, lca_per_orf, top_bitscores, n):
     taxid_mask = lca_per_orf != NO_TAXID
-    total_bitscore = np.zeros(n, dtype=np.int32)
+    total_bitscore = np.zeros(n, dtype=np.int64)
     np.add.at(total_bitscore, orf_type[taxid_mask], top_bitscores[taxid_mask])
     return total_bitscore
 
@@ -193,7 +218,7 @@ def sum_taxid_bitscores(taxonomy, orf_type, lca_per_orf, top_bitscores):
         axis=0, return_inverse=True
     )
 
-    taxid_bitscores = np.zeros(len(pairs), dtype=np.int32)
+    taxid_bitscores = np.zeros(len(pairs), dtype=np.int64)
     np.add.at(taxid_bitscores, pair_pos, bitscores)
 
     first_orf = np.full(len(pairs), np.iinfo(np.int64).max, dtype=np.int64)
@@ -209,9 +234,11 @@ def find_weighted_LCA(taxonomy, orf_type, lca_per_orf, top_bitscores, f, n):
 
     f_numerator, f_denominator = f.as_integer_ratio()
 
-    bitscore_cutoffs = np.fromiter((total * f_numerator // f_denominator
-                                    for total in total_bitscore),
-                                   dtype=np.int64, count=n)
+    bitscore_cutoffs = np.fromiter(
+        (int(total) * f_numerator // f_denominator
+         for total in total_bitscore),
+        dtype=np.int64, count=n,
+    )
 
     pair_cutoff = bitscore_cutoffs[pairs[:, 0]]
 
@@ -234,14 +261,43 @@ def find_weighted_LCA(taxonomy, orf_type, lca_per_orf, top_bitscores, f, n):
             continue
 
         selected_rows.append(canidate)
-        taxid_trace.update(taxonomy.find_taxid(taxid))
+        taxid_trace.update(taxonomy.find_lineage(taxid))
 
     selected_rows = np.asarray(selected_rows, dtype=np.int64)
 
-    orf_id = pairs[selected_rows, 0]
-    taxon = pairs[selected_rows, 1]
+    assignment_entity = pairs[selected_rows, 0]
+    assignment_taxon = pairs[selected_rows, 1]
 
-    return orf_id, taxon, total_bitscore
+    lineage_lengths = taxonomy.depth[assignment_taxon] + 1
+    lineage_offsets = np.concatenate(([0], np.cumsum(lineage_lengths)))
+
+    lineage_taxids = np.empty(lineage_offsets[-1], dtype=np.int32)
+    lineage_bitscores = np.empty(lineage_offsets[-1], dtype=np.int64)
+
+    support_offsets = np.searchsorted(pairs[:, 0], np.arange(n + 1))
+
+    for assignment, (entity, taxid) in enumerate(
+        zip(assignment_entity, assignment_taxon)
+    ):
+        lineage = taxonomy.find_lineage(taxid)
+        start, end = lineage_offsets[assignment:assignment + 2]
+
+        support_start, support_end = support_offsets[entity:entity + 2]
+        support_rows = support_start + np.searchsorted(
+            pairs[support_start:support_end, 1], lineage
+        )
+
+        lineage_taxids[start:end] = lineage
+        lineage_bitscores[start:end] = taxid_bitscores[support_rows]
+
+    return WeightedLCA(
+        total=total_bitscore,
+        assignment_entity=assignment_entity,
+        assignment_taxon=assignment_taxon,
+        lineage_offsets=lineage_offsets,
+        lineage_taxids=lineage_taxids,
+        lineage_bitscores=lineage_bitscores,
+    )
 
 def convert_to_names(lineage, taxid2rank, taxid2name, scores=None):
     names = []
