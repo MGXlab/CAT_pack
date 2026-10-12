@@ -142,7 +142,7 @@ class Taxonomy:
         orf_of_hit = orf_of_hit[no_taxid_hit_mask]
 
         hits_per_orf = np.bincount(orf_of_hit, minlength=orf_count)
-        hit_start = np.concatenate([0], np.cumsum(hits_per_orf))[:-1]
+        hit_start = np.concatenate(([0], np.cumsum(hits_per_orf)))[:-1]
         lca_per_orf = np.full(orf_count, self.no_taxid, dtype=np.int32)
 
         has_hits = hits_per_orf > 0
@@ -172,7 +172,7 @@ def sum_taxid_bitscores(taxonomy, orf_type, lca_per_orf, top_bitscores):
     support = [(orf_ids, taxids, bitscores, orf_pos)]
 
     while True:
-        parent_taxids = taxonomy.parent[taxids]
+        parent_taxids = taxonomy.parents[taxids]
         is_not_root = parent_taxids != taxids
 
         if not np.any(is_not_root):
@@ -181,130 +181,66 @@ def sum_taxid_bitscores(taxonomy, orf_type, lca_per_orf, top_bitscores):
         orf_ids = orf_ids[is_not_root]
         taxids = parent_taxids[is_not_root]
         bitscores = bitscores[is_not_root]
-        orf = orf[is_not_root]
+        orf_pos = orf_pos[is_not_root]
 
-        support.append((orf_ids, taxids, bitscores, orf))
+        support.append((orf_ids, taxids, bitscores, orf_pos))
 
     orf_ids, taxids, bitscores, orf_pos = (
         np.concatenate(column) for column in zip(*support))
 
     pairs, pair_pos = np.unique(
         np.column_stack((orf_ids, taxids)),
-        axis=0, return_index=True
+        axis=0, return_inverse=True
     )
 
     taxid_bitscores = np.zeros(len(pairs), dtype=np.int32)
     np.add.at(taxid_bitscores, pair_pos, bitscores)
 
-    first_orf = np.full(len(pairs), np.finfo(np.int64).max, dtype=np.int32)
-    np.minimum(first_orf, pair_pos, orf_pos)
+    first_orf = np.full(len(pairs), np.iinfo(np.int64).max, dtype=np.int64)
+    np.minimum.at(first_orf, pair_pos, orf_pos)
 
     return pairs, taxid_bitscores, first_orf
 
 
+def find_weighted_LCA(taxonomy, orf_type, lca_per_orf, top_bitscores, f, n):
+    total_bitscore = sum_bitscores(orf_type, lca_per_orf, top_bitscores, n)
+    pairs, taxid_bitscores, first_orf = sum_taxid_bitscores(
+        taxonomy, orf_type, lca_per_orf, top_bitscores)
 
+    f_numerator, f_denominator = f.as_integer_ratio()
 
+    bitscore_cutoffs = np.fromiter((total * f_numerator // f_denominator
+                                    for total in total_bitscore),
+                                   dtype=np.int64, count=n)
 
-        
-def find_questionable_taxids(lineage, taxids_with_multiple_offspring):
-    questionable_taxids = []
+    pair_cutoff = bitscore_cutoffs[pairs[:, 0]]
 
-    if lineage == ["1"] or lineage == ["root"]:
-        return questionable_taxids
-    
-    if len(lineage) == 2 and (lineage[1:] == ["1"] or lineage[1:] == ["root"]):
-        return questionable_taxids 
-    
-    for (i, taxid) in enumerate(lineage):
-        taxid_parent = lineage[i + 1]
-        if taxid_parent in taxids_with_multiple_offspring:
-            return questionable_taxids
+    canidates = np.flatnonzero(taxid_bitscores > pair_cutoff)
 
-        questionable_taxids.append(taxid)
+    order = np.lexsort((first_orf[canidates], -taxonomy.depth[pairs[canidates, 1]], pairs[canidates, 0]))
 
-
-def star_lineage(lineage, taxids_with_multiple_offspring):
-    questionable_taxids = find_questionable_taxids(
-            lineage, taxids_with_multiple_offspring)
-
-    starred_lineage = [
-            taxid if
-            taxid not in questionable_taxids else
-            "{0}*".format(taxid) for taxid in lineage
-            ]
-
-    return starred_lineage
-
-
-def find_weighted_LCA(LCAs_ORFs, taxid2parent, f, *, lineage_lookup=None):
-    if lineage_lookup is None:
-        lineage_lookup = lambda taxid: find_lineage(taxid, taxid2parent)
-    list_of_lineages = []
-    list_of_bitscores = []
-    based_on_n_ORFs = 0
-
-    for (taxid, top_bitscore) in LCAs_ORFs:
-        if taxid.startswith("no taxid found"):
-            # Thus the ORFs that are not classified because they don't have an
-            # associated taxid are not taken into account for the
-            # classification of the contig.
-            continue
-        
-        lineage = lineage_lookup(taxid)
-        
-        list_of_lineages.append(lineage)
-        list_of_bitscores.append(top_bitscore)
-        based_on_n_ORFs += 1
-
-    if len(list_of_lineages) == 0:
-        return (
-                "no ORFs with taxids found.",
-                "no ORFs with taxids found.",
-                "no ORFs with taxids found."
-                )
-
-    taxid2bitscore = {}
-    for (i, lineage) in enumerate(list_of_lineages):
-        for taxid in lineage:
-            if taxid not in taxid2bitscore:
-                taxid2bitscore[taxid] = 0
-
-            taxid2bitscore[taxid] += list_of_bitscores[i]
-
-    total_bitscore = sum(list_of_bitscores)
-    whitelisted_lineages = []
-    for taxid in taxid2bitscore:
-        if taxid2bitscore[taxid] / total_bitscore > f:
-            lineage = lineage_lookup(taxid)
-
-            whitelisted_lineages.append(lineage)
-
-    if len(whitelisted_lineages) == 0:
-        return (
-                "no lineage whitelisted.",
-                "no lineage whitelisted.",
-                "no lineage whitelisted."
-                )
-
-    whitelisted_lineages = sorted(whitelisted_lineages,
-            key=lambda x: len(x), reverse=True)
-
-    longest_lineages = []
-    longest_lineages_scores = []
-
+    selected_rows = []
     taxid_trace = set()
-    for whitelisted_lineage in whitelisted_lineages:
-        if whitelisted_lineage[0] not in taxid_trace:
-            longest_lineages.append(list(whitelisted_lineage))
+    previous_orf_id = None
 
-            scores = [taxid2bitscore[taxid] / total_bitscore for
-                      taxid in whitelisted_lineage]
-            longest_lineages_scores.append(scores)
+    for canidate in canidates:
+        orf_id, taxid = pairs[canidate]
 
-            taxid_trace |= set(whitelisted_lineage)
+        if orf_id != previous_orf_id:
+            taxid_trace.clear()
+            previous_orf_id = orf_id
 
-    return (longest_lineages, longest_lineages_scores, based_on_n_ORFs)
+        if taxid not in taxid_trace:
+            continue
 
+        selected_rows.append(canidate)
+
+    selected_rows = np.asarray(selected_rows, dtype=np.int64)
+
+    orf_id = pairs[selected_rows, 0]
+    taxon = pairs[selected_rows, 1]
+
+    return orf_id, taxon, total_bitscore
 
 def convert_to_names(lineage, taxid2rank, taxid2name, scores=None):
     names = []
@@ -438,6 +374,36 @@ def import_names(names_dmp: Path):
                 taxid2name[taxid] = name
 
     return taxid2name
+
+
+def find_questionable_taxids(lineage, taxids_with_multiple_offspring):
+    questionable_taxids = []
+
+    if lineage == ["1"] or lineage == ["root"]:
+        return questionable_taxids
+
+    if len(lineage) == 2 and (lineage[1:] == ["1"] or lineage[1:] == ["root"]):
+        return questionable_taxids
+
+    for (i, taxid) in enumerate(lineage):
+        taxid_parent = lineage[i + 1]
+        if taxid_parent in taxids_with_multiple_offspring:
+            return questionable_taxids
+
+        questionable_taxids.append(taxid)
+
+
+def star_lineage(lineage, taxids_with_multiple_offspring):
+    questionable_taxids = find_questionable_taxids(
+        lineage, taxids_with_multiple_offspring)
+
+    starred_lineage = [
+        taxid if
+        taxid not in questionable_taxids else
+        "{0}*".format(taxid) for taxid in lineage
+    ]
+
+    return starred_lineage
 
 if __name__ == "__main__":
     sys.exit("Run \'CAT_pack\' to run CAT, BAT, or RAT.")
