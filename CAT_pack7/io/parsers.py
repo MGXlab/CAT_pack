@@ -327,10 +327,10 @@ class ClassificationParser:
                 entity2ORFs[contig] = contig2ORFs.get(contig, [])
 
         alignment = AlignmentParser(self.files.alignment, self.range_, self.cat_only).parse()
-        taxonomy = tax.Taxonomy.from_nodes_file(self.files.nodes)
-        fastaid2LCAtaxid = read_fastaid2LCAtaxid(
-            self.files.fastaid2LCA, set(alignment.hit_names), workers=self.workers)
-        fastaid2taxid = taxonomy.taxa_of_hits(alignment.hit_names, fastaid2LCAtaxid)
+        taxonomy = tax.Taxonomy.import_nodes(self.files.nodes)
+
+        fastaid2LCAtaxid = read_fastaid2LCAtaxid(self.files.fastaid2LCA, set(alignment.hit_names), workers=self.workers)
+        fastaid2taxid = taxonomy.taxid_of_hits(alignment.hit_names, fastaid2LCAtaxid)
         branches = read_branch_taxids(self.files.branches)
 
         return ClassificationInputs(

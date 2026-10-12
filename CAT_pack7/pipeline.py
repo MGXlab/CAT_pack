@@ -4,13 +4,13 @@ from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 
-from . import tax
 from .classification import ClassificationEngine
 from .config.options import BatOptions, CatOptions, PrepareOptions
 from .config.settings import BatFiles, BatSettings, CatFiles, CatSettings, DiamondSettings
 from .config.validation import check_orfs_match_contigs, get_file_names, get_validated_settings, make_prefix, \
     validate_prepare
 from .io.parsers import ClassificationParser
+from .io.taxonomy import read_nodes
 from .io.writers import ClassificationWriter
 from .prepare import (
     copy_taxonomy, find_offspring, make_diamond_database,
@@ -169,26 +169,30 @@ def run_classification(
     files: CatFiles | BatFiles,
     report: Report,
 ) -> tuple[int, int, str, Decimal]:
-    """Load and validate inputs, then classify and write the results."""
+    """Load inputs, classify all entities, then write their reports."""
     log = logging.getLogger("CAT_pack")
-    inputs = ClassificationParser(files, settings.range_, workers=settings.threads).parse()
-    check_orfs_match_contigs(inputs.contig_names, inputs.contig2ORFs, files.proteins_fasta)
+    inputs = ClassificationParser(
+        files, settings.range_, workers=settings.threads
+    ).parse()
+    check_orfs_match_contigs(
+        inputs.contig_names, inputs.contig2ORFs, files.proteins_fasta
+    )
     engine = ClassificationEngine(
-        taxid2parent=inputs.taxid2parent,
+        taxonomy=inputs.taxonomy,
         fastaid2taxid=inputs.fastaid2taxid,
         fraction=settings.fraction,
     )
 
-    if isinstance(files, BatFiles):
-        tool = "BAT"
-        action = "flying"
-    else:
-        tool = "CAT"
-        action = "spinning"
-    log.info(f"{tool} is {action}! Files {files.report} and {files.orf_report} are created.")
-    n_classified = 0
     total = len(inputs.entity2ORFs)
     report("Classify", Status.RUNNING, 0, total)
+    result = engine.classify(
+        inputs.entity_type, inputs.entity2ORFs, inputs.alignment
+    )
+
+    log.info(
+        "Writing classifications to %s and %s.",
+        files.report, files.orf_report,
+    )
     with (
         files.report.open("w", encoding="utf-8") as classification_out,
         files.orf_report.open("w", encoding="utf-8") as orf_out,
@@ -202,17 +206,14 @@ def run_classification(
             branches=inputs.branches,
             no_stars=getattr(settings, "no_stars", False),
         )
-        for index, entity_id in enumerate(sorted(inputs.entity2ORFs), start=1):
-            result = engine.classify_group(
-                entity_id=entity_id,
-                orf_ids=inputs.entity2ORFs[entity_id],
-                orf2hits=inputs.alignment.orf2hits,
-            )
-            writer.write(result)
-            if result.assigned:
-                n_classified += 1
-            report("Classify", Status.RUNNING, index, total)
-    classification_summary(n_classified, total, inputs.entity_type, settings.fraction)
+        for entity in range(len(result)):
+            writer.write(result, entity)
+            report("Classify", Status.RUNNING, entity + 1, total)
+
+    n_classified = result.n_assigned
+    classification_summary(
+        n_classified, total, inputs.entity_type, settings.fraction
+    )
     return n_classified, total, inputs.entity_type, settings.fraction
 
 
@@ -276,7 +277,7 @@ def run_prepare(args: PrepareOptions, report: Report):
                 make_mmseqs2_database(settings)
             else:
                 if taxid2parent is None:
-                    taxid2parent, _ = tax.import_nodes(files.nodes)
+                    taxid2parent = read_nodes(files.nodes)
                 if current_step.name == "Make fastaid2LCAtaxid":
                     make_fastaid2LCAtaxid_file(
                         files.fastaid2LCAtaxid, settings.db_fasta, settings.acc2tax,

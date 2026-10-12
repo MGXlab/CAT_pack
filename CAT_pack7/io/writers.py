@@ -2,11 +2,13 @@
 from decimal import Decimal
 from typing import TextIO
 
-from ..results import ClassificationResult, Lineage, ORFClassification, ORFStatus
+from .parsers import format_bitscore
+from ..results import Classification, ClassificationStatus, Lineage, NO_HIT
+from ..tax import NO_TAXID
 
 
 class ClassificationWriter:
-    """Write headers on creation, then write and format the results"""
+    """Write headers on creation, then write the array results."""
 
     def __init__(
         self, classification_out: TextIO, orf_out: TextIO, *,
@@ -28,50 +30,76 @@ class ClassificationWriter:
             f"# {self.entity_type}\tclassification\treason\tlineage\t"
             f"lineage scores (f: {float(self.fraction)})\n"
         )
-        bin_column = ""
-        if self.is_bin:
-            bin_column = "bin\t"
+        bin_column = "bin\t" if self.is_bin else ""
         self.orf_out.write(
             f"# ORF\t{bin_column}number of hits (r: {self.range_})\tlineage\ttop bit-score\n"
         )
 
-    def write(self, result: ClassificationResult) -> None:
-        for orf_result in result.orf_results:
-            self.write_orf(orf_result, result.entity_id)
+    def write(self, result: Classification, entity: int) -> None:
+        entity_id = result.entities[entity]
+        orfs = result.get_orfs(entity)
+        for orf in range(orfs.start, orfs.stop):
+            self.write_orf(result, orf, entity)
 
-        if not result.assigned:
+        status = result.get_status(entity)
+        if status != ClassificationStatus.ASSIGNED:
             self.classification_out.write(
-                f"{result.entity_id}\tno taxid assigned\t{result.reason}\n"
+                f"{entity_id}\tno taxid assigned\t{status.reason}\n"
             )
             return
 
-        n_assignments = len(result.assignments)
-        reason = result.reason
-        for index, assignment in enumerate(result.assignments, start=1):
+        assignments = result.get_assignments(entity)
+        reason = (
+            f"based on {result.n_orfs_with_taxid[entity]}/"
+            f"{orfs.stop - orfs.start} ORFs"
+        )
+        weighted = result.weighted
+        total = int(weighted.total[entity])
+
+        for index, assignment in enumerate(assignments, start=1):
             label = "taxid assigned"
-            if n_assignments > 1:
-                label += f" ({index}/{n_assignments})"
-            lineage = self.format_lineage(assignment.lineage)
-            formatted_scores = []
-            for score in reversed(assignment.lineage_scores):
-                formatted_scores.append(f"{score:.2f}")
-            scores = ";".join(formatted_scores)
+            if len(assignments) > 1:
+                label += f" ({index}/{len(assignments)})"
+
+            start, end = weighted.lineage_offsets[assignment:assignment + 2]
+            taxids = tuple(
+                result.taxonomy.taxids[taxid]
+                for taxid in weighted.lineage_taxids[start:end]
+            )
+            lineage = self.format_lineage(taxids)
+            scores = ";".join(
+                f"{Decimal(int(score)) / Decimal(total):.2f}"
+                for score in weighted.lineage_bitscores[start:end][::-1]
+            )
             self.classification_out.write(
-                f"{result.entity_id}\t{label}\t{reason}\t{lineage}\t{scores}\n"
+                f"{entity_id}\t{label}\t{reason}\t{lineage}\t{scores}\n"
             )
 
-    def write_orf(self, result: ORFClassification, entity_id: str) -> None:
-        prefix = result.orf_id
+    def write_orf(self, result: Classification, orf: int, entity: int) -> None:
+        prefix = result.orf_names[orf]
         if self.is_bin:
-            prefix += f"\t{entity_id}"
-        if result.status == ORFStatus.NO_HIT:
+            prefix += f"\t{result.entities[entity]}"
+
+        row = int(result.orf_row[orf])
+        if row == NO_HIT:
             self.orf_out.write(f"{prefix}\tORF has no hit to database\n")
             return
-        if result.status == ORFStatus.NO_TAXID:
-            lineage = result.message
+
+        taxid = int(result.orf_lca[orf])
+        if taxid == NO_TAXID:
+            hits = ";".join(result.alignment.hit_names_of(row))
+            lineage = f"no taxid found ({hits})"
         else:
-            lineage = self.format_lineage(result.lineage)
-        self.orf_out.write(f"{prefix}\t{result.n_hits}\t{lineage}\t{result.top_bitscore}\n")
+            taxids = tuple(
+                result.taxonomy.taxids[position]
+                for position in result.taxonomy.find_lineage(taxid)
+            )
+            lineage = self.format_lineage(taxids)
+
+        bitscore = format_bitscore(int(result.orf_top_bitscore[orf]))
+        self.orf_out.write(
+            f"{prefix}\t{result.orf_n_hits[orf]}\t{lineage}\t{bitscore}\n"
+        )
 
     def format_lineage(self, lineage: tuple[str, ...]) -> str:
         return Lineage(lineage).format(self.branches, no_stars=self.no_stars)
