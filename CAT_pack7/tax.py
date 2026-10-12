@@ -140,16 +140,16 @@ class Taxonomy:
         orf_of_hit = orf_of_hit[no_taxid_hit_mask]
 
         hits_per_orf = np.bincount(orf_of_hit, minlength=orf_count)
-        hit_start = np.concatenate([0], np.cumsum(orf_of_hit))[:-1]
+        hit_start = np.concatenate([0], np.cumsum(hits_per_orf))[:-1]
         lca_per_orf = np.full(orf_count, self.no_taxid, dtype=np.int32)
 
         has_hits = hits_per_orf > 0
         lca_per_orf[has_hits] = hits[hit_start[has_hits]]
 
         for hit_index in range(1, hits_per_orf.max()):
-            orf = (hits_per_orf == hit_index) & (lca_per_orf != self.no_taxid)
+            orf = (hits_per_orf > hit_index) & (lca_per_orf != self.no_taxid)
             next_hit_pos = hit_start[orf] + hit_index
-            lca_per_orf[orf] = self.find_LCA(lca_per_orf[orf], hits_per_orf[next_hit_pos])
+            lca_per_orf[orf] = self.find_LCA(lca_per_orf[orf], hits[next_hit_pos])
 
         return lca_per_orf
 
