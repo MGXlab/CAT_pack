@@ -130,10 +130,28 @@ class Taxonomy:
     def find_LCA_for_ORF(self, orf_hit_offsets, hits):
         orf_count = len(orf_hit_offsets) - 1
 
-        lca = np.full(orf_count, self.no_taxid, dtype=np.int32)
+        if orf_count == 0:
+            return np.empty(0, dtype=np.int32)
 
-        for orf in range(orf_count):
+        orf_of_hit = np.repeat(np.arange(orf_count), np.diff(orf_hit_offsets))
 
+        no_taxid_hit_mask = hits != self.no_taxid
+        hits = hits[no_taxid_hit_mask]
+        orf_of_hit = orf_of_hit[no_taxid_hit_mask]
+
+        hits_per_orf = np.bincount(orf_of_hit, minlength=orf_count)
+        hit_start = np.concatenate([0], np.cumsum(orf_of_hit))[:-1]
+        lca_per_orf = np.full(orf_count, self.no_taxid, dtype=np.int32)
+
+        has_hits = hits_per_orf > 0
+        lca_per_orf[has_hits] = hits[hit_start[has_hits]]
+
+        for hit_index in range(1, hits_per_orf.max()):
+            orf = (hits_per_orf == hit_index) & (lca_per_orf != self.no_taxid)
+            next_hit_pos = hit_start[orf] + hit_index
+            lca_per_orf[orf] = self.find_LCA(lca_per_orf[orf], hits_per_orf[next_hit_pos])
+
+        return lca_per_orf
 
 
 
