@@ -1,4 +1,5 @@
 """Shared taxonomic classification engine for CAT and BAT"""
+from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 from itertools import chain
 from typing import Mapping, Sequence
@@ -15,10 +16,14 @@ from .results import NO_HIT, Classification, ClassificationStatus
 class ClassificationEngine:
     """Classify ORFs and combine their total support for one contig or bin."""
 
-    def __init__(self, taxonomy: tax.Taxonomy, fastaid2taxid: np.ndarray, fraction: Decimal) -> None:
+    def __init__(
+        self, taxonomy: tax.Taxonomy, fastaid2taxid: np.ndarray,
+        fraction: Decimal, threads: int = 1,
+    ) -> None:
         self.taxonomy = taxonomy
         self.hit2taxon = fastaid2taxid
         self.fraction = fraction
+        self.threads = threads
 
     def classify(
         self, entity_type: str, entity2ORFs: Mapping[str, Sequence[str]], alignment: AlignmentInput,
@@ -85,8 +90,34 @@ class ClassificationEngine:
         hits_start = alignment.orf_offsets[alignment_indices]
         hits_end = alignment.orf_offsets[alignment_indices + 1]
 
-        alignment_ORF_LCAs = self.taxonomy.find_LCA_for_ORF(
-            alignment.orf_offsets, self.hit2taxon[alignment.hit_ids])
+        hit_taxids = self.hit2taxon[alignment.hit_ids]
+        n_alignment_ORFs = len(alignment.orf_names)
+        workers = min(self.threads, max(1, n_alignment_ORFs // 20_000))
+
+        if workers > 1:
+            ORF_bounds = np.linspace(
+                0, n_alignment_ORFs, workers + 1, dtype=np.int64
+            )
+            hit_bounds = alignment.orf_offsets[ORF_bounds]
+            offset_batches = (
+                alignment.orf_offsets[start:end + 1] - hit_start
+                for start, end, hit_start in zip(
+                    ORF_bounds[:-1], ORF_bounds[1:], hit_bounds[:-1]
+                )
+            )
+            hit_batches = (
+                hit_taxids[start:end]
+                for start, end in zip(hit_bounds[:-1], hit_bounds[1:])
+            )
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                alignment_ORF_LCAs = np.concatenate(list(pool.map(
+                    self.taxonomy.find_LCA_for_ORF,
+                    offset_batches, hit_batches,
+                )))
+        else:
+            alignment_ORF_LCAs = self.taxonomy.find_LCA_for_ORF(
+                alignment.orf_offsets, hit_taxids
+            )
 
         LCA_per_ORF = np.full(n_ORFs, tax.NO_TAXID, dtype=np.int32)
         LCA_per_ORF[ORF_has_hits] = alignment_ORF_LCAs[alignment_indices]
