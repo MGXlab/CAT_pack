@@ -4,6 +4,7 @@ import logging
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from time import perf_counter
 
 import numpy as np
 
@@ -132,6 +133,7 @@ class Taxonomy:
 
 
     def find_LCA_for_ORF(self, orf_hit_offsets, hits):
+        batch_started = perf_counter()
         orf_count = len(orf_hit_offsets) - 1
 
         if orf_count == 0:
@@ -144,17 +146,53 @@ class Taxonomy:
         orf_of_hit = orf_of_hit[no_taxid_hit_mask]
 
         hits_per_orf = np.bincount(orf_of_hit, minlength=orf_count)
+        max_hits = int(hits_per_orf.max())
+        known_hit_count = len(hits)
+        log.info(
+            "ORF LCA workload: %d ORFs, %d known hits, max hits/ORF=%d.",
+            orf_count, known_hit_count, max_hits,
+        )
         hit_start = np.concatenate(([0], np.cumsum(hits_per_orf)))[:-1]
         lca_per_orf = np.full(orf_count, self.no_taxid, dtype=np.int32)
 
         has_hits = hits_per_orf > 0
-        lca_per_orf[has_hits] = hits[hit_start[has_hits]]
+        reduction_rounds = 0
 
-        for hit_index in range(1, hits_per_orf.max()):
-            orf = (hits_per_orf > hit_index) & (lca_per_orf != self.no_taxid)
-            next_hit_pos = hit_start[orf] + hit_index
-            lca_per_orf[orf] = self.find_LCA(lca_per_orf[orf], hits[next_hit_pos])
+        while np.any(hits_per_orf > 1):
+            reduced_hits_per_orf = (hits_per_orf + 1) // 2
+            reduced_hit_start = np.concatenate(([0], np.cumsum(reduced_hits_per_orf)))[:-1]
+            orf_of_reduced_hit = np.repeat(np.arange(orf_count), reduced_hits_per_orf)
+            first_hit_pos = hit_start[orf_of_reduced_hit] + 2 * (
+                np.arange(len(orf_of_reduced_hit)) - reduced_hit_start[orf_of_reduced_hit]
+            )
+            reduced_hits = hits[first_hit_pos]
+            pair_pos = np.flatnonzero(
+                first_hit_pos + 1
+                < hit_start[orf_of_reduced_hit] + hits_per_orf[orf_of_reduced_hit]
+            )
+            taxids_a = reduced_hits[pair_pos]
+            taxids_b = hits[first_hit_pos[pair_pos] + 1]
+            known_pair = (taxids_a != self.no_taxid) & (taxids_b != self.no_taxid)
 
+            reduced_hits[pair_pos[~known_pair]] = self.no_taxid
+            different = known_pair & (taxids_a != taxids_b)
+            reduced_hits[pair_pos[different]] = self.find_LCA(
+                taxids_a[different], taxids_b[different]
+            )
+
+            hits = reduced_hits
+            hits_per_orf = reduced_hits_per_orf
+            hit_start = reduced_hit_start
+            reduction_rounds += 1
+
+        lca_per_orf[has_hits] = hits
+
+        elapsed = perf_counter() - batch_started
+        log.info(
+            "Classification timing: ORF LCA batch: %.3f s (%d ORFs, %d known hits, max hits/ORF=%d, %d rounds)",
+            elapsed, orf_count, known_hit_count, max_hits, reduction_rounds,
+            extra={"classification_phase": "orf_lca_batch", "classification_seconds": elapsed},
+        )
         return lca_per_orf
 
 
@@ -189,7 +227,10 @@ def sum_bitscores(orf_type, lca_per_orf, top_bitscores, n):
     return total_bitscore
 
 def sum_taxid_bitscores(taxonomy, orf_type, lca_per_orf, top_bitscores):
+    log.info("Starting support expansion.")
+    stage_started = perf_counter()
     orf_pos = np.flatnonzero(lca_per_orf != NO_TAXID)
+    known_orfs = len(orf_pos)
 
     orf_ids = orf_type[orf_pos]
     taxids = lca_per_orf[orf_pos]
@@ -213,26 +254,56 @@ def sum_taxid_bitscores(taxonomy, orf_type, lca_per_orf, top_bitscores):
 
     orf_ids, taxids, bitscores, orf_pos = (
         np.concatenate(column) for column in zip(*support))
+    elapsed = perf_counter() - stage_started
+    log.info(
+        "Classification timing: support expansion: %.3f s (%d known ORFs, %d expanded rows, %d levels)",
+        elapsed, known_orfs, len(taxids), len(support),
+        extra={"classification_phase": "support_expansion", "classification_seconds": elapsed},
+    )
 
+    log.info("Starting support grouping: %d expanded rows.", len(taxids))
+    stage_started = perf_counter()
     pairs, pair_pos = np.unique(
         np.column_stack((orf_ids, taxids)),
         axis=0, return_inverse=True
     )
+    elapsed = perf_counter() - stage_started
+    log.info(
+        "Classification timing: support grouping: %.3f s (%d expanded rows, %d unique pairs)",
+        elapsed, len(taxids), len(pairs),
+        extra={"classification_phase": "support_grouping", "classification_seconds": elapsed},
+    )
 
+    stage_started = perf_counter()
     taxid_bitscores = np.zeros(len(pairs), dtype=np.int64)
     np.add.at(taxid_bitscores, pair_pos, bitscores)
 
     first_orf = np.full(len(pairs), np.iinfo(np.int64).max, dtype=np.int64)
     np.minimum.at(first_orf, pair_pos, orf_pos)
+    elapsed = perf_counter() - stage_started
+    log.info(
+        "Classification timing: support accumulation: %.3f s (%d unique pairs)",
+        elapsed, len(pairs),
+        extra={"classification_phase": "support_accumulation", "classification_seconds": elapsed},
+    )
 
     return pairs, taxid_bitscores, first_orf
 
 
 def find_weighted_LCA(taxonomy, orf_type, lca_per_orf, top_bitscores, f, n):
+    stage_started = perf_counter()
     total_bitscore = sum_bitscores(orf_type, lca_per_orf, top_bitscores, n)
+    elapsed = perf_counter() - stage_started
+    log.info(
+        "Classification timing: total bitscores: %.3f s (%d entities)",
+        elapsed, n,
+        extra={"classification_phase": "total_bitscores", "classification_seconds": elapsed},
+    )
     pairs, taxid_bitscores, first_orf = sum_taxid_bitscores(
         taxonomy, orf_type, lca_per_orf, top_bitscores)
 
+    log.info("Starting candidate selection: %d support pairs.", len(pairs))
+    stage_started = perf_counter()
     f_numerator, f_denominator = f.as_integer_ratio()
 
     bitscore_cutoffs = np.fromiter(
@@ -265,7 +336,14 @@ def find_weighted_LCA(taxonomy, orf_type, lca_per_orf, top_bitscores, f, n):
         taxid_trace.update(taxonomy.find_lineage(taxid))
 
     selected_rows = np.asarray(selected_rows, dtype=np.int64)
+    elapsed = perf_counter() - stage_started
+    log.info(
+        "Classification timing: candidate selection: %.3f s (%d candidates, %d assignments)",
+        elapsed, len(canidates), len(selected_rows),
+        extra={"classification_phase": "candidate_selection", "classification_seconds": elapsed},
+    )
 
+    stage_started = perf_counter()
     assignment_entity = pairs[selected_rows, 0]
     assignment_taxon = pairs[selected_rows, 1]
 
@@ -291,7 +369,7 @@ def find_weighted_LCA(taxonomy, orf_type, lca_per_orf, top_bitscores, f, n):
         lineage_taxids[start:end] = lineage
         lineage_bitscores[start:end] = taxid_bitscores[support_rows]
 
-    return WeightedLCA(
+    result = WeightedLCA(
         total=total_bitscore,
         assignment_entity=assignment_entity,
         assignment_taxon=assignment_taxon,
@@ -299,6 +377,13 @@ def find_weighted_LCA(taxonomy, orf_type, lca_per_orf, top_bitscores, f, n):
         lineage_taxids=lineage_taxids,
         lineage_bitscores=lineage_bitscores,
     )
+    elapsed = perf_counter() - stage_started
+    log.info(
+        "Classification timing: lineage packing: %.3f s (%d assignments, %d lineage entries)",
+        elapsed, len(assignment_entity), len(lineage_taxids),
+        extra={"classification_phase": "lineage_packing", "classification_seconds": elapsed},
+    )
+    return result
 
 def convert_to_names(lineage, taxid2rank, taxid2name, scores=None):
     names = []
