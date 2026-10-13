@@ -12,7 +12,6 @@ from typing import Iterator
 import numpy as np
 
 from .reference_mapping import read_fastaid2LCAtaxid
-from .taxonomy import read_branch_taxids
 from .. import tax
 from ..config.settings import BatFiles, CatFiles, ParserSettings
 from ..utils.errors import InputError
@@ -331,7 +330,7 @@ class ClassificationParser:
 
         fastaid2LCAtaxid = read_fastaid2LCAtaxid(self.files.fastaid2LCA, set(alignment.hit_names), workers=self.workers)
         fastaid2taxid = taxonomy.taxid_of_hits(alignment.hit_names, fastaid2LCAtaxid)
-        branches = read_branch_taxids(self.files.branches)
+        branches = tax.import_taxids_with_multiple_offspring(self.files.branches)
 
         return ClassificationInputs(
             entity_type=entity_type,
