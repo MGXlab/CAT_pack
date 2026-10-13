@@ -1,4 +1,5 @@
 """Shared taxonomic classification engine for CAT and BAT"""
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 from itertools import chain
@@ -9,6 +10,8 @@ import numpy as np
 from . import tax
 from .io.parsers import AlignmentInput
 from .results import NO_HIT, Classification, ClassificationStatus
+
+log = logging.getLogger("CAT_pack")
 
 
 # DEVNOTE: Add a flowchart in devdocs to make this more clear for non
@@ -28,6 +31,7 @@ class ClassificationEngine:
     def classify(
         self, entity_type: str, entity2ORFs: Mapping[str, Sequence[str]], alignment: AlignmentInput,
     ) -> Classification:
+        log.info(f"Starting classification calculation: {len(entity2ORFs)} {entity_type}.")
         orf_entities_names = sorted(entity2ORFs)
         n_entities = len(orf_entities_names)
 
@@ -36,7 +40,6 @@ class ClassificationEngine:
         n_ORFs = np.array([len(entity2ORFs[name]) for name in orf_entities_names], dtype=np.int64)
         ORF_starts = np.concatenate(([0], np.cumsum(n_ORFs)))
         ORF2contig_or_bin = np.repeat(np.arange(n_entities), n_ORFs)
-
         ORF2alignment_index, ORF_has_hits, LCA_per_ORF, n_hits_per_ORF, top_bitscore_per_ORF = (self.per_ORF_stats(ORF_names, alignment))
 
         # Combine the ORF lowest common ancestors per contig (or bin)
@@ -44,6 +47,7 @@ class ClassificationEngine:
         weighted_LCAs = tax.WeightedLCA.find(
             self.taxonomy, ORF2contig_or_bin, LCA_per_ORF,
             top_bitscore_per_ORF, self.fraction, n_entities)
+        log.info("Finished Weighted LCA")
         assignment_starts = np.searchsorted(weighted_LCAs.assignment_entity, np.arange(n_entities + 1))
 
         def count_per_entity(ORF_mask: np.ndarray) -> np.ndarray:
@@ -91,9 +95,12 @@ class ClassificationEngine:
         hits_end = alignment.orf_offsets[alignment_indices + 1]
 
         hit_taxids = self.hit2taxon[alignment.hit_ids]
+        log.info(f"hit taxonomy lookup: {len(hit_taxids)}accepted hits")
         n_alignment_ORFs = len(alignment.orf_names)
         workers = min(self.threads, max(1, n_alignment_ORFs // 20_000))
 
+        log.info(f"Starting ORF LCA calculation: with {n_alignment_ORFs} alignment ORFs, "
+                f"{len(hit_taxids)} accepted hits, and {workers} workers.")
         if workers > 1:
             ORF_bounds = np.linspace(
                 0, n_alignment_ORFs, workers + 1, dtype=np.int64
@@ -112,8 +119,7 @@ class ClassificationEngine:
             with ThreadPoolExecutor(max_workers=workers) as pool:
                 alignment_ORF_LCAs = np.concatenate(list(pool.map(
                     self.taxonomy.find_LCA_for_ORF,
-                    offset_batches, hit_batches,
-                )))
+                    offset_batches, hit_batches)))
         else:
             alignment_ORF_LCAs = self.taxonomy.find_LCA_for_ORF(
                 alignment.orf_offsets, hit_taxids
