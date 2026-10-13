@@ -92,8 +92,9 @@ class DiamondSettings(DiamondParameters):
             f"--{self.mode}" if self.mode != 'default' else "",
             "--quiet" if not self.verbose else "",
             "--no-self-hits" if self.no_self_hits else "",
-            "--outfmt 6 qseqid sseqid bitscore" if self.cat_only else ""
         ]
+        if self.cat_only:
+            command.extend(["--outfmt", "6", "qseqid", "sseqid", "bitscore"])
         return [str(arg) for arg in command if arg != ""]
 
 
