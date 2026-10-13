@@ -4,7 +4,7 @@ from typing import TextIO
 
 from .parsers import format_bitscore
 from ..results import Classification, ClassificationStatus, Lineage, NO_HIT
-from ..tax import NO_TAXID
+from ..tax import NO_TAXID, Taxonomy
 
 
 class ClassificationWriter:
@@ -23,6 +23,8 @@ class ClassificationWriter:
         self.range_ = range_
         self.branches = branches
         self.no_stars = no_stars
+        self._lineage_taxonomy: Taxonomy | None = None
+        self._lineages: dict[int, str] = {}
         self._write_headers()
 
     def _write_headers(self) -> None:
@@ -54,7 +56,8 @@ class ClassificationWriter:
             f"{orfs.stop - orfs.start} ORFs"
         )
         weighted = result.weighted
-        total = int(weighted.total[entity])
+        total = Decimal(int(weighted.total[entity]))
+        score_strings: dict[int, str] = {}
 
         for index, assignment in enumerate(assignments, start=1):
             label = "taxid assigned"
@@ -62,15 +65,16 @@ class ClassificationWriter:
                 label += f" ({index}/{len(assignments)})"
 
             start, end = weighted.lineage_offsets[assignment:assignment + 2]
-            taxids = tuple(
-                result.taxonomy.taxids[taxid]
-                for taxid in weighted.lineage_taxids[start:end]
-            )
-            lineage = self.format_lineage(taxids)
-            scores = ";".join(
-                f"{Decimal(int(score)) / Decimal(total):.2f}"
-                for score in weighted.lineage_bitscores[start:end][::-1]
-            )
+            lineage = self._lineage_for(result.taxonomy, int(weighted.assignment_taxon[assignment]))
+            score_parts = []
+            for value in weighted.lineage_bitscores[start:end][::-1]:
+                score = int(value)
+                text = score_strings.get(score)
+                if text is None:
+                    text = f"{Decimal(score) / total:.2f}"
+                    score_strings[score] = text
+                score_parts.append(text)
+            scores = ";".join(score_parts)
             self.classification_out.write(
                 f"{entity_id}\t{label}\t{reason}\t{lineage}\t{scores}\n"
             )
@@ -90,11 +94,7 @@ class ClassificationWriter:
             hits = ";".join(result.alignment.hit_names_of(row))
             lineage = f"no taxid found ({hits})"
         else:
-            taxids = tuple(
-                result.taxonomy.taxids[position]
-                for position in result.taxonomy.find_lineage(taxid)
-            )
-            lineage = self.format_lineage(taxids)
+            lineage = self._lineage_for(result.taxonomy, taxid)
 
         bitscore = format_bitscore(int(result.orf_top_bitscore[orf]))
         self.orf_out.write(
@@ -103,3 +103,14 @@ class ClassificationWriter:
 
     def format_lineage(self, lineage: tuple[str, ...]) -> str:
         return Lineage(lineage).format(self.branches, no_stars=self.no_stars)
+
+    def _lineage_for(self, taxonomy: Taxonomy, taxid: int) -> str:
+        if taxonomy is not self._lineage_taxonomy:
+            self._lineages.clear()
+            self._lineage_taxonomy = taxonomy
+        lineage = self._lineages.get(taxid)
+        if lineage is None:
+            taxids = tuple(taxonomy.taxids[position] for position in taxonomy.find_lineage(taxid))
+            lineage = self.format_lineage(taxids)
+            self._lineages[taxid] = lineage
+        return lineage
