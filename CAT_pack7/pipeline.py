@@ -181,6 +181,7 @@ def run_classification(
         taxonomy=inputs.taxonomy,
         fastaid2taxid=inputs.fastaid2taxid,
         fraction=settings.fraction,
+        threads=settings.threads,
     )
 
     total = len(inputs.entity2ORFs)
