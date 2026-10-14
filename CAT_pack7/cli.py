@@ -117,7 +117,16 @@ def download(
         quiet: Annotated[bool, Option("--quiet")] = DownloadOptions.quiet,
         #no_log: Annotated[bool, Option("no_log")] = DownloadOptions.no_log
 ):
-    pass
+    args = DownloadOptions(
+        db_type=db,
+        out_dir=out_dir,
+        cleanup=cleanup,
+        quiet=quiet
+    )
+    progress, tasks = make_progress([step.name for step in build_plan(args)])
+    progress.disable = args.quiet
+    report = partial(update_progress, progress, tasks)
+
 
 
 @app.command()

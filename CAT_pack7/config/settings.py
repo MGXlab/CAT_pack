@@ -210,3 +210,61 @@ class PrepareSettings(ExecutionSettings):
 @dataclass()
 class ParserSettings:
     bit_score_multiplier = 10
+
+@dataclass()
+class DownloadSettings:
+    db_type: str
+    out_dir: Path
+    cleanup: bool
+    quiet: bool
+    no_log: bool
+    urls: NRUrls | GTDBUrls | None = None
+
+@dataclass()
+class NRUrls:
+    urls: list[str]
+
+    def __init__(self):
+        base_tax_url = "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/"
+        base_blast_url = "ftp://ftp.ncbi.nlm.nih.gov/blast/db/FASTA/"
+
+        tax_file_list = ["taxdump.tar.gz", "taxdump.tar.gz.md5",
+                         "prot.accession2taxid.FULL.gz",
+                         "prot.accession2taxid.FULL.gz.md5"]
+        blast_file_list = ["prot.accession2taxid.FULL.gz",
+                           "prot.accession2taxid.FULL.gz.md5"]
+        self.urls = [f"{url}/{file}" for url, files in ((base_tax_url, tax_file_list), (base_blast_url, blast_file_list)) for file in files]
+
+
+
+
+
+
+@dataclass
+class GTDBUrls:
+    urls: list[str]
+    version: str
+
+    def __init__(self):
+        import urllib.request
+        # Using "latest" as an entry point.
+        # This needs to be checked for future versions.
+        # Use the European mirror.
+        parent_url = "https://data.gtdb.aau.ecogenomic.org/releases/latest/"
+
+        file_list = [
+            "VERSION.txt",
+            "ar53_taxonomy.tsv.gz",
+            "bac120_taxonomy.tsv.gz",
+            "MD5SUM.txt",
+            "bac120.tree",
+            "ar53.tree",
+            "genomic_files_reps/gtdb_proteins_aa_reps.tar.gz"
+        ]
+        self.urls = [f"{parent_url}/{file_}" for file_ in file_list]
+
+        version_url = f"{parent_url}/VERSION.txt"
+        with urllib.request.urlopen(version_url) as f:
+            version_data = f.read().decode()
+
+        self.version = "{0} ({3})".format(*version_data.split("\n"))
