@@ -4,9 +4,9 @@ from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 
+from CAT_pack7.io.download import multi_download
 from . import tax
 from .classification import ClassificationEngine
-from .config.download import multi_download
 from .config.options import BatOptions, CatOptions, PrepareOptions, DownloadOptions
 from .config.settings import BatFiles, BatSettings, CatFiles, CatSettings, DiamondSettings
 from .config.validation import check_orfs_match_contigs, get_file_names, get_validated_settings, make_prefix, \
@@ -344,6 +344,10 @@ def run_download(args: DownloadOptions, report: Report):
                 settings = validate_download(args)
             elif current_step.name == "Downloading":
                 multi_download(settings)
+            elif current_step.name == "Check files":
+                pass
+            elif current_step.name == "Process files":
+                pass
 
 
             report(current_step.name, Status.COMPLETE, 1, 1)
