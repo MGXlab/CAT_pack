@@ -11,7 +11,7 @@ from .options import AlignerName, BatOptions, CatOptions, ExecutionOptions, Diam
 from .settings import (
     BatFiles, BatSettings, CatFiles, CatSettings, ClassificationSettings, DatabaseFiles, DiamondParameters,
     DiamondPrepareSettings, DiamondSettings, ExecutionSettings, MMseqsPrepareSettings,
-    PrepareOutputs, PrepareSettings, TaxonomyFiles, MemorySettings, DownloadSettings
+    PrepareOutputs, PrepareSettings, TaxonomyFiles, MemorySettings, DownloadSettings, NRUrls, GTDBUrls
 )
 from ..io.parsers import BinParser
 from ..utils.check import (
@@ -146,12 +146,14 @@ def validate_download(args: DownloadOptions) -> DownloadSettings:
     checks = ValErrorCollector()
     out_dir = checks.check(check_folder, args.out_dir, make=True)
 
+    urls = NRUrls() # DEVNOTE here in case of faulty entry
     db_type = None
     match args.db_type.lower().strip():
         case "nr":
             db_type = "nr"
         case "gtdb":
             db_type = "gtdb"
+            urls = GTDBUrls()
         case _:
             checks.add(InputError("Incorrect database selected. Please select one of the following: nr or gtdb."))
 
@@ -161,7 +163,8 @@ def validate_download(args: DownloadOptions) -> DownloadSettings:
         out_dir=out_dir,
         cleanup=args.cleanup,
         quiet=args.quiet,
-        no_log=False # FIXME there is a Typererror in cli.py with double no_log, why??
+        no_log=False, # FIXME there is a Typererror in cli.py with double no_log, why??
+        urls=urls,
     )
 
     # FIXME naming of the Downloadsettings urls, lots of urls urls now :)))
