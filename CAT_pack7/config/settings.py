@@ -218,7 +218,7 @@ class DownloadSettings:
     cleanup: bool
     quiet: bool
     no_log: bool
-    urls: NRUrls | GTDBUrls | None = None
+    urls: NRUrls | GTDBUrls
 
 @dataclass()
 class NRUrls:

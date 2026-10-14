@@ -7,16 +7,16 @@ from decimal import Decimal
 from pathlib import Path
 
 from .options import AlignerName, BatOptions, CatOptions, ExecutionOptions, DiamondOptions, PrepareOptions, \
-    MemoryOptions
+    MemoryOptions, DownloadOptions
 from .settings import (
     BatFiles, BatSettings, CatFiles, CatSettings, ClassificationSettings, DatabaseFiles, DiamondParameters,
     DiamondPrepareSettings, DiamondSettings, ExecutionSettings, MMseqsPrepareSettings,
-    PrepareOutputs, PrepareSettings, TaxonomyFiles, MemorySettings
+    PrepareOutputs, PrepareSettings, TaxonomyFiles, MemorySettings, DownloadSettings
 )
 from ..io.parsers import BinParser
 from ..utils.check import (
     check_db_file, check_diamond, check_fasta_file, check_folder, check_integer, check_number,
-    check_output_prefix, check_outputs, check_pyrodigal, check_file_not_empty,
+    check_output_prefix, check_outputs, check_pyrodigal, check_file_not_empty, check_file,
 )
 from ..utils.errors import ExternalToolError, InputError, ValErrorCollector
 from ..utils.memory import GIB
@@ -122,6 +122,9 @@ def make_prefix(args: PrepareOptions) -> PrepareOptions:
         return args
     return replace(args, common_prefix=f"{datetime.now():%Y-%m-%d}_CAT_pack")
 
+# FIXME: Clean this up with the above funtion and merge. Just for now
+def get_date():
+    return f"{datetime.now():%Y-%m-%d}"
 
 def get_file_names(args: PrepareOptions) -> PrepareOutputs:
     prefix = make_prefix(args).common_prefix
@@ -137,6 +140,37 @@ def get_file_names(args: PrepareOptions) -> PrepareOutputs:
         fastaid2LCAtaxid=folder / f"{prefix}.fastaid2LCAtaxid",
         taxids_with_multiple_offspring=folder / f"{prefix}.taxids_with_multiple_offspring",
     )
+
+
+def validate_download(args: DownloadOptions) -> DownloadSettings:
+    checks = ValErrorCollector()
+    out_dir = checks.check(check_folder, args.out_dir, make=True)
+
+    db_type = None
+    match args.db_type.lower().strip():
+        case "nr":
+            db_type = "nr"
+        case "gtdb":
+            db_type = "gtdb"
+        case _:
+            checks.add(InputError("Incorrect database selected. Please select one of the following: nr or gtdb."))
+
+
+    settings = DownloadSettings(
+        db_type=db_type,
+        out_dir=out_dir,
+        cleanup=args.cleanup,
+        quiet=args.quiet,
+        no_log=False # FIXME there is a Typererror in cli.py with double no_log, why??
+    )
+
+    # FIXME naming of the Downloadsettings urls, lots of urls urls now :)))
+    for url in settings.urls.urls:
+        url_leaf = url.split("/")[-1]
+        output_path = out_dir / Path(f"{get_date()}.{url_leaf}")
+        checks.check(check_file, output_path, output_path("/")[-1], exists=False)
+
+    return settings
 
 
 def validate_prepare(args: PrepareOptions, files: PrepareOutputs | None = None) -> PrepareSettings:
