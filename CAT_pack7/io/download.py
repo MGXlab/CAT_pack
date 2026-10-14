@@ -53,13 +53,13 @@ def multi_download(settings: DownloadSettings, report: Report,
 
     urls = settings.urls.urls
     prefix = get_date()
-    output_paths = [settings.out_dir / f"{prefix}.{url.split('/')[-1]}" for url in urls]
+    output_paths = {url.split('/')[-1]: settings.out_dir / f"{prefix}.{url.split('/')[-1]}" for url in urls}
     if queue_report is not None:
-        queue_report(output_paths)
+        queue_report(output_paths.())
     if report is not None:
         report("Downloading", Status.RUNNING, 0, len(urls))
 
-    for index, (url, output_path) in enumerate(zip(urls, output_paths), start=1):
+    for index, (url, output_path) in enumerate(zip(urls, output_paths.values()), start=1):
         url_leaf = url.split("/")[-1]
         # @Bastiaan want to keep this functionality in?
         # if output_path in existing_files:
@@ -74,17 +74,17 @@ def multi_download(settings: DownloadSettings, report: Report,
         if report is not None:
             report("Downloading", Status.RUNNING, index, len(urls))
 
-    return
+    return output_paths
 
 
-def check_nr_md5s(data_dir, log_file, quiet):
+def check_nr_md5s(settings: DownloadSettings):
     """Check integrity of all files in a dir with their paired .md5 files.
     """
-    md5_files = list([p.resolve() for p in data_dir.glob("*.md5")])
+    md5_files = list([p.resolve() for p in settings.out_dir.glob("*.md5")])
     
     for md5_file in md5_files:
         data_file = md5_file.with_suffix("")
-        check.check_md5_gz(data_file, md5_file, log_file, quiet)
+        check.check_md5_gz(data_file, md5_file)
                         
     return
 
