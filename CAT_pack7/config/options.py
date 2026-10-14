@@ -91,3 +91,11 @@ class PrepareOptions(ExecutionOptions):
     common_prefix: str | None = None
     build_mmseqs2: bool = False
     path_to_mmseqs: Path | None = None
+
+@dataclass
+class DownloadOptions():
+    db_type: str
+    out_dir: Path
+    cleanup: bool = False
+    quiet: bool = False
+    no_log: bool = False
