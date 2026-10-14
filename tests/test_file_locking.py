@@ -3,6 +3,8 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from textwrap import dedent
+from unittest.mock import Mock
 
 from CAT_pack7.config.options import CatOptions
 from CAT_pack7.pipeline import run_annotation
@@ -10,51 +12,70 @@ from CAT_pack7.utils.errors import InputError
 from CAT_pack7.utils.locking import lock_outputs
 
 
-class LockingTests(unittest.TestCase):
+class OutputLockingTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
-        self.output = self.root / "output"
+        self.temp_dir = tempfile.TemporaryDirectory(dir=Path(__file__).parent)
+        self.addCleanup(self.temp_dir.cleanup)
+        self.directory = Path(self.temp_dir.name)
+        self.output_prefix = self.directory / "sample.CAT"
 
-    def test_if_another_process_is_blocked(self):
-        code =  """
+    def test_another_process_can_lock_only_after_release(self):
+        child_code = dedent("""
             import sys
             from pathlib import Path
+
             from CAT_pack7.utils.locking import lock_outputs
             from CAT_pack7.utils.errors import InputError
-            
+
             try:
                 with lock_outputs([Path(sys.argv[1])]):
                     pass
-            except InputError:
-                sys.exit(1)
-            """
-        command = [sys.executable, "-c", code, str(self.output)]
-        with lock_outputs([self.output]):
-            result = subprocess.run(command, capture_output=True, timeout=10)
-            self.assertEqual(result.returncode, 1, result.stderr)
-        result = subprocess.run(command, capture_output=True, timeout=10)
-        self.assertEqual(result.returncode, 0, result.stderr)
+            except InputError as error:
+                print(error, file=sys.stderr)
+                sys.exit(2)
+        """)
+        command = [sys.executable, "-B", "-c", child_code, str(self.output_prefix)]
+        repository = Path(__file__).resolve().parents[1]
+
+        with lock_outputs([self.output_prefix]):
+            blocked = subprocess.run(
+                command, cwd=repository, capture_output=True, text=True, timeout=10,
+            )
+            self.assertEqual(blocked.returncode, 2, blocked.stderr)
+            self.assertIn("Another run is using", blocked.stderr)
+
+        released = subprocess.run(
+            command, cwd=repository, capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(released.returncode, 0, released.stderr)
 
     def test_exception_releases_the_lock(self):
-        with self.assertRaises(RuntimeError):
-            with lock_outputs([self.output]):
+        with self.assertRaisesRegex(RuntimeError, "run failed"):
+            with lock_outputs([self.output_prefix]):
                 raise RuntimeError("run failed")
-        with lock_outputs([self.output]):
+
+        with lock_outputs([self.output_prefix]):
             pass
 
     def test_different_outputs_can_run_together(self):
-        with lock_outputs([self.output]):
-            with lock_outputs([self.root / "other"]):
+        other_prefix = self.directory / "other.CAT"
+
+        with lock_outputs([self.output_prefix]):
+            with lock_outputs([other_prefix]):
                 pass
 
     def test_conflicting_annotation_does_not_write_its_log(self):
-        options = CatOptions(contigs=self.root / "contigs.fna", database=self.root / "db",
-                             output_prefix=self.output)
-        with lock_outputs([self.output]):
-            with self.assertRaises(InputError):
-                run_annotation(options, lambda *event: None)
+        options = CatOptions(
+            contigs=self.directory / "contigs.fna",
+            database=self.directory / "db",
+            output_prefix=self.output_prefix,
+        )
+        report = Mock()
+
+        with lock_outputs([self.output_prefix]):
+            with self.assertRaisesRegex(InputError, "Another run is using"):
+                run_annotation(options, report)
+
         self.assertFalse(options.log_path.exists())
 
 
