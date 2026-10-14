@@ -218,14 +218,13 @@ class NRUrls:
     urls: list[str]
 
     def __init__(self):
-        base_tax_url = "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/"
-        base_blast_url = "ftp://ftp.ncbi.nlm.nih.gov/blast/db/FASTA/"
+        base_tax_url = "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy"
+        base_blast_url = "ftp://ftp.ncbi.nlm.nih.gov/blast/db/FASTA"
 
         tax_file_list = ["taxdump.tar.gz", "taxdump.tar.gz.md5",
-                         "prot.accession2taxid.FULL.gz",
-                         "prot.accession2taxid.FULL.gz.md5"]
-        blast_file_list = ["prot.accession2taxid.FULL.gz",
-                           "prot.accession2taxid.FULL.gz.md5"]
+                         "accession2taxid/prot.accession2taxid.FULL.gz",
+                         "paccession2taxid/prot.accession2taxid.FULL.gz.md5"]
+        blast_file_list = ["nr.gz", "nr.gz.md5"]
         self.urls = [f"{url}/{file}" for url, files in ((base_tax_url, tax_file_list), (base_blast_url, blast_file_list)) for file in files]
 
 

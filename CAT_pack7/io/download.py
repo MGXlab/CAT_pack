@@ -16,17 +16,58 @@ from CAT_pack7.io.parsers import optionally_compressed_handle
 from CAT_pack7.utils import check
 
 log = logging.getLogger("CAT_pack")
+from rich.progress import (
+    Progress,
+    BarColumn,
+    DownloadColumn,
+    TextColumn,
+    TimeRemainingColumn,
+    TransferSpeedColumn,
+)
 
 
-def download_singleton(target_url, local_path):
+
+def download_singleton(target_url, local_path: pathlib.Path) -> None:
     """Download a single file to the specified location."""
     try:
-        urllib.request.urlretrieve(target_url, local_path)
+        progress = Progress(
+            TextColumn("[bold cyan]{task.fields[filename]}"),
+            BarColumn(bar_width=None),
+            "[progress.percentage]{task.percentage:>3.1f}%",
+            " ",
+            DownloadColumn(),
+            " ",
+            TransferSpeedColumn(),
+            " ",
+            TimeRemainingColumn(),
+        )
+        with progress:
+            file = None
+            def reporthook(blocknum: int, blocksize: int, totalsize: int):
+                nonlocal file
+                if file is None:
+                    total = totalsize if totalsize > 0 else None
+                    file = progress.add_task("download", filename=local_path.name, total=total)
+
+                downloaded = blocknum * blocksize
+
+                if totalsize > 0:
+                    downloaded = min(downloaded, totalsize)
+
+                progress.update(file, completed=downloaded)
+
+
+            urllib.request.urlretrieve(target_url, local_path, reporthook=reporthook)
     except:
         log.info("Failed downloading file: {0}.".format(target_url))
         raise
         
     return
+
+
+
+
+
 
 
 def multi_download(settings: DownloadSettings):
