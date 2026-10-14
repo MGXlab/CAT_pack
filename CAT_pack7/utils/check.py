@@ -10,21 +10,32 @@ from pathlib import Path
 from .errors import InputError, ExternalToolError, ValErrorCollector
 
 
-def check_folder(path: Path, label: str) -> Path:
+def check_folder(path: Path, label: str, make: bool=False) -> Path:
     if not path.is_dir():
         raise InputError(
             f"{label} was not found.",
             hint="Double check if the folder exists.",
             path=path,
         )
+    # Make/create the folder if it does not exist yet :)
+    if make and not path.exists():
+        path.mkdir(parents=True)
     return path
 
 
-def check_file(path: Path, label: str) -> Path:
+def check_file(path: Path, label: str, exist=True) -> Path:
     if not path.is_file():
+        if not exist:
+            return path
         raise InputError(
             f"{label} was not found.",
             hint="Double check if the file exists.",
+            path=path,
+        )
+    if not exist:
+        raise InputError(
+            f"{label} was found.",
+            hint="Please remove the file, or choose another out folder",
             path=path,
         )
     return path

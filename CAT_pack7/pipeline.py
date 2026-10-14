@@ -322,3 +322,67 @@ def run_prepare(args: PrepareOptions, report: Report):
         raise
     finally:
         locks.close()
+
+def run_download(args: DownloadOptions, report: Report):
+    plan = build_plan(args)
+    step_index = 0
+    current_step = plan[step_index]
+    log = logging.getLogger("CAT_pack")
+    # FIXME: Add locks to the downloading files
+    #locks = ExitStack()
+
+    try:
+        # FIXME as well
+        #files.data_folder.parent.mkdir(parents=True, exist_ok=True)
+        #locks.enter_context(lock_outputs([files.data_folder]))
+        for step_index, current_step in enumerate(plan):
+            report(current_step.name, Status.RUNNING, 0, None)
+            log.info(f"Starting: {current_step.name}")
+            if step_index == 0:
+                settings = validate_download(args)
+                copy_taxonomy(settings)
+            elif current_step.name == "Make DIAMOND database":
+                make_diamond_database(settings)
+            elif current_step.name == "Make MMseqs2 database":
+                make_mmseqs2_database(settings)
+            else:
+                if taxid2parent is None:
+                    taxid2parent = tax.read_nodes(files.nodes)
+                if current_step.name == "Make fastaid2LCAtaxid":
+                    make_fastaid2LCAtaxid_file(
+                        files.fastaid2LCAtaxid, settings.db_fasta, settings.acc2tax,
+                        taxid2parent, report,
+                    )
+                elif current_step.name == "Make taxids with multiple offspring":
+                    taxid2offspring = find_offspring(files.fastaid2LCAtaxid, taxid2parent, report)
+                    write_taxids_with_multiple_offspring_file(
+                        files.taxids_with_multiple_offspring, taxid2offspring,
+                    )
+            report(current_step.name, Status.COMPLETE, 1, 1)
+            log.info(f"Completed: {current_step.name}")
+
+        log.info("Preparation complete. Use -d %s with CAT_pack7 CAT or BAT.", files.data_folder)
+        return 0
+
+    except KeyboardInterrupt:
+        report(current_step.name, Status.CANCELLED, 0, None)
+        for skipped_steps in plan[step_index + 1:]:
+            report(skipped_steps.name, Status.SKIPPED, 0, None)
+        log.error("Run cancelled by the user :(")
+        raise
+
+    except Exception as error:
+        report(current_step.name, Status.FAILED, 0, None)
+        for remaining_step in plan[step_index + 1:]:
+            report(remaining_step.name, Status.SKIPPED, 0, None)
+        log.error("Preparation failed during %s: %s", current_step.name, error)
+
+        if isinstance(error, (OSError, UnicodeError, EOFError)):
+            error = CatError(str(error), path=files.data_folder)
+        if isinstance(error, CatError):
+            error.step = current_step.name
+            error.log_file = files.log_file if files.log_file.is_file() else None
+            raise error
+        raise
+    finally:
+        locks.close()
