@@ -3,6 +3,8 @@ import bz2
 import gzip
 import logging
 import os
+import pathlib
+import tarfile
 from array import array
 from contextlib import ExitStack, closing
 from dataclasses import dataclass
@@ -484,3 +486,17 @@ def optionally_compressed_handle(file_path, mode):
         return gzip.open(file_path, mode=mode)
     else:
         return open(file_path, mode=mode)
+
+
+def tar_extraction(file: pathlib.Path, output_dir: pathlib.Path, prefix: str = "", files_to_extract: list[str] = None):
+    with tarfile.open(file, "r:gz") as tar:
+        for dmp in files_to_extract:
+            log.info("Extracting {0} from taxdump.tar.gz".format(dmp))
+
+            tar.extract(dmp, path=output_dir)
+
+            # Timestamp the extracted dmp file
+            outf1 = output_dir / pathlib.Path(dmp)
+            timestamped_fname = "{0}.{1}".format(prefix, dmp)
+            timestamped_outf1 = output_dir / pathlib.Path(timestamped_fname)
+            outf1.rename(timestamped_outf1)

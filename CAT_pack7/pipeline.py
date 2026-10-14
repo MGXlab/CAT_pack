@@ -4,14 +4,14 @@ from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 
-from CAT_pack7.io.download import DownloadQueueReport, DownloadReport, multi_download
+from CAT_pack7.io.download import DownloadQueueReport, DownloadReport, multi_download, check_nr_md5s
 from . import tax
 from .classification import ClassificationEngine
 from .config.options import BatOptions, CatOptions, PrepareOptions, DownloadOptions
 from .config.settings import BatFiles, BatSettings, CatFiles, CatSettings, DiamondSettings
 from .config.validation import check_orfs_match_contigs, get_file_names, get_validated_settings, make_prefix, \
     validate_prepare, validate_download
-from .io.parsers import ClassificationParser
+from .io.parsers import ClassificationParser, tar_extraction
 from .io.writers import ClassificationWriter
 from .prepare import (
     copy_taxonomy, find_offspring, make_diamond_database,
@@ -334,12 +334,12 @@ def run_download(
     current_step = plan[step_index]
     log = logging.getLogger("CAT_pack")
     settings = None
+    files = None
     # FIXME: Add locks to the downloading files
     #locks = ExitStack()
 
     try:
         # FIXME as well
-        #files.data_folder.parent.mkdir(parents=True, exist_ok=True)
         #locks.enter_context(lock_outputs([files.data_folder]))
         for step_index, current_step in enumerate(plan):
             report(current_step.name, Status.RUNNING, 0, None)
@@ -347,11 +347,15 @@ def run_download(
             if step_index == 0:
                 settings = validate_download(args)
             elif current_step.name == "Downloading":
-                multi_download(settings, report, download_report, queue_report)
+                files = multi_download(settings, report, download_report, queue_report)
             elif current_step.name == "Check files":
-                pass
+                check_nr_md5s(settings)
             elif current_step.name == "Process files":
-                pass
+                tar_extraction(files["taxdump.tar.gz"], settings.out_dir,
+                               files["taxdump.tar.gz"].name().split('.')[0],
+                               ["names.dmp", "nodes.dmp"])
+                if settings.cleanup:
+                    pass
 
 
             report(current_step.name, Status.COMPLETE, 1, 1)

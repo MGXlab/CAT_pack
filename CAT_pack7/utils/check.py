@@ -151,7 +151,7 @@ def check_outputs(paths: list[Path]) -> None:
     checks.finish()
 
 
-def check_md5_gz(gz_file, md5_file, log_file, quiet):
+def check_md5_gz(gz_file, md5_file):
     checks = ValErrorCollector()
     with open(md5_file, "r") as f1:
         md5_exp = f1.read().strip().split(" ")[0]
