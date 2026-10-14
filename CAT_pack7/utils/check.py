@@ -7,7 +7,7 @@ import shutil
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-from .errors import InputError, ExternalToolError, ValErrorCollector
+from .errors import InputError, ExternalToolError, ValErrorCollector, CheckSumError
 
 
 def check_folder(path: Path, label: str, make: bool=False) -> Path:
@@ -149,3 +149,32 @@ def check_outputs(paths: list[Path]) -> None:
                 hint="Choose a different output location",
             ))
     checks.finish()
+
+
+def check_md5_gz(gz_file, md5_file, log_file, quiet):
+    checks = ValErrorCollector()
+    with open(md5_file, "r") as f1:
+        md5_exp = f1.read().strip().split(" ")[0]
+
+    if md5_exp == "":
+
+        checks.add(CheckSumError("no MD5 found in {0}. Integrity of {1} cannot be "
+                "established.".format(md5_file, gz_file)))
+    else:
+        md5 = gz_md5(gz_file)
+
+        if md5 != md5_exp:
+            checks.add(CheckSumError("MD5 of {0} does not check out.".format(gz_file)))
+
+    checks.finish()
+    return
+
+
+def gz_md5(input_gz, block_size=4096):
+    import hashlib
+    md5 = hashlib.md5()
+    with open(input_gz, "rb") as f1:
+        for chunk in iter(lambda: f1.read(block_size), b""):
+            md5.update(chunk)
+
+    return md5.hexdigest()

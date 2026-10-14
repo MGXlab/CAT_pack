@@ -6,10 +6,11 @@ from pathlib import Path
 
 from . import tax
 from .classification import ClassificationEngine
+from .config.download import multi_download
 from .config.options import BatOptions, CatOptions, PrepareOptions, DownloadOptions
 from .config.settings import BatFiles, BatSettings, CatFiles, CatSettings, DiamondSettings
 from .config.validation import check_orfs_match_contigs, get_file_names, get_validated_settings, make_prefix, \
-    validate_prepare
+    validate_prepare, validate_download
 from .io.parsers import ClassificationParser
 from .io.writers import ClassificationWriter
 from .prepare import (
@@ -66,7 +67,7 @@ def build_plan(args: CatOptions | BatOptions | PrepareOptions | DownloadOptions,
     if isinstance(args, DownloadOptions):
         return [
             Step("Input validation"),
-            Step("Downloading?")
+            Step("Downloading")
         ]
     raise CatError("I haven't figured out how to build that specific plan")
 
@@ -328,6 +329,7 @@ def run_download(args: DownloadOptions, report: Report):
     step_index = 0
     current_step = plan[step_index]
     log = logging.getLogger("CAT_pack")
+    settings = None
     # FIXME: Add locks to the downloading files
     #locks = ExitStack()
 
@@ -338,30 +340,15 @@ def run_download(args: DownloadOptions, report: Report):
         for step_index, current_step in enumerate(plan):
             report(current_step.name, Status.RUNNING, 0, None)
             log.info(f"Starting: {current_step.name}")
-            if step_index == 0:
+            if current_step == "Input validation":
                 settings = validate_download(args)
-                copy_taxonomy(settings)
-            elif current_step.name == "Make DIAMOND database":
-                make_diamond_database(settings)
-            elif current_step.name == "Make MMseqs2 database":
-                make_mmseqs2_database(settings)
-            else:
-                if taxid2parent is None:
-                    taxid2parent = tax.read_nodes(files.nodes)
-                if current_step.name == "Make fastaid2LCAtaxid":
-                    make_fastaid2LCAtaxid_file(
-                        files.fastaid2LCAtaxid, settings.db_fasta, settings.acc2tax,
-                        taxid2parent, report,
-                    )
-                elif current_step.name == "Make taxids with multiple offspring":
-                    taxid2offspring = find_offspring(files.fastaid2LCAtaxid, taxid2parent, report)
-                    write_taxids_with_multiple_offspring_file(
-                        files.taxids_with_multiple_offspring, taxid2offspring,
-                    )
+            elif current_step == "Downloading":
+                multi_download(settings)
+
+
             report(current_step.name, Status.COMPLETE, 1, 1)
             log.info(f"Completed: {current_step.name}")
 
-        log.info("Preparation complete. Use -d %s with CAT_pack7 CAT or BAT.", files.data_folder)
         return 0
 
     except KeyboardInterrupt:
@@ -377,12 +364,7 @@ def run_download(args: DownloadOptions, report: Report):
             report(remaining_step.name, Status.SKIPPED, 0, None)
         log.error("Preparation failed during %s: %s", current_step.name, error)
 
-        if isinstance(error, (OSError, UnicodeError, EOFError)):
-            error = CatError(str(error), path=files.data_folder)
         if isinstance(error, CatError):
             error.step = current_step.name
-            error.log_file = files.log_file if files.log_file.is_file() else None
             raise error
         raise
-    finally:
-        locks.close()
