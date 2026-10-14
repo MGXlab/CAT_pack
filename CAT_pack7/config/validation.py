@@ -144,7 +144,7 @@ def get_file_names(args: PrepareOptions) -> PrepareOutputs:
 
 def validate_download(args: DownloadOptions) -> DownloadSettings:
     checks = ValErrorCollector()
-    out_dir = checks.check(check_folder, args.out_dir, make=True)
+    out_dir = checks.check(check_folder, args.out_dir, "outdir", make=True)
 
     urls = NRUrls() # DEVNOTE here in case of faulty entry
     db_type = None
@@ -160,7 +160,7 @@ def validate_download(args: DownloadOptions) -> DownloadSettings:
 
     settings = DownloadSettings(
         db_type=db_type,
-        out_dir=out_dir,
+        out_dir=args.out_dir,
         cleanup=args.cleanup,
         quiet=args.quiet,
         no_log=False, # FIXME there is a Typererror in cli.py with double no_log, why??
@@ -170,9 +170,10 @@ def validate_download(args: DownloadOptions) -> DownloadSettings:
     # FIXME naming of the Downloadsettings urls, lots of urls urls now :)))
     for url in settings.urls.urls:
         url_leaf = url.split("/")[-1]
-        output_path = out_dir / Path(f"{get_date()}.{url_leaf}")
-        checks.check(check_file, output_path, output_path("/")[-1], exists=False)
+        output_path = settings.out_dir / Path(f"{get_date()}.{url_leaf}")
+        checks.check(check_file, output_path, url.split("/")[-1], exist=False)
 
+    checks.finish()
     return settings
 
 

@@ -340,9 +340,9 @@ def run_download(args: DownloadOptions, report: Report):
         for step_index, current_step in enumerate(plan):
             report(current_step.name, Status.RUNNING, 0, None)
             log.info(f"Starting: {current_step.name}")
-            if current_step == "Input validation":
+            if step_index == 0:
                 settings = validate_download(args)
-            elif current_step == "Downloading":
+            elif current_step.name == "Downloading":
                 multi_download(settings)
 
 

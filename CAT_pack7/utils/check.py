@@ -11,7 +11,7 @@ from .errors import InputError, ExternalToolError, ValErrorCollector, CheckSumEr
 
 
 def check_folder(path: Path, label: str, make: bool=False) -> Path:
-    if not path.is_dir():
+    if not path.is_dir() and not make:
         raise InputError(
             f"{label} was not found.",
             hint="Double check if the folder exists.",

@@ -20,7 +20,7 @@ from .cli_options import (
 from .config.options import BatOptions, CatOptions, ExecutionOptions, DiamondOptions, MMseqsOptions, PrepareOptions, \
     MemoryOptions, DownloadOptions
 from .config.validation import get_file_names, make_prefix
-from .pipeline import run_annotation, build_plan, Status, run_prepare
+from .pipeline import run_annotation, build_plan, Status, run_prepare, run_download
 from .utils.errors import CatError, show_error
 from .utils.logging import init_logging
 
@@ -110,22 +110,39 @@ def update_progress(progress, tasks, step, status, completed=0, total=None):
 
 
 @app.command()
+@with_option_groups(execution=execution_options)
 def download(
         db: Annotated[str, Option("--db", metavar="<nr|GTDB>")],
         out_dir: Annotated[Path, Option("--out-dir", metavar="<DIR>", help="Directory where data will be stored.")],
         cleanup: Annotated[bool, Option("--cleanup")] = DownloadOptions.cleanup,
-        quiet: Annotated[bool, Option("--quiet")] = DownloadOptions.quiet,
-        #no_log: Annotated[bool, Option("no_log")] = DownloadOptions.no_log
+        #quiet: Annotated[bool, Option("--quiet")] = DownloadOptions.quiet,
+        *, execution: ExecutionOptions,
 ):
     args = DownloadOptions(
         db_type=db,
         out_dir=out_dir,
         cleanup=cleanup,
-        quiet=quiet
+        quiet=execution.quiet
     )
     progress, tasks = make_progress([step.name for step in build_plan(args)])
     progress.disable = args.quiet
     report = partial(update_progress, progress, tasks)
+    try:
+        with progress:
+            run_download(args, report)
+    except KeyboardInterrupt:
+        console.print("\nDownload cancelled :(")
+        raise typer.Exit(code=130)
+
+    except CatError as error:
+        show_error(error, console)
+        raise typer.Exit(code=1)
+
+    except Exception:
+
+        # if args.debug:
+        console.print_exception(show_locals=True) # TODO: before release back to False
+        raise typer.Exit(code=1)
 
 
 
