@@ -18,7 +18,7 @@ from .cli_options import (
     DiamondPathOption, diamond_options, execution_options, mmseqs_options, memory_options, with_option_groups,
 )
 from .config.options import BatOptions, CatOptions, ExecutionOptions, DiamondOptions, MMseqsOptions, PrepareOptions, \
-    MemoryOptions
+    MemoryOptions, DownloadOptions
 from .config.validation import get_file_names, make_prefix
 from .pipeline import run_annotation, build_plan, Status, run_prepare
 from .utils.errors import CatError, show_error
@@ -108,6 +108,16 @@ def update_progress(progress, tasks, step, status, completed=0, total=None):
         case _: # catch all
             progress.update(task_id,status=status,refresh=True)
 
+
+@app.command()
+def download(
+        db: Annotated[str, Option("--db", metavar="<nr|GTDB>")],
+        out_dir: Annotated[Path, Option("--out-dir", metavar="<DIR>", help="Directory where data will be stored.")],
+        cleanup: Annotated[bool, Option("--cleanup")] = DownloadOptions.cleanup,
+        quiet: Annotated[bool, Option("--quiet")] = DownloadOptions.quiet,
+        #no_log: Annotated[bool, Option("no_log")] = DownloadOptions.no_log
+):
+    pass
 
 
 @app.command()
@@ -508,3 +518,5 @@ def run_annotation_cli(arguments: CatOptions | BatOptions):
             title=f"{tool} completed",
             border_style="green",
         ))
+
+
