@@ -2,6 +2,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from rich.text import Text
 from typer.testing import CliRunner
 
 from CAT_pack7.cli import app
@@ -16,12 +17,19 @@ class CliTests(unittest.TestCase):
 
     def test_command_help_lists_execution_flags(self):
         for command in ("prepare", "cat", "bat", "bins"):
-            with self.subTest(command=command):
-                result = self.runner.invoke(app, [command, "--help"], color=False)
+            for force_color in (False, True):
+                with self.subTest(command=command, force_color=force_color), patch.multiple(
+                    "typer.rich_utils", FORCE_TERMINAL=force_color,
+                    COLOR_SYSTEM="standard" if force_color else None, MAX_WIDTH=80,
+                ):
+                    result = self.runner.invoke(app, [command, "--help"], color=False)
 
-                self.assertEqual(result.exit_code, 0, result.output)
-                for flag in ("--threads", "--verbose", "--quiet", "--debug"):
-                    self.assertIn(flag, result.output)
+                    self.assertEqual(result.exit_code, 0, result.output)
+                    self.assertEqual("\x1b[" in result.output, force_color)
+                    # Rich can force ANSI styling in CI despite color=False.
+                    help_text = Text.from_ansi(result.output).plain
+                    for flag in ("--threads", "--verbose", "--quiet", "--debug"):
+                        self.assertIn(flag, help_text)
 
     def test_annotation_commands_forward_execution_flags(self):
         for command, input_flag in ANNOTATION_COMMANDS:
