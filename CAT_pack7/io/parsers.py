@@ -453,3 +453,34 @@ class ClassificationParser:
                 orfs.extend(contig2ORFs.get(contig, []))
             bin2ORFs[bin_name] = orfs
         return bin2ORFs
+
+
+def is_gz(file_path):
+    """Check if given file_path is gzipped based on suffix."""
+    if isinstance(file_path, Path):
+        file_path = file_path.name
+    return file_path.endswith(".gz") or file_path.endswith(".z")
+
+
+def optionally_compressed_handle(file_path, mode):
+    """Return an appropriate file handle to operate on.
+
+    Arguments:
+      file_path: str or PathLike: File path.
+      mode: str: The passed mode to open the file on.
+
+    Return:
+        A file handle either gzip opened or plainly opened for
+        reading/writing/appending in text mode.
+    """
+    if mode == "r" or mode == "rb":
+        mode = "rt"
+    if mode == "w" or mode == "wb":
+        mode = "wt"
+    if mode == "a" or mode == "ab":
+        mode = "at"
+
+    if is_gz(file_path):
+        return gzip.open(file_path, mode=mode)
+    else:
+        return open(file_path, mode=mode)

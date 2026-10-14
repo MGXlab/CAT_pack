@@ -1,102 +1,55 @@
 #!/usr/bin/env python3
 
-import argparse
-from collections import namedtuple
-import datetime
 import hashlib
+import logging
 import os
 import pathlib
 import shutil
 import sys
 import tarfile
 import urllib.request
+from collections import namedtuple
 
-import shared
-import check
+from CAT_pack7.config.settings import DownloadSettings
+from CAT_pack7.config.validation import get_date
+from CAT_pack7.io.parsers import optionally_compressed_handle
+from CAT_pack7.utils import check
 
-
-def parse_arguments():
-    date = datetime.datetime.now().strftime("%Y-%m-%d")
-
-    parser = argparse.ArgumentParser(
-            prog="CAT_pack download",
-            description=(
-                "Download and preprocess sequence and taxonomy information. "
-                "Currently supports the NCBI non-redundant (nr) database "
-                "and the GTDB database."
-                ),
-        usage=("CAT_pack download --db <nr|GTDB> -o <DIR> [options] "
-            "[-h / --help]"),
-        add_help=False
-        )
-
-    required = parser.add_argument_group("Required arguments")
-    shared.add_argument(required, "db", True)
-    shared.add_argument(required, "output_dir", True)
-
-    optional = parser.add_argument_group("Optional arguments")
-    shared.add_argument(optional, "cleanup", False)
-    shared.add_argument(optional, "quiet", False)
-    shared.add_argument(optional, "no_log", False)
-    shared.add_argument(optional, "help", False)
-
-    args, extra_args = parser.parse_known_args()
-
-    extra_args = [
-            arg
-            for (i, arg) in enumerate(extra_args)
-            if (i, arg) != (0, "download")
-            ]
-    if len(extra_args) > 0:
-        sys.exit(
-                "error: too many arguments supplied:\n{0}".format(
-                    "\n".join(extra_args)
-                    )
-                )
-
-    setattr(args, "date", date)
-    shared.expand_arguments(args)
-                        
-    return args
+log = logging.getLogger("CAT_pack")
 
 
-def download_singleton(target_url, local_path, log_file, quiet):
+def download_singleton(target_url, local_path):
     """Download a single file to the specified location."""
     try:
         urllib.request.urlretrieve(target_url, local_path)
     except:
-        message = "Failed downloading file: {0}.".format(target_url)
-        shared.give_user_feedback(message, log_file, quiet)
+        log.info("Failed downloading file: {0}.".format(target_url))
         raise
         
     return
 
 
-def multi_download(url_list, output_dir, log_file, quiet, prefix=None):
+def multi_download(settings: DownloadSettings):
     """Download all required nr files in the specified output dir."""
-    existing_files = list([p.resolve() for p in output_dir.iterdir()])
+    #existing_files = list([p.resolve() for p in settings.out_dir.iterdir()])
 
-    for url in url_list:
+    for url in settings.urls.urls:
         url_leaf = url.split("/")[-1]
-        
-        if prefix:
-            output_basename = "{0}.{1}".format(prefix, url_leaf)
-        else:
-            output_basename = url_leaf
+
+        output_basename = "{0}.{1}".format(get_date(), url_leaf)
+
             
-        output_path = output_dir / pathlib.Path(output_basename)
-        if output_path in existing_files:
-            message = (
-                    "Skipping download of file {0}. It already exists.".format(
-                        output_path.name
-                        )
-                    )
-            shared.give_user_feedback(message, log_file, quiet)
-        else:
-            message = "Downloading {0}.".format(url_leaf)
-            shared.give_user_feedback(message, log_file, quiet)
+        output_path = settings.out_dir / pathlib.Path(output_basename)
+        # @Bastiaan want to keep this functionality in?
+        # if output_path in existing_files:
+        #     log.info(
+        #             "Skipping download of file {0}. It already exists.".format(
+        #                 output_path.name
+        #                 )
+        #             )
+        log.info("Downloading {0}.".format(url_leaf))
             
-            download_singleton(url, output_path, log_file, quiet)
+        download_singleton(url, output_path)
 
     return
 
@@ -138,7 +91,6 @@ def process_nr(output_dir, log_file, quiet, prefix, cleanup):
     with tarfile.open(tax_tar_path, "r:gz") as tar:
         for dmp in ["names.dmp", "nodes.dmp"]:
             message = "Extracting {0} from taxdump.tar.gz".format(dmp)
-            shared.give_user_feedback(message, log_file, quiet)
             
             tar.extract(dmp, path=output_dir)
 
@@ -163,7 +115,7 @@ def process_nr(output_dir, log_file, quiet, prefix, cleanup):
     nodes_dmp = list(output_dir.glob("*nodes.dmp"))[0]
     acc2taxid_gz = list(output_dir.glob("*accession2taxid.FULL.gz"))[0]
     
-    message = (
+    log.info(
             "\n-----------------\n\n"
             "Done!\n\n"
             "A CAT_pack database can be build with:\n\n"
@@ -179,7 +131,6 @@ def process_nr(output_dir, log_file, quiet, prefix, cleanup):
                 acc2taxid_gz.resolve(),
                 )
             )
-    shared.give_user_feedback(message, log_file, quiet, show_time=False)
     
     return
 
@@ -235,13 +186,11 @@ def check_gtdb_md5s(data_dir, md5_dict, log_file, quiet):
             
         md5 = check.gz_md5(f)
         if md5_dict[f.name] != md5:
-            message = "MD5 of {0} does not check out.".format(f.resolve())
-            shared.give_user_feedback(message, log_file, quiet, error=True)
+            log.info("MD5 of {0} does not check out.".format(f.resolve()))
 
             sys.exit(1)
         else:
-            message = "MD5 of {0} checks out.".format(f.resolve())
-            shared.give_user_feedback(message, log_file, quiet)
+            log.info("MD5 of {0} checks out.".format(f.resolve()))
             
     return
 
@@ -249,7 +198,7 @@ def check_gtdb_md5s(data_dir, md5_dict, log_file, quiet):
 def concatenate_taxonomies_gz(ar_tsv_gz, bac_tsv_gz, output_tsv):
     with open(output_tsv, "w") as outf1:
         for f in [ar_tsv_gz, bac_tsv_gz]:
-            with shared.optionally_compressed_handle(f, "r") as f1:
+            with optionally_compressed_handle(f, "r") as f1:
                 for line in f1:
                     outf1.write(line)
 
@@ -405,7 +354,7 @@ def fastaIterator_gz(fasta_in_gz, gid2taxid):
     """
     origin = fasta_in_gz.name.replace("_protein.faa.gz", "")
     taxid = gid2taxid[origin]
-    with shared.optionally_compressed_handle(fasta_in_gz, "r") as f1:
+    with optionally_compressed_handle(fasta_in_gz, "r") as f1:
         for line in f1:
             if line[0] == ">":
                 title = line[1:].rstrip()
@@ -448,7 +397,7 @@ def extract_duplicates(proteins_dir, gid2taxid, acc2taxid_fp, log_file, quiet):
     multiplets = {}
     seq_counter, file_counter = 0, 0
     
-    with shared.optionally_compressed_handle(acc2taxid_fp, "w") as outf1:
+    with optionally_compressed_handle(acc2taxid_fp, "w") as outf1:
         outf1.write("accession.version\ttaxid\n")
         
         for f in proteins_dir.rglob("*/*.faa.gz"):
@@ -489,9 +438,8 @@ def extract_duplicates(proteins_dir, gid2taxid, acc2taxid_fp, log_file, quiet):
                 seq_counter += 1
 
             if file_counter % 1000 == 0 and file_counter != 0:
-                message = "Parsed {0:,d} sequences from {1:,d} files.".format(
-                        seq_counter, file_counter)
-                shared.give_user_feedback(message, log_file, quiet)
+                log.info("Parsed {0:,d} sequences from {1:,d} files.".format(
+                        seq_counter, file_counter))
         # This else is part of the outter for-loop.
         # It executes when the for loop finishes.
         else:
@@ -501,7 +449,7 @@ def extract_duplicates(proteins_dir, gid2taxid, acc2taxid_fp, log_file, quiet):
             # Calculate the total number of identified multiplets.
             redundants = sum(map(len, [v for v in multiplets.values()]))
             
-            message = (
+            log.info(
                     "    Total files: {0:>12,d}\n"
                     "{1}Total sequences: {2:>12,d}\n"
                     "{3}     Multiplets: {4:>12,d}\n"
@@ -516,7 +464,6 @@ def extract_duplicates(proteins_dir, gid2taxid, acc2taxid_fp, log_file, quiet):
                         len(multiplets),
                         )
                     )
-            shared.give_user_feedback(message, log_file, quiet)
             
     return multiplets
 
@@ -525,7 +472,7 @@ def write_singletons(
     proteins_dir, duplicates, gid2taxid, singletons_fp, log_file, quiet):
     seq_counter, file_counter, skipped = 0, 0, 0
     
-    with shared.optionally_compressed_handle(singletons_fp, "w") as outf1:
+    with optionally_compressed_handle(singletons_fp, "w") as outf1:
         for f in proteins_dir.rglob("*/*.faa.gz"):
             file_counter += 1
             
@@ -537,17 +484,15 @@ def write_singletons(
                     skipped += 1
                     
             if file_counter % 1000 == 0 and file_counter != 0:
-                message = ("Written {0:,d} sequences from {1:,d} files "
+                log.info("Written {0:,d} sequences from {1:,d} files "
                         "({2:,d} skipped).".format(
                             seq_counter, file_counter, skipped)
                         )
-                shared.give_user_feedback(message, log_file, quiet)
         else:
-            message = ("Written {0:,d} sequences from {1:,d} files "
+            log.info("Written {0:,d} sequences from {1:,d} files "
                     "({2:,d} skipped).".format(
                         seq_counter, file_counter, skipped)
                     )
-            shared.give_user_feedback(message, log_file, quiet)
             
     return
 
@@ -582,8 +527,8 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
 
     version = get_gtdb_latest_version(parent_url)
     
-    message = "CAT_pack will download files from GTDB {0}.".format(version)
-    shared.give_user_feedback(message, log_file, quiet)
+    log.info("CAT_pack will download files from GTDB {0}.".format(version))
+    
 
     file_list = [
             "VERSION.txt",
@@ -617,8 +562,8 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
     ar_tree_fp = list(output_dir.glob("*ar*.tree"))[0]
     concatenated_tree_fp = output_dir / pathlib.Path("gtdb.tree")
     if not concatenated_tree_fp.exists():
-        message = "Concatenating newick trees."
-        shared.give_user_feedback(message, log_file, quiet)
+        log.info("Concatenating newick trees.")
+        
         concatenate_trees(bac_tree_fp, ar_tree_fp, concatenated_tree_fp)
 
     # Extract protein files from archive.
@@ -646,33 +591,33 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
                 
             safe_extract(tar, output_dir)
     else:
-        message = "Proteins directory {0} already exists.".format(
-                proteins_dir.resolve())
-        shared.give_user_feedback(message, log_file, quiet)
+        log.info("Proteins directory {0} already exists.".format(
+                proteins_dir.resolve()))
+        
 
     # Process files.
     # NODES.
     nodes_dmp = output_dir / pathlib.Path("nodes.dmp")
     if not nodes_dmp.exists():
-        message = "Writing nodes information to {0}.".format(
-                nodes_dmp.resolve())
-        shared.give_user_feedback(message, log_file, quiet)
+        log.info("Writing nodes information to {0}.".format(
+                nodes_dmp.resolve()))
+        
         write_nodes_dmp(all_taxa_tsv, nodes_dmp)
     else:
-        message = "Nodes file found : {0}.".format(nodes_dmp.resolve())
-        shared.give_user_feedback(message, log_file, quiet)
+        log.info("Nodes file found : {0}.".format(nodes_dmp.resolve()))
+        
 
     # NAMES.
     names_dmp = output_dir / pathlib.Path("names.dmp")
     if not names_dmp.exists():
-        message = "Writing names information to {0}.".format(
-                names_dmp.resolve())
-        shared.give_user_feedback(message, log_file, quiet)
+        log.info("Writing names information to {0}.".format(
+                names_dmp.resolve()))
+        
         
         write_names_dmp(all_taxa_tsv, names_dmp)
     else:
-        message = "Names file found : {0}.".format(names_dmp.resolve())
-        shared.give_user_feedback(message, log_file, quiet)
+        log.info("Names file found : {0}.".format(names_dmp.resolve()))
+        
 
     gid2taxid = genome_id_to_taxid(all_taxa_tsv)
 
@@ -683,21 +628,21 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
     acc2taxid_fp = output_dir / pathlib.Path("prot.accession2taxid.txt.gz")
     
     if not acc2taxid_fp.exists():
-        message = "1st pass: Extracting multiplets."
-        shared.give_user_feedback(message, log_file, quiet)
+        log.info("1st pass: Extracting multiplets.")
+        
         
         ## 1st pass.
         ## Write acc2taxid file, extract duplicates in their own fasta.
         duplicates = extract_duplicates(
             proteins_dir, gid2taxid, acc2taxid_fp, log_file, quiet)
-        with shared.optionally_compressed_handle(duplicates_fp, "w") as outf1:
+        with optionally_compressed_handle(duplicates_fp, "w") as outf1:
             for rec in duplicates.values():
                 outf1.write(">{0}\n{1}\n".format(rec.id, rec.seq))
 
         # 2nd pass.
         # Write the unique sequences to a separate file.
-        message = "2nd pass: Retrieving unique sequences."
-        shared.give_user_feedback(message, log_file, quiet)
+        log.info("2nd pass: Retrieving unique sequences.")
+        
         
         write_singletons(
                 proteins_dir,
@@ -708,13 +653,13 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
                 quiet
                 )
 
-        message = "Concatenating sequence files."
-        shared.give_user_feedback(message, log_file, quiet)
+        log.info("Concatenating sequence files.")
+        
         
         # Concatenate the two files into one.
-        with shared.optionally_compressed_handle(all_seqs_fp, "w") as outf1:
+        with optionally_compressed_handle(all_seqs_fp, "w") as outf1:
             for f in [duplicates_fp, singletons_fp]:
-                with shared.optionally_compressed_handle(f, "r") as f1:
+                with optionally_compressed_handle(f, "r") as f1:
                     for line in f1:
                         outf1.write(line)
 
@@ -730,8 +675,8 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
                 all_taxa_tsv,
                 proteins_tar,
                 ]
-        message = "Cleanup specified. Removing unnecessary files and folders."
-        shared.give_user_feedback(message, log_file, quiet)
+        log.info("Cleanup specified. Removing unnecessary files and folders.")
+        
 
         for target in remove_targets:
             if target.is_dir():
@@ -739,7 +684,7 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
             else:
                 target.unlink()
                 
-    message = (
+    log.info(
             "\n-----------------\n\n"
             "Done!\n\n"
             "A CAT_pack database can be build with:\n\n"
@@ -756,38 +701,9 @@ def process_gtdb(output_dir, log_file, quiet, cleanup=False):
                 )
             )
 
-    shared.give_user_feedback(message, log_file, quiet, show_time=False)
+
     
     return
-
-
-def run():
-    args = parse_arguments()
-    
-    if not args.output_dir.exists():
-        args.output_dir.mkdir(parents=True)
-        
-    if args.no_log:
-        log_file = None
-    else:
-        log_fname = "{0}.CAT_pack_download.log".format(args.date)
-        log_file = args.output_dir / pathlib.Path(log_fname)
-
-    setattr(args, "log_file", log_file)
-    
-    if args.db == "nr":
-        process_nr(
-                args.output_dir,
-                args.log_file,
-                args.quiet,
-                prefix=args.date,
-                cleanup=args.cleanup,
-                )
-    elif args.db.upper() == "GTDB":
-        process_gtdb(args.output_dir, args.log_file, args.quiet, args.cleanup)
-        
-    return
-
 
 if __name__ == "__main__":
     sys.exit("Run \'CAT_pack download\' to download and preprocess data from "

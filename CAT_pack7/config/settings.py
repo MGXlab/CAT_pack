@@ -211,14 +211,7 @@ class PrepareSettings(ExecutionSettings):
 class ParserSettings:
     bit_score_multiplier = 10
 
-@dataclass()
-class DownloadSettings:
-    db_type: str
-    out_dir: Path
-    cleanup: bool
-    quiet: bool
-    no_log: bool
-    urls: NRUrls | GTDBUrls
+
 
 @dataclass()
 class NRUrls:
@@ -268,3 +261,12 @@ class GTDBUrls:
             version_data = f.read().decode()
 
         self.version = "{0} ({3})".format(*version_data.split("\n"))
+
+@dataclass()
+class DownloadSettings:
+    db_type: str
+    out_dir: Path
+    cleanup: bool
+    quiet: bool
+    no_log: bool
+    urls: NRUrls | GTDBUrls
