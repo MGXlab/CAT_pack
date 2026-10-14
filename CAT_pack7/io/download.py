@@ -55,7 +55,7 @@ def multi_download(settings: DownloadSettings, report: Report,
     prefix = get_date()
     output_paths = {url.split('/')[-1]: settings.out_dir / f"{prefix}.{url.split('/')[-1]}" for url in urls}
     if queue_report is not None:
-        queue_report(output_paths.())
+        queue_report(list(output_paths.values()))
     if report is not None:
         report("Downloading", Status.RUNNING, 0, len(urls))
 
