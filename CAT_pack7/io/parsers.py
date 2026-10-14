@@ -489,6 +489,7 @@ def optionally_compressed_handle(file_path, mode):
 
 
 def tar_extraction(file: pathlib.Path, output_dir: pathlib.Path, prefix: str = "", files_to_extract: list[str] = None):
+    files = {}
     with tarfile.open(file, "r:gz") as tar:
         for dmp in files_to_extract:
             log.info("Extracting {0} from taxdump.tar.gz".format(dmp))
@@ -500,3 +501,5 @@ def tar_extraction(file: pathlib.Path, output_dir: pathlib.Path, prefix: str = "
             timestamped_fname = "{0}.{1}".format(prefix, dmp)
             timestamped_outf1 = output_dir / pathlib.Path(timestamped_fname)
             outf1.rename(timestamped_outf1)
+            files[dmp] = timestamped_fname
+    return files

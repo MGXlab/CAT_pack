@@ -169,7 +169,7 @@ def download(
         display = nullcontext() if args.quiet else Live(Group(progress, file_progress), console=console)
         with display:
             try:
-                run_download(args, report, report_download, download_queue)
+                files, dmp_files = run_download(args, report, report_download, download_queue)
                 file_status = "[green]Completed[/green]"
             except KeyboardInterrupt:
                 file_status = "[red]Cancelled[/red]"
@@ -195,6 +195,28 @@ def download(
         # if args.debug:
         console.print_exception(show_locals=True) # TODO: before release back to False
         raise typer.Exit(code=1)
+    else:
+        if args.quiet:
+            return
+
+        #succes = Text("Downloading completed.", style="bold green")
+
+        command = ["--db_fasta", files["nr.gz"].resolve(),
+                   "--names", dmp_files["names.dmp"].resolve(),
+                   "--nodes", dmp_files["nodes.dmp"].resolve(),
+                   "--acc2tax", files["prot.accession2taxid.FULL.gz"]]
+
+
+        prepare_command = Group(
+            Text("A CAT_pack database can be build with:", style="bold"),
+            Text(f"$ {shlex.join(command)}", style="cyan")
+        )
+
+        console.print(Panel(
+            Group(prepare_command),
+            title=f"Download completed",
+            border_style="green",
+        ))
 
 
 

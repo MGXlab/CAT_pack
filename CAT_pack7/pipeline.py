@@ -334,6 +334,7 @@ def run_download(
     current_step = plan[step_index]
     log = logging.getLogger("CAT_pack")
     settings = None
+    dmp_files = None
     files = None
     # FIXME: Add locks to the downloading files
     #locks = ExitStack()
@@ -351,17 +352,21 @@ def run_download(
             elif current_step.name == "Check files":
                 check_nr_md5s(settings)
             elif current_step.name == "Process files":
-                tar_extraction(files["taxdump.tar.gz"], settings.out_dir,
-                               files["taxdump.tar.gz"].name().split('.')[0],
+                tax_tar_path = files["taxdump.tar.gz"]
+                dmp_files = tar_extraction(tax_tar_path, settings.out_dir,
+                               tax_tar_path.name().split('.')[0],
                                ["names.dmp", "nodes.dmp"])
-                if settings.cleanup:
-                    pass
 
+                if settings.cleanup:
+                    tax_tar_path.resolve().unlink()
+
+                    for i in settings.out_dir.glob("*.md5"):
+                        i.resolve().unlink()
 
             report(current_step.name, Status.COMPLETE, 1, 1)
             log.info(f"Completed: {current_step.name}")
 
-        return 0
+        return files, dmp_files
 
     except KeyboardInterrupt:
         report(current_step.name, Status.CANCELLED, 0, None)
