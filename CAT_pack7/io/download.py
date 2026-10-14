@@ -9,56 +9,33 @@ import sys
 import tarfile
 import urllib.request
 from collections import namedtuple
+from typing import Callable
 
 from CAT_pack7.config.settings import DownloadSettings
 from CAT_pack7.config.validation import get_date
 from CAT_pack7.io.parsers import optionally_compressed_handle
 from CAT_pack7.utils import check
+from CAT_pack7.utils.logging import Report, Status
 
 log = logging.getLogger("CAT_pack")
-from rich.progress import (
-    Progress,
-    BarColumn,
-    DownloadColumn,
-    TextColumn,
-    TimeRemainingColumn,
-    TransferSpeedColumn,
-)
+DownloadReport = Callable[[pathlib.Path, int, int | None], None]
+DownloadQueueReport = Callable[[list[pathlib.Path]], None]
 
 
-
-def download_singleton(target_url, local_path: pathlib.Path) -> None:
+def download_singleton(target_url, local_path: pathlib.Path, report: DownloadReport) -> None:
     """Download a single file to the specified location."""
+    def reporthook(blocknum: int, blocksize: int, totalsize: int):
+        total = totalsize if totalsize >= 0 else None
+        downloaded = blocknum * blocksize
+        if total is not None:
+            downloaded = min(downloaded, total)
+        report(local_path, downloaded, total)
+
     try:
-        progress = Progress(
-            TextColumn("[bold cyan]{task.fields[filename]}"),
-            BarColumn(bar_width=None),
-            "[progress.percentage]{task.percentage:>3.1f}%",
-            " ",
-            DownloadColumn(),
-            " ",
-            TransferSpeedColumn(),
-            " ",
-            TimeRemainingColumn(),
-        )
-        with progress:
-            file = None
-            def reporthook(blocknum: int, blocksize: int, totalsize: int):
-                nonlocal file
-                if file is None:
-                    total = totalsize if totalsize > 0 else None
-                    file = progress.add_task("download", filename=local_path.name, total=total)
-
-                downloaded = blocknum * blocksize
-
-                if totalsize > 0:
-                    downloaded = min(downloaded, totalsize)
-
-                progress.update(file, completed=downloaded)
-
-
-            urllib.request.urlretrieve(target_url, local_path, reporthook=reporthook)
-    except:
+        if report is not None:
+            report(local_path, 0, None)
+        urllib.request.urlretrieve(target_url, local_path, reporthook=reporthook)
+    except Exception:
         log.info("Failed downloading file: {0}.".format(target_url))
         raise
         
@@ -68,19 +45,22 @@ def download_singleton(target_url, local_path: pathlib.Path) -> None:
 
 
 
-
-
-def multi_download(settings: DownloadSettings):
+def multi_download(settings: DownloadSettings, report: Report,
+    download_report: DownloadReport, queue_report: DownloadQueueReport
+):
     """Download all required nr files in the specified output dir."""
     #existing_files = list([p.resolve() for p in settings.out_dir.iterdir()])
 
-    for url in settings.urls.urls:
+    urls = settings.urls.urls
+    prefix = get_date()
+    output_paths = [settings.out_dir / f"{prefix}.{url.split('/')[-1]}" for url in urls]
+    if queue_report is not None:
+        queue_report(output_paths)
+    if report is not None:
+        report("Downloading", Status.RUNNING, 0, len(urls))
+
+    for index, (url, output_path) in enumerate(zip(urls, output_paths), start=1):
         url_leaf = url.split("/")[-1]
-
-        output_basename = "{0}.{1}".format(get_date(), url_leaf)
-
-            
-        output_path = settings.out_dir / pathlib.Path(output_basename)
         # @Bastiaan want to keep this functionality in?
         # if output_path in existing_files:
         #     log.info(
@@ -90,7 +70,9 @@ def multi_download(settings: DownloadSettings):
         #             )
         log.info("Downloading {0}.".format(url_leaf))
             
-        download_singleton(url, output_path)
+        download_singleton(url, output_path, download_report)
+        if report is not None:
+            report("Downloading", Status.RUNNING, index, len(urls))
 
     return
 

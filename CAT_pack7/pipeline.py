@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 
-from CAT_pack7.io.download import multi_download
+from CAT_pack7.io.download import DownloadQueueReport, DownloadReport, multi_download
 from . import tax
 from .classification import ClassificationEngine
 from .config.options import BatOptions, CatOptions, PrepareOptions, DownloadOptions
@@ -324,7 +324,11 @@ def run_prepare(args: PrepareOptions, report: Report):
     finally:
         locks.close()
 
-def run_download(args: DownloadOptions, report: Report):
+def run_download(
+    args: DownloadOptions, report: Report,
+    download_report: DownloadReport,
+    queue_report: DownloadQueueReport
+):
     plan = build_plan(args)
     step_index = 0
     current_step = plan[step_index]
@@ -343,7 +347,7 @@ def run_download(args: DownloadOptions, report: Report):
             if step_index == 0:
                 settings = validate_download(args)
             elif current_step.name == "Downloading":
-                multi_download(settings)
+                multi_download(settings, report, download_report, queue_report)
             elif current_step.name == "Check files":
                 pass
             elif current_step.name == "Process files":

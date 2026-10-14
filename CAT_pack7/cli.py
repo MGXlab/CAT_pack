@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import shlex
 import sys
+from contextlib import nullcontext
 from decimal import Decimal
 from functools import partial
 from pathlib import Path
@@ -8,8 +9,12 @@ from typing import Annotated
 
 import typer
 from rich.console import Console, Group
+from rich.live import Live
 from rich.panel import Panel
-from rich.progress import Progress, ProgressColumn, BarColumn, TextColumn, TimeElapsedColumn
+from rich.progress import (
+    Progress, ProgressColumn, BarColumn, DownloadColumn, TaskProgressColumn,
+    TextColumn, TimeElapsedColumn, TimeRemainingColumn, TransferSpeedColumn,
+)
 from rich.table import Table
 from rich.text import Text
 from typer import Option
@@ -36,6 +41,10 @@ class StaticBarColumn(BarColumn):
     def render(self, task):
         bar = super().render(task)
         bar.pulse = False
+        # Rich also pulses when the rendered bar has an unknown total.
+        if bar.total is None:
+            bar.total = 1
+            bar.completed = 0
         return bar
 
 
@@ -127,9 +136,52 @@ def download(
     progress, tasks = make_progress([step.name for step in build_plan(args)])
     progress.disable = args.quiet
     report = partial(update_progress, progress, tasks)
+    file_progress = Progress(
+        TextColumn("  {task.description}", markup=False, style="bold cyan"),
+        StaticBarColumn(), TaskProgressColumn(), DownloadColumn(),
+        TransferSpeedColumn(), TimeRemainingColumn(),
+        TextColumn("{task.fields[status]}"),
+        console=console, disable=args.quiet,refresh_per_second=1
+    )
+    file_task = None
+    file_tasks = {}
+
+    def download_queue(paths):
+        for path in paths:
+            file_tasks[path] = file_progress.add_task(
+                path.name, total=None, start=False, status="[dim]Waiting[/dim]"
+            )
+
+    def report_download(path, completed, total):
+        nonlocal file_task
+        task_id = file_tasks[path]
+        if task_id != file_task:
+            if file_task is not None:
+                file_progress.stop_task(file_task)
+                file_progress.update(file_task, status="[green]Completed[/green]")
+            file_task = task_id
+            file_progress.start_task(file_task)
+            file_progress.update(file_task, status="[yellow]Downloading[/yellow]")
+        file_progress.update(file_task, completed=completed, total=total)
+
+
     try:
-        with progress:
-            run_download(args, report)
+        display = nullcontext() if args.quiet else Live(Group(progress, file_progress), console=console)
+        with display:
+            try:
+                run_download(args, report, report_download, download_queue)
+                file_status = "[green]Completed[/green]"
+            except KeyboardInterrupt:
+                file_status = "[red]Cancelled[/red]"
+                raise
+            except Exception:
+                file_status = "[bold red]Failed[/bold red]"
+                raise
+            finally:
+
+                if file_task is not None:
+                    file_progress.stop_task(file_task)
+                    file_progress.update(file_task, status=file_status)
     except KeyboardInterrupt:
         console.print("\nDownload cancelled :(")
         raise typer.Exit(code=130)
