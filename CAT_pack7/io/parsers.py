@@ -2,10 +2,12 @@
 import bz2
 import gzip
 import logging
+import os
 from array import array
+from contextlib import ExitStack, closing
 from dataclasses import dataclass
 from decimal import Decimal
-from itertools import chain
+from itertools import chain, islice
 from pathlib import Path
 from typing import Iterator
 
@@ -168,7 +170,7 @@ class BinParser:
 
 def parse_bitscore(text: str) -> int:
     whole_number, _, decimal = text.strip().partition(".")
-    return int(whole_number) * parser_settings.bit_score_multiplier + int(decimal or "0")
+    return int(whole_number) * parser_settings.bit_score_multiplier + int(decimal[:1] or "0")
 
 
 def format_bitscore(bitscore: int) -> str:
@@ -194,19 +196,120 @@ class AlignmentInput:
         return [self.hit_names[hit] for hit in self.hit_ids[self.hits_of(orf)].tolist()]
 
 
-class AlignmentParser:
-    """Keep hits within range_ percent of each ORF's highest bit score.
+class _HitIndex:
+    def __init__(self):
+        import polars as pl
 
-    Validate that input is grouped by ORF, bitscores must be descending per ORF
+        self.hit_name_dtype = pl.Categorical(pl.Categories.random())
+        # Keep the hit-name mapping across multiple batches
+        self.hit_name_keep = pl.Series([], dtype=self.hit_name_dtype)
+        self.hit_code2hit_id = np.full(1024, -1, dtype=np.int32)
+        self.new_hit_codes_by_batch = []
+        self.n_hit_names = 0
+
+    def index_hits(self, hit_names):
+        encoded_hit_names = hit_names.cast(self.hit_name_dtype)
+        hit_name_codes = encoded_hit_names.to_physical().to_numpy()
+
+        if not len(hit_name_codes):
+            return np.empty(0, dtype=np.int32)
+
+        unique_hit_name_codes = encoded_hit_names.unique(maintain_order=True).to_physical().to_numpy()
+        required_code_capacity = int(unique_hit_name_codes.max()) + 1
+
+        if required_code_capacity > len(self.hit_code2hit_id):
+            capacity = max(required_code_capacity, len(self.hit_code2hit_id) * 2)
+            expanded_hit_code2hit_id = np.full(capacity, -1, dtype=np.int32)
+            expanded_hit_code2hit_id[:len(self.hit_code2hit_id)] = self.hit_code2hit_id
+            self.hit_code2hit_id = expanded_hit_code2hit_id
+
+        new_hit_name_codes = unique_hit_name_codes[self.hit_code2hit_id[unique_hit_name_codes] < 0]
+        self.hit_code2hit_id[new_hit_name_codes] = np.arange(
+            self.n_hit_names, self.n_hit_names + len(new_hit_name_codes), dtype=np.int32,
+        )
+        self.new_hit_codes_by_batch.append(new_hit_name_codes)
+        self.n_hit_names += len(new_hit_name_codes)
+        return self.hit_code2hit_id[hit_name_codes]
+
+    def get_hit_names(self):
+        import polars as pl
+
+        if not self.n_hit_names:
+            return []
+        hit_name_codes = np.concatenate(self.new_hit_codes_by_batch)
+        return pl.Series(hit_name_codes, dtype=pl.UInt32).cat.to(self.hit_name_dtype).cast(pl.String).to_list()
+
+
+class AlignmentParser:
+    """Load DIAMOND hits within range_
+
+    DEVNOTE: The input is asseumed to be grouped by ORF!
+    DEVNOTE 2: the Alignment file is not validated during loading.
+               Users responsibility to supply correct files or let cat_pack generate it
+
+    Bitscore comparison products are assumed to fit in int64.
+
     """
 
-    def __init__(self, path: Path, range_: Decimal, cat_only: bool | None = None) -> None:
+    _chunk_rows = 100_000
+
+    def __init__(self, path: Path, range_: Decimal, cat_only: bool | None = None, workers: int = 1) -> None:
         self.path = path
         self.cutoff_numerator, self.cutoff_denominator = ((Decimal(100) - range_)/Decimal(100)).as_integer_ratio()
         self.cat_only = cat_only
+        self.workers = workers
+
+    def _read_in_batches(self, source, first_line, bitscore_index):
+        import polars as pl
+
+        column_names = [f"field_{i}" for i in range(bitscore_index + 1)]
+        schema = dict.fromkeys(column_names, pl.String)
+        selected_columns = [column_names[0], column_names[1], column_names[-1]]
+        # Parse one decimal place. After that it's stored in integers (decimal * 10)
+        bitscore_column = (
+            pl.col(selected_columns[-1]).cast(pl.Decimal(precision=38, scale=1))
+            .to_physical().cast(pl.Int64).alias("bitscore")
+        )
+        reader_options = dict(
+            has_header=False, separator="\t", quote_char=None, schema=schema,
+            empty_string_is_null=False, raise_if_empty=False,
+            missing_columns="insert", extra_columns="ignore",
+        )
+        log.info(f"Loading alignment with Polars using a total of {pl.thread_pool_size()} threads.")
+
+        if self.path.suffix == ".bz2":
+            alignment_lines = chain((first_line,), source)
+            for lines in iter(lambda: list(islice(alignment_lines, self._chunk_rows)), []):
+                alignment_batch = pl.read_csv("".join(lines).encode("utf-8"), **reader_options).with_columns(
+                    bitscore_column,
+                ).select([selected_columns[0], selected_columns[1], "bitscore"])
+                if alignment_batch.height:
+                    yield alignment_batch, selected_columns
+            return
+
+        alignment_scan = (
+            pl.scan_csv(self.path, glob=False, **reader_options)
+            .with_columns(bitscore_column)
+            .select([selected_columns[0], selected_columns[1], "bitscore"])
+        )
+        batches = alignment_scan.collect_batches(chunk_size=self._chunk_rows, maintain_order=True)
+        try:
+            for alignment_batch in batches:
+                if alignment_batch.height:
+                    yield alignment_batch, selected_columns
+        finally:
+            del batches
 
     def parse(self) -> AlignmentInput:
         log.info(f"Parsing alignment file {self.path}.")
+        # https://docs.pola.rs/api/python/stable/reference/api/polars.thread_pool_size.html
+        # DEVNOTE: During testing the sweetspot was 16 cores at 76 seconds and 8 cores around 77 secons
+        #  10-12 cores need to be tested
+        os.environ.setdefault("POLARS_MAX_THREADS", str(min(self.workers, os.cpu_count() or 1)))
+
+        # Import AFTER threads setting, so Polars initializes with the correct core count!
+        import polars as pl
+
         if self.path.suffix == ".gz":
             source_file = gzip.open(self.path, "rt", encoding="utf-8")
         elif self.path.suffix == ".bz2":
@@ -218,64 +321,59 @@ class AlignmentParser:
         orf_offsets = array("q")
         hit_ids = array("i")
         bitscores = array("q")
-        hit2index: dict[str, int] = {}
-        with source_file as source:
-            current_orf = None
-            cutoff = 0
+        hit_index = _HitIndex()
+        with source_file as source, ExitStack() as cleanup:
+            current_ORF = None
+            top_bitscore = 0
             below_cutoff = False
-            previous_bitscore = None
-            bitscore_values: dict[str, int] = {}
-            lines = enumerate(source, start=1)
-            first_row = next((row for row in lines if row[1].strip()), None)
-            rows = chain((first_row,), lines) if first_row is not None else ()
+            first_line = next(source, None)
             if self.cat_only is None:
                 bitscore_index = 11
             else:
                 bitscore_index = 2 if self.cat_only else 11
 
-            for line_number, line in rows:
-                if below_cutoff:
-                    first_tab = line.find("\t")
-                    if first_tab != -1 and line[:first_tab] == current_orf:
-                        continue
-                if line == "\n" or line == "\r\n":
-                    continue
-                fields = line.split("\t", bitscore_index + 1)
-                orf_id = fields[0]
-                hit_id = fields[1]
-                bitscore_string = fields[bitscore_index].rstrip("\r\n")
-                bitscore = bitscore_values.get(bitscore_string)
-                if bitscore is None:
-                    bitscore = parse_bitscore(bitscore_string)
-                    bitscore_values[bitscore_string] = bitscore
+            batches = cleanup.enter_context(closing(self._read_in_batches(source, first_line, bitscore_index))) if first_line is not None else ()
+            for alignment_batch, selected_columns in batches:
+                batch_bitscores = alignment_batch["bitscore"].to_numpy()
+                ORF_groups = alignment_batch[selected_columns[0]].rle()
+                n_hits_per_ORF = ORF_groups.struct.field("len").to_numpy().astype(np.int64)
+                ORF_names = np.asarray(ORF_groups.struct.field("value").to_list(), dtype=object)
+                ORF_starts = np.concatenate(([0], np.cumsum(n_hits_per_ORF)[:-1]))
+                continues_ORF = ORF_names[0] == current_ORF
+                new_ORF_starts = ORF_starts[1:] if continues_ORF else ORF_starts
+                new_ORF_names = ORF_names[1:] if continues_ORF else ORF_names
+                first_ORF_index = len(orf_names)
+                orf_index.update(zip(new_ORF_names, range(first_ORF_index, first_ORF_index + len(new_ORF_names))))
+                orf_names.extend(new_ORF_names)
 
-                if orf_id != current_orf:
-                    if orf_id in orf_index:
-                        raise InputError(
-                            f"Alignment hits for ORF {orf_id} are not grouped at line {line_number}.",
-                            path=self.path,
-                            hint="Group alignment rows by ORF, with descending bit scores within each group.")
-                    current_orf = orf_id
-                    cutoff = bitscore * self.cutoff_numerator
-                    orf_index[orf_id] = len(orf_names)
-                    orf_names.append(orf_id)
-                    orf_offsets.append(len(hit_ids))
-                    below_cutoff = False
-                    previous_bitscore = None
+                top_bitscores = batch_bitscores[ORF_starts]
+                if continues_ORF:
+                    top_bitscores[0] = top_bitscore
+                cutoff_numerator, cutoff_denominator = self.cutoff_numerator, self.cutoff_denominator
+                # Compare B * denominator with H * numerator
+                # DEVNOTE: Logic being here that
+                #  B >= Fraction * H  <-> B * denominator >= H * numerator
+                #  This keeps the comparison Integer only
+                hits_below_cutoff = (batch_bitscores * cutoff_denominator < np.repeat(top_bitscores * cutoff_numerator, n_hits_per_ORF))
 
-                if previous_bitscore is not None and bitscore > previous_bitscore:
-                    raise InputError(
-                        f"Alignment bit scores for ORF {orf_id} are not descending at line {line_number}.",
-                        path=self.path,
-                        hint="Sort each ORF's alignment hits by descending bit score.")
-                previous_bitscore = bitscore
+                row_indices = np.arange(len(batch_bitscores))
+                first_below_cutoff = np.minimum.reduceat(np.where(hits_below_cutoff, row_indices, len(batch_bitscores)), ORF_starts)
 
-                if bitscore * self.cutoff_denominator < cutoff:
-                    below_cutoff = True
-                    continue
+                if continues_ORF and below_cutoff:
+                    first_below_cutoff[0] = -1
 
-                hit_ids.append(hit2index.setdefault(hit_id, len(hit2index)))
-                bitscores.append(bitscore)
+                keep_hits = row_indices < np.repeat(first_below_cutoff, n_hits_per_ORF)
+                n_kept_before = np.concatenate(([0], np.cumsum(keep_hits)))
+                orf_offsets.frombytes((len(hit_ids) + n_kept_before[new_ORF_starts]).astype(np.int64).tobytes())
+
+                hit_names = alignment_batch[selected_columns[1]].filter(pl.Series(keep_hits))
+                batch_hit_ids = hit_index.index_hits(hit_names)
+                hit_ids.frombytes(batch_hit_ids.tobytes())
+                bitscores.frombytes(batch_bitscores[keep_hits].tobytes())
+
+                current_ORF = ORF_names[-1]
+                top_bitscore = int(top_bitscores[-1])
+                below_cutoff = first_below_cutoff[-1] < len(batch_bitscores)
 
         orf_offsets.append(len(hit_ids))
         return AlignmentInput(
@@ -284,7 +382,7 @@ class AlignmentParser:
             orf_offsets=np.frombuffer(orf_offsets, dtype=np.int64),
             hit_ids=np.frombuffer(hit_ids, dtype=np.int32),
             bitscores=np.frombuffer(bitscores, dtype=np.int64),
-            hit_names=list(hit2index),
+            hit_names=hit_index.get_hit_names(),
         )
 
 
@@ -325,7 +423,7 @@ class ClassificationParser:
             for contig in contig_names:
                 entity2ORFs[contig] = contig2ORFs.get(contig, [])
 
-        alignment = AlignmentParser(self.files.alignment, self.range_, self.cat_only).parse()
+        alignment = AlignmentParser(self.files.alignment, self.range_, self.cat_only, workers=self.workers).parse()
         taxonomy = tax.Taxonomy.import_nodes(self.files.nodes)
 
         fastaid2LCAtaxid = read_fastaid2LCAtaxid(self.files.fastaid2LCA, set(alignment.hit_names), workers=self.workers)
