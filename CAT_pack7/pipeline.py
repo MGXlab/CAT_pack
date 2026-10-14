@@ -6,7 +6,7 @@ from pathlib import Path
 
 from . import tax
 from .classification import ClassificationEngine
-from .config.options import BatOptions, CatOptions, PrepareOptions
+from .config.options import BatOptions, CatOptions, PrepareOptions, DownloadOptions
 from .config.settings import BatFiles, BatSettings, CatFiles, CatSettings, DiamondSettings
 from .config.validation import check_orfs_match_contigs, get_file_names, get_validated_settings, make_prefix, \
     validate_prepare
@@ -40,7 +40,7 @@ class Step:
         return self.name
 
 
-def build_plan(args: CatOptions | BatOptions | PrepareOptions, files=None) -> list[Step]:
+def build_plan(args: CatOptions | BatOptions | PrepareOptions | DownloadOptions, files=None) -> list[Step]:
     if type(args) == PrepareOptions:
         return [
             Step("Input validation"),
@@ -62,6 +62,11 @@ def build_plan(args: CatOptions | BatOptions | PrepareOptions, files=None) -> li
             ),
             Step("Alignment", supplied=args.alignment is not None),
             Step("Classify"),
+        ]
+    if isinstance(args, DownloadOptions):
+        return [
+            Step("Input validation"),
+            Step("Downloading?")
         ]
     raise CatError("I haven't figured out how to build that specific plan")
 
