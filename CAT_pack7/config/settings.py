@@ -213,6 +213,13 @@ class ParserSettings:
 
 
 
+@dataclass(frozen=True)
+class DownloadFile:
+    url: str
+    path: Path
+    checksum: Path | None = None
+
+
 @dataclass()
 class NRUrls:
     urls: list[str]
@@ -262,11 +269,23 @@ class GTDBUrls:
 
         self.version = "{0} ({3})".format(*version_data.split("\n"))
 
-@dataclass()
+
+@dataclass(frozen=True)
+class DownloadOutputs(TaxonomyFiles):
+    prefix: str
+    data_folder: Path
+    log_file: Path
+    db_fasta: Path
+    acc2tax: Path
+    taxonomy_archive: Path
+    downloads: tuple[DownloadFile, ...]
+
+
+@dataclass(frozen=True)
 class DownloadSettings:
     db_type: str
-    out_dir: Path
+    files: DownloadOutputs
     cleanup: bool
     quiet: bool
     no_log: bool
-    urls: NRUrls | GTDBUrls
+    debug: bool

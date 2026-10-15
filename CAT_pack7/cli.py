@@ -124,14 +124,17 @@ def download(
         db: Annotated[str, Option("--db", metavar="<nr|GTDB>")],
         out_dir: Annotated[Path, Option("--out-dir", metavar="<DIR>", help="Directory where data will be stored.")],
         cleanup: Annotated[bool, Option("--cleanup")] = DownloadOptions.cleanup,
-        #quiet: Annotated[bool, Option("--quiet")] = DownloadOptions.quiet,
+        no_log: Annotated[bool, Option("--no-log")] = DownloadOptions.no_log,
         *, execution: ExecutionOptions,
 ):
     args = DownloadOptions(
         db_type=db,
         out_dir=out_dir,
         cleanup=cleanup,
-        quiet=execution.quiet
+        quiet=execution.quiet,
+        verbose=execution.verbose,
+        debug=execution.debug,
+        no_log=no_log,
     )
     progress, tasks = make_progress([step.name for step in build_plan(args)])
     progress.disable = args.quiet
@@ -141,10 +144,21 @@ def download(
         StaticBarColumn(), TaskProgressColumn(), DownloadColumn(),
         TransferSpeedColumn(), TimeRemainingColumn(),
         TextColumn("{task.fields[status]}"),
-        console=console, disable=args.quiet,refresh_per_second=1
+        console=console, disable=args.quiet, refresh_per_second=1,
+        speed_estimate_period=60,
     )
     file_task = None
     file_tasks = {}
+    last_file_update = 0.0
+    subtasks = {"Downloading": file_progress}
+
+    def render_progress():
+        rows = []
+        for task in progress.tasks:
+            rows.append(progress.make_tasks_table([task]))
+            if task.description in subtasks:
+                rows.append(subtasks[task.description])
+        return Group(*rows)
 
     def download_queue(paths):
         for path in paths:
@@ -153,23 +167,29 @@ def download(
             )
 
     def report_download(path, completed, total):
-        nonlocal file_task
+        nonlocal file_task, last_file_update
         task_id = file_tasks[path]
         if task_id != file_task:
             if file_task is not None:
                 file_progress.stop_task(file_task)
                 file_progress.update(file_task, status="[green]Completed[/green]")
             file_task = task_id
+            last_file_update = 0.0
             file_progress.start_task(file_task)
             file_progress.update(file_task, status="[yellow]Downloading[/yellow]")
+        now = file_progress.get_time()
+        # Keep Rich's bounded speed history from filling with tiny block updates.
+        if completed > 0 and (total is None or completed < total) and now - last_file_update < 0.5:
+            return
         file_progress.update(file_task, completed=completed, total=total)
+        last_file_update = now
 
 
     try:
-        display = nullcontext() if args.quiet else Live(Group(progress, file_progress), console=console)
+        display = nullcontext() if args.quiet else Live(get_renderable=render_progress, console=console)
         with display:
             try:
-                files, dmp_files = run_download(args, report, report_download, download_queue)
+                files = run_download(args, report, report_download, download_queue)
                 file_status = "[green]Completed[/green]"
             except KeyboardInterrupt:
                 file_status = "[red]Cancelled[/red]"
@@ -181,7 +201,10 @@ def download(
 
                 if file_task is not None:
                     file_progress.stop_task(file_task)
-                    file_progress.update(file_task, status=file_status)
+                    task = file_progress.tasks[file_task]
+                    file_progress.update(file_task, status=(
+                        "[green]Completed[/green]" if task.finished else file_status
+                    ))
     except KeyboardInterrupt:
         console.print("\nDownload cancelled :(")
         raise typer.Exit(code=130)
@@ -199,19 +222,17 @@ def download(
         if args.quiet:
             return
 
-        #succes = Text("Downloading completed.", style="bold green")
-
-        command = ["--db_fasta", files["nr.gz"].resolve(),
-                   "--names", dmp_files["names.dmp"].resolve(),
-                   "--nodes", dmp_files["nodes.dmp"].resolve(),
-                   "--acc2tax", files["prot.accession2taxid.FULL.gz"]]
-
-
+        command = ["cat_pack7", "prepare", "--db_fasta", str(files.db_fasta.resolve()),
+                   "--names", str(files.names.resolve()),
+                   "--nodes", str(files.nodes.resolve()),
+                   "--acc2tax", str(files.acc2tax.resolve()),
+                   "--db_dir", "path/to/prepare_output"]
         prepare_command = Group(
             Text("A CAT_pack database can be build with:", style="bold"),
             Text(f"$ {shlex.join(command)}", style="cyan")
         )
 
+        console.print()
         console.print(Panel(
             Group(prepare_command),
             title=f"Download completed",

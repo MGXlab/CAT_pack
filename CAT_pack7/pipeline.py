@@ -3,15 +3,19 @@ from contextlib import ExitStack
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
+from tarfile import TarError
 
-from CAT_pack7.io.download import DownloadQueueReport, DownloadReport, multi_download, check_nr_md5s
+from CAT_pack7.io.download import (
+    DownloadQueueReport, DownloadReport, multi_download, check_nr_md5s,
+    extract_nr_taxonomy, cleanup_nr_downloads,
+)
 from . import tax
 from .classification import ClassificationEngine
 from .config.options import BatOptions, CatOptions, PrepareOptions, DownloadOptions
-from .config.settings import BatFiles, BatSettings, CatFiles, CatSettings, DiamondSettings
+from .config.settings import BatFiles, BatSettings, CatFiles, CatSettings, DiamondSettings, DownloadOutputs
 from .config.validation import check_orfs_match_contigs, get_file_names, get_validated_settings, make_prefix, \
-    validate_prepare, validate_download
-from .io.parsers import ClassificationParser, tar_extraction
+    validate_prepare, validate_download, get_download_file_names
+from .io.parsers import ClassificationParser
 from .io.writers import ClassificationWriter
 from .prepare import (
     copy_taxonomy, find_offspring, make_diamond_database,
@@ -67,7 +71,10 @@ def build_plan(args: CatOptions | BatOptions | PrepareOptions | DownloadOptions,
     if isinstance(args, DownloadOptions):
         return [
             Step("Input validation"),
-            Step("Downloading")
+            Step("Downloading"),
+            Step("Check files"),
+            Step("Process files"),
+            Step("Cleanup", supplied=not args.cleanup),
         ]
     raise CatError("I haven't figured out how to build that specific plan")
 
@@ -328,45 +335,43 @@ def run_download(
     args: DownloadOptions, report: Report,
     download_report: DownloadReport,
     queue_report: DownloadQueueReport
-):
+) -> DownloadOutputs:
+    files = get_download_file_names(args)
     plan = build_plan(args)
     step_index = 0
     current_step = plan[step_index]
     log = logging.getLogger("CAT_pack")
-    settings = None
-    dmp_files = None
-    files = None
-    # FIXME: Add locks to the downloading files
-    #locks = ExitStack()
+    locks = ExitStack()
 
     try:
-        # FIXME as well
-        #locks.enter_context(lock_outputs([files.data_folder]))
+        files.data_folder.parent.mkdir(parents=True, exist_ok=True)
+        locks.enter_context(lock_outputs([files.data_folder]))
         for step_index, current_step in enumerate(plan):
+            # A bit of a missuse of the term supplied. this is for if cleanup isnt enabled
+            if current_step.supplied:
+                report(current_step.name, Status.SKIPPED, 0, None)
+                continue
             report(current_step.name, Status.RUNNING, 0, None)
             log.info(f"Starting: {current_step.name}")
             if step_index == 0:
-                settings = validate_download(args)
+                settings = validate_download(args, files)
+                files.data_folder.mkdir(parents=True, exist_ok=True)
+                if not settings.no_log:
+                    locks.enter_context(file_logging(log, files.log_file, settings.debug))
             elif current_step.name == "Downloading":
-                files = multi_download(settings, report, download_report, queue_report)
+                multi_download(settings, report, download_report, queue_report)
             elif current_step.name == "Check files":
-                check_nr_md5s(settings)
+                check_nr_md5s(settings, report)
             elif current_step.name == "Process files":
-                tax_tar_path = files["taxdump.tar.gz"]
-                dmp_files = tar_extraction(tax_tar_path, settings.out_dir,
-                               tax_tar_path.name().split('.')[0],
-                               ["names.dmp", "nodes.dmp"])
-
-                if settings.cleanup:
-                    tax_tar_path.resolve().unlink()
-
-                    for i in settings.out_dir.glob("*.md5"):
-                        i.resolve().unlink()
+                extract_nr_taxonomy(files, report)
+            elif current_step.name == "Cleanup":
+                cleanup_nr_downloads(settings)
 
             report(current_step.name, Status.COMPLETE, 1, 1)
             log.info(f"Completed: {current_step.name}")
 
-        return files, dmp_files
+        log.info("Download complete. NR inputs are ready for CAT_pack7 prepare.")
+        return files
 
     except KeyboardInterrupt:
         report(current_step.name, Status.CANCELLED, 0, None)
@@ -379,9 +384,14 @@ def run_download(
         report(current_step.name, Status.FAILED, 0, None)
         for remaining_step in plan[step_index + 1:]:
             report(remaining_step.name, Status.SKIPPED, 0, None)
-        log.error("Preparation failed during %s: %s", current_step.name, error)
+        log.error("Download failed during %s: %s", current_step.name, error)
 
+        if isinstance(error, (OSError, UnicodeError, EOFError, TarError)):
+            error = CatError(str(error), path=files.data_folder)
         if isinstance(error, CatError):
             error.step = current_step.name
+            error.log_file = files.log_file if not args.no_log and files.log_file.is_file() else None
             raise error
         raise
+    finally:
+        locks.close()
