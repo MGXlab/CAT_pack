@@ -62,7 +62,6 @@ def multi_download(settings: DownloadSettings, report: Report,
 
 
 def check_nr_md5s(files: DownloadOutputs, report: Report) -> None:
-    """Check only this run's explicit data/checksum pairs."""
     pairs = [item for item in files.downloads if item.checksum is not None]
     for index, item in enumerate(pairs, 1):
         check.check_md5_gz(item.path, item.checksum)
@@ -70,7 +69,6 @@ def check_nr_md5s(files: DownloadOutputs, report: Report) -> None:
 
 
 def extract_nr_taxonomy(files: DownloadOutputs, report: Report) -> None:
-    """Copy only regular taxonomy members directly to their planned output paths."""
     targets = (("names.dmp", files.names), ("nodes.dmp", files.nodes))
     with tarfile.open(files.taxonomy_archive, "r:gz") as archive:
         members = []
@@ -142,7 +140,7 @@ def staged_outputs(paths: list[pathlib.Path]):
 
 
 def load_gtdb_md5sums(md5sums_file: pathlib.Path) -> dict[str, str]:
-    # The latest/ aliases omit release suffixes present in MD5SUM.txt.
+    """Create a dictionary from the MD5SUMS file."""
     md5_dict = {}
     for line in md5sums_file.read_text(encoding="utf-8").splitlines():
         if not line.strip():
@@ -157,7 +155,6 @@ def load_gtdb_md5sums(md5sums_file: pathlib.Path) -> dict[str, str]:
 @check_files.register
 def check_gtdb_md5s(files: GTDBDownloadOutputs, report: Report) -> None:
     md5_dict = load_gtdb_md5sums(files.checksums)
-    # As in the original downloader, check only gzip files listed in MD5SUM.txt.
     inputs = [item for item in files.downloads
               if item.path.suffix == ".gz" and item.url.rsplit("/", 1)[-1] in md5_dict]
     for index, item in enumerate(inputs, 1):
@@ -174,7 +171,6 @@ def check_gtdb_md5s(files: GTDBDownloadOutputs, report: Report) -> None:
 
 @contextmanager
 def _taxonomy_handle(taxonomies_tsv):
-    """Read the two downloaded taxonomy tables through the original writers."""
     if isinstance(taxonomies_tsv, (str, pathlib.Path)):
         taxonomies_tsv = (taxonomies_tsv,)
     with ExitStack() as stack:
@@ -331,7 +327,6 @@ fastaRecord = namedtuple("fastaRecord", ["id", "seq", "uid", "taxid"])
 
 
 def fastaIterator_gz(fasta_in_gz, gid2taxid, *, handle=None):
-    """Yield the original record shape, optionally using an open archive member."""
     origin = pathlib.Path(fasta_in_gz).name.removesuffix(".gz").removesuffix("_protein.faa")
     taxid = gid2taxid[origin]
     source = nullcontext(handle) if handle is not None else optionally_compressed_handle(fasta_in_gz, "r")
@@ -395,8 +390,8 @@ def extract_duplicates(proteins_tar, gid2taxid, acc2taxid_fp):
                 )
             seq_counter += 1
             if seq_counter % 100000 == 0:
-                log.info("Indexed %s GTDB proteins.", f"{seq_counter:,}")
-    log.info("Indexed %s GTDB proteins in total.", f"{seq_counter:,}")
+                log.info(f"Indexed {seq_counter:,} GTDB proteins.")
+    log.info(f"Indexed {seq_counter:,} GTDB proteins in total.")
     return multiplets
 
 
@@ -433,5 +428,5 @@ def process_gtdb(files: GTDBDownloadOutputs, report: Report) -> None:
 def cleanup_gtdb_downloads(files: GTDBDownloadOutputs) -> None:
     for item in files.downloads:
         if item.path != files.version:
-            log.info("Removing %s.", item.path)
+            log.info(f"Removing {item.path}")
             item.path.unlink()
