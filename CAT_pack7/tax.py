@@ -17,6 +17,8 @@ NO_TAXID = -1
 
 class Taxonomy:
     def __init__(self, parents, taxid_index, taxids):
+        self.root = None
+        self.depth = None
         self.parents = parents
         self.taxid_index = taxid_index
         self.taxids = taxids
@@ -30,7 +32,7 @@ class Taxonomy:
 
         taxid2parent = {}
 
-        with open(nodes_dmp, "r") as f1:
+        with open(nodes_dmp) as f1:
             for line in f1:
                 line = line.split("\t")
                 taxid2parent[line[0]] = line[2]
@@ -215,6 +217,7 @@ class WeightedLCA:
             bitscore, fraction, n_entities,
         )
 
+    # TODO: Continue
     def lineage_support_of(self, assignment):
         start, end = self.lineage_offsets[assignment:assignment + 2]
         return self.lineage_bitscores[start:end].tolist()
@@ -314,16 +317,16 @@ def find_weighted_LCA(taxonomy, orf_type, lca_per_orf, top_bitscores, f, n):
 
     pair_cutoff = bitscore_cutoffs[pairs[:, 0]]
 
-    canidates = np.flatnonzero(taxid_bitscores > pair_cutoff)
+    candidates = np.flatnonzero(taxid_bitscores > pair_cutoff)
 
-    order = np.lexsort((first_orf[canidates], -taxonomy.depth[pairs[canidates, 1]], pairs[canidates, 0]))
+    order = np.lexsort((first_orf[candidates], -taxonomy.depth[pairs[candidates, 1]], pairs[candidates, 0]))
 
     selected_rows = []
     taxid_trace = set()
     previous_orf_id = None
 
-    for canidate in canidates[order]:
-        orf_id, taxid = pairs[canidate]
+    for candidate in candidates[order]:
+        orf_id, taxid = pairs[candidate]
 
         if orf_id != previous_orf_id:
             taxid_trace.clear()
@@ -332,14 +335,14 @@ def find_weighted_LCA(taxonomy, orf_type, lca_per_orf, top_bitscores, f, n):
         if taxid in taxid_trace:
             continue
 
-        selected_rows.append(canidate)
+        selected_rows.append(candidate)
         taxid_trace.update(taxonomy.find_lineage(taxid))
 
     selected_rows = np.asarray(selected_rows, dtype=np.int64)
     elapsed = perf_counter() - stage_started
     log.info(
         "Classification timing: candidate selection: %.3f s (%d candidates, %d assignments)",
-        elapsed, len(canidates), len(selected_rows),
+        elapsed, len(candidates), len(selected_rows),
         extra={"classification_phase": "candidate_selection", "classification_seconds": elapsed},
     )
 
@@ -385,78 +388,6 @@ def find_weighted_LCA(taxonomy, orf_type, lca_per_orf, top_bitscores, f, n):
     )
     return result
 
-def convert_to_names(lineage, taxid2rank, taxid2name, scores=None):
-    names = []
-    for (i, taxid) in enumerate(lineage):
-        if "*" in taxid:
-            taxid = taxid.rstrip("*")
-
-            starred = True
-        else:
-            starred = False
-
-        name = taxid2name[taxid]
-        rank = taxid2rank[taxid]
-
-        if scores is not None:
-            if starred:
-                names.append("{0}* ({1}): {2}".format(name, rank, scores[i]))
-            else:
-                names.append("{0} ({1}): {2}".format(name, rank, scores[i]))
-        else:
-            if starred:
-                names.append("{0}* ({1})".format(name, rank))
-            else:
-                names.append("{0} ({1})".format(name, rank))
-                
-    return names
-
-
-def convert_to_official_names(lineage, taxid2rank, taxid2name, scores=None):
-    official_ranks = ["superkingdom", "phylum", "class", "order", "family",
-                      "genus", "species"]
-    lineage_ranks = [taxid2rank[taxid.rstrip("*")] for taxid in lineage]
-
-    official_names = ["no support"] * 7
-
-    for (i, rank) in enumerate(official_ranks):
-        if rank in lineage_ranks:
-            index = lineage_ranks.index(rank)
-
-            taxid = lineage[index]
-
-            if "*" in taxid:
-                taxid = taxid.rstrip("*")
-
-                starred = True
-            else:
-                starred = False
-                
-            name = taxid2name[taxid]
-
-            if scores is not None:
-                if starred:
-                    official_names[i] = "{0}*: {1}".format(name, scores[index])
-                else:
-                    official_names[i] = "{0}: {1}".format(name, scores[index])
-            else:
-                if starred:
-                    official_names[i] = "{0}*".format(name)
-                else:
-                    official_names[i] = name
-
-    # Fill the official lineage with NAs if a lower classification is present.
-    index_lowest_classification = 0
-    for (i, name) in enumerate(official_names):
-        if name != "no support":
-            index_lowest_classification = i
-            
-    for i in range(index_lowest_classification):
-        if official_names[i] == "no support":
-            official_names[i] = "NA"
-
-    return official_names
-
 
 def read_nodes(path: Path) -> dict[str, str]:
     log.info(f"Loading file {path}.")
@@ -488,7 +419,7 @@ def import_fastaid2LCAtaxid(fastaid2LCAtaxid_file: Path, all_hits, *, workers=1)
 def import_taxids_with_multiple_offspring(taxids_with_multiple_offspring_file):
     log.info(f"Loading file {taxids_with_multiple_offspring_file}.")
 
-    with open(taxids_with_multiple_offspring_file, "r", encoding="utf-8") as f1:
+    with open(taxids_with_multiple_offspring_file, encoding="utf-8") as f1:
         return {taxid for line in f1 if (taxid := line.strip())}
 
 
@@ -507,61 +438,15 @@ def find_lineage(taxid, parents):
     return np.array(lineage, dtype=np.int32)
 
 
+# noinspection PyTypeChecker
 def find_LCA(list_of_lineages):
     overlap = set.intersection(*map(set, list_of_lineages))
 
     for taxid in list_of_lineages[0]:
         if taxid in overlap:
             return taxid
+    return None
 
-
-
-def import_names(names_dmp: Path):
-    log.info(f"Loading file {names_dmp}.")
-
-    taxid2name = {}
-
-    with open(names_dmp, "r") as f1:
-        for line in f1:
-            line = line.split("\t")
-
-            if line[6] == "scientific name":
-                taxid = line[0]
-                name = line[2]
-
-                taxid2name[taxid] = name
-
-    return taxid2name
-
-
-def find_questionable_taxids(lineage, taxids_with_multiple_offspring):
-    questionable_taxids = []
-
-    if lineage == ["1"] or lineage == ["root"]:
-        return questionable_taxids
-
-    if len(lineage) == 2 and (lineage[1:] == ["1"] or lineage[1:] == ["root"]):
-        return questionable_taxids
-
-    for (i, taxid) in enumerate(lineage):
-        taxid_parent = lineage[i + 1]
-        if taxid_parent in taxids_with_multiple_offspring:
-            return questionable_taxids
-
-        questionable_taxids.append(taxid)
-
-
-def star_lineage(lineage, taxids_with_multiple_offspring):
-    questionable_taxids = find_questionable_taxids(
-        lineage, taxids_with_multiple_offspring)
-
-    starred_lineage = [
-        taxid if
-        taxid not in questionable_taxids else
-        "{0}*".format(taxid) for taxid in lineage
-    ]
-
-    return starred_lineage
 
 if __name__ == "__main__":
     sys.exit("Run \'CAT_pack\' to run CAT, BAT, or RAT.")
