@@ -57,6 +57,9 @@ class ExternalToolError(CatError):
         super().__init__(f"{tool}: {message}")
         self.hint = hint
 
+class CheckSumError(CatError):
+    title = "Checksum error"
+
 
 class ValErrorCollector:
     """A class that collects all the errors

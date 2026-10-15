@@ -5,7 +5,7 @@ from typing import Annotated
 
 from typer import Option
 
-from .config.options import DiamondOptions, ExecutionOptions, MMseqsOptions
+from .config.options import DiamondOptions, ExecutionOptions, MMseqsOptions, MemoryOptions
 
 DiamondPathOption = Annotated[Path | None, Option(
     "--path-to-diamond", rich_help_panel="DIAMOND",
@@ -69,6 +69,23 @@ def mmseqs_options(
 
 
 
+
+
+def memory_options(
+    low_memory: Annotated[bool, Option(
+        "--low-memory", rich_help_panel="Memory",
+        help="Use an estimated memory budget of up to 1 GiB.",
+    )] = MemoryOptions.low_memory,
+    high_memory: Annotated[bool, Option(
+        "--high-memory", rich_help_panel="Memory",
+        help="Use all detected available memory (also the default).",
+    )] = MemoryOptions.high_memory,
+    available_memory: Annotated[int | None, Option(
+        "--available-memory", "-available-memory", min=1, rich_help_panel="Memory",
+        help="Estimated available memory in GiB, e.g. 4.",
+    )] = MemoryOptions.available_memory,
+) -> MemoryOptions:
+    return MemoryOptions(low_memory, high_memory, available_memory)
 
 
 def with_option_groups(**providers):

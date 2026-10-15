@@ -6,18 +6,21 @@ from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
-from .options import AlignerName, BatOptions, CatOptions, ExecutionOptions, DiamondOptions, PrepareOptions
+from .options import AlignerName, BatOptions, CatOptions, ExecutionOptions, DiamondOptions, PrepareOptions, \
+    MemoryOptions, DownloadOptions
 from .settings import (
     BatFiles, BatSettings, CatFiles, CatSettings, ClassificationSettings, DatabaseFiles, DiamondParameters,
     DiamondPrepareSettings, DiamondSettings, ExecutionSettings, MMseqsPrepareSettings,
-    PrepareOutputs, PrepareSettings, TaxonomyFiles, PyrodigalSettings
+    PrepareOutputs, PrepareSettings, TaxonomyFiles, MemorySettings,
+    DownloadFile, DownloadOutputs, DownloadSettings, NRUrls, GTDBUrls, GTDBDownloadOutputs,
 )
 from ..io.parsers import BinParser
 from ..utils.check import (
-    check_db_file, check_diamond, check_file, check_folder, check_integer, check_number,
-    check_output_prefix, check_outputs, check_pyrodigal,
+    check_db_file, check_diamond, check_fasta_file, check_folder, check_integer, check_number,
+    check_output_prefix, check_outputs, check_pyrodigal, check_file_not_empty, check_file,
 )
 from ..utils.errors import ExternalToolError, InputError, ValErrorCollector
+from ..utils.memory import GIB
 
 log = logging.getLogger("CAT_pack")
 
@@ -28,22 +31,42 @@ DIAMOND_MODES = {
 
 
 def validate_execution(options: ExecutionOptions) -> ExecutionSettings:
-    return ExecutionSettings(options.threads, options.quiet, options.verbose, options.debug)
+    memory = validate_memory(options.memory) if isinstance(options, (CatOptions, BatOptions)) else MemorySettings()
+    if memory.available_memory_bytes is not None:
+        log.info(f"[red]Memory mode[/red]: custom ({memory.available_memory_bytes / GIB:g} GiB)")
+    elif memory.low_memory:
+        log.info("Memory mode: low")
+    else:
+        log.info("[red]Memory mode[/red]: automatic")
+    return ExecutionSettings(options.threads, options.quiet, options.verbose, options.debug, memory=memory)
 
 
 def validate_classification(range_, fraction) -> ClassificationSettings:
     checks = ValErrorCollector()
+    log.debug("Checking range parameter")
     range_ = checks.check(check_number, range_, "Range", 0, 100)
+    log.info(f"Checked Range parameter: {range_}")
+    log.debug("Checking fraction parameter")
     fraction = checks.check(check_number, fraction, "Fraction", 0, Decimal("0.99"))
-    pyrodigal = PyrodigalSettings()
+    log.info(f"Checked Fraction parameter: {fraction}")
     checks.finish()
-    return ClassificationSettings(range_, fraction, pyrodigal)
+    return ClassificationSettings(range_, fraction)
+
+
+def validate_memory(options: MemoryOptions) -> MemorySettings:
+    if sum((options.low_memory, options.high_memory, options.available_memory is not None)) > 1:
+        raise InputError("Woah, too many memories",
+                         hint="Choose only one of --low-memory, --high-memory, --available-memory.")
+    budget = None
+    if options.available_memory is not None:
+        budget = check_integer(options.available_memory, "Available memory (GiB)", 1, sys.maxsize) * GIB
+    return MemorySettings(low_memory=options.low_memory, available_memory_bytes=budget)
 
 
 def validate_taxonomy(names: Path, nodes: Path) -> TaxonomyFiles:
     checks = ValErrorCollector()
-    names = checks.check(check_file, names, "Taxonomy names file")
-    nodes = checks.check(check_file, nodes, "Taxonomy nodes file")
+    names = checks.check(check_file_not_empty, names, "Taxonomy names file")
+    nodes = checks.check(check_file_not_empty, nodes, "Taxonomy nodes file")
     checks.finish()
     return TaxonomyFiles(names, nodes)
 
@@ -100,7 +123,6 @@ def make_prefix(args: PrepareOptions) -> PrepareOptions:
         return args
     return replace(args, common_prefix=f"{datetime.now():%Y-%m-%d}_CAT_pack")
 
-
 def get_file_names(args: PrepareOptions) -> PrepareOutputs:
     prefix = make_prefix(args).common_prefix
     folder = args.db_dir
@@ -117,13 +139,81 @@ def get_file_names(args: PrepareOptions) -> PrepareOutputs:
     )
 
 
+def get_download_file_names(args: DownloadOptions) -> DownloadOutputs:
+    prefix = f"{datetime.now():%Y-%m-%d}"
+    folder = args.out_dir
+    db_type = args.db_type.lower().strip()
+    if db_type not in {"nr", "gtdb"}:
+        raise InputError("Incorrect database selected. Please select nr or gtdb.")
+    if db_type == "gtdb":
+        urls = {url.rsplit("/", 1)[-1]: url for url in GTDBUrls().urls}
+        paths = {name: folder / f"{prefix}.{name}" for name in urls}
+        return GTDBDownloadOutputs(
+            prefix=prefix, data_folder=folder,
+            log_file=folder / f"{prefix}.download.log",
+            db_fasta=folder / f"{prefix}.gtdb_seqs.fa.gz",
+            acc2tax=folder / f"{prefix}.prot.accession2taxid.txt.gz",
+            taxonomy_archive=None,
+            names=folder / f"{prefix}.names.dmp",
+            nodes=folder / f"{prefix}.nodes.dmp",
+            downloads=tuple(DownloadFile(url, paths[name]) for name, url in urls.items()),
+            protein_archive=paths["gtdb_proteins_aa_reps.tar.gz"],
+            taxonomy_tables=(paths["ar53_taxonomy.tsv.gz"], paths["bac120_taxonomy.tsv.gz"]),
+            trees=(paths["ar53.tree"], paths["bac120.tree"]),
+            tree=folder / f"{prefix}.gtdb.tree",
+            version=paths["VERSION.txt"], checksums=paths["MD5SUM.txt"],
+        )
+    urls = {url.rsplit("/", 1)[-1]: url for url in NRUrls().urls}
+    paths = {name: folder / f"{prefix}.{name}" for name in urls}
+    downloads = []
+    for name, url in urls.items():
+        downloads.append(DownloadFile(url, paths[name], paths.get(f"{name}.md5")))
+    return DownloadOutputs(
+        prefix=prefix, data_folder=folder,
+        log_file=folder / f"{prefix}.download.log",
+        db_fasta=paths["nr.gz"],
+        acc2tax=paths["prot.accession2taxid.FULL.gz"],
+        taxonomy_archive=paths["taxdump.tar.gz"],
+        names=folder / f"{prefix}.names.dmp",
+        nodes=folder / f"{prefix}.nodes.dmp",
+        downloads=tuple(downloads),
+    )
+
+
+def validate_download(args: DownloadOptions, files: DownloadOutputs | None = None) -> DownloadSettings:
+    match args.db_type.lower().strip():
+        case "nr":
+            db_type = "nr"
+        case "gtdb":
+            db_type = "gtdb"
+        case _:
+            raise InputError("Incorrect database selected. Please select nr or gtdb.")
+    files = files or get_download_file_names(args)
+    checks = ValErrorCollector()
+    if files.data_folder.exists() and not files.data_folder.is_dir():
+        checks.add(InputError("Download output location must be a directory.", path=files.data_folder))
+    outputs = {item.path for item in files.downloads} | {
+        files.names, files.nodes, files.db_fasta, files.acc2tax,
+    }
+    if not args.no_log:
+        outputs.add(files.log_file)
+    if isinstance(files, GTDBDownloadOutputs):
+        outputs.add(files.tree)
+    for path in outputs:
+        checks.check(check_file, path, path.name, exist=False)
+    checks.finish()
+
+    return DownloadSettings(db_type=db_type, files=files, cleanup=args.cleanup,
+                        quiet=args.quiet, no_log=args.no_log, debug=args.debug)
+
+
 def validate_prepare(args: PrepareOptions, files: PrepareOutputs | None = None) -> PrepareSettings:
     args = make_prefix(args)
     checks = ValErrorCollector()
     execution = checks.check(validate_execution, args)
-    db_fasta = checks.check(check_file, args.db_fasta, "Database FASTA")
+    db_fasta = checks.check(check_fasta_file, args.db_fasta, "Database FASTA")
     taxonomy = checks.check(validate_taxonomy, args.names, args.nodes)
-    acc2tax = checks.check(check_file, args.acc2tax, "Accession-to-taxid file")
+    acc2tax = checks.check(check_file_not_empty, args.acc2tax, "Accession-to-taxid file")
     files = files or get_file_names(args)
     threads = checks.check(check_integer, args.threads, "Threads", 1, sys.maxsize)
     if not files.prefix or files.prefix in {".", ".."} or any(c in files.prefix for c in '/\\:'):
@@ -168,19 +258,26 @@ def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | Non
     checks = ValErrorCollector()
 
     is_bat = isinstance(args, BatOptions)
-    bins = checks.check(BinParser(args.bins, args.bin_suffix).parse) if is_bat else None
+    bins = None
+    if is_bat:
+        parser = BinParser(args.bins, args.bin_suffix)
+        bin_paths = checks.check(parser.find_bin_paths)
+        if bin_paths is not None:
+            valid_paths = [checks.check(check_fasta_file, path, "Bin fasta") for path in bin_paths]
+            if all(path is not None for path in valid_paths):
+                bins = checks.check(parser.parse, bin_paths)
     contigs = (None if is_bat
-               else checks.check(check_file, args.contigs, "Contigs file"))
+               else checks.check(check_fasta_file, args.contigs, "Contigs file"))
 
     proteins = None
     alignment = None
     if args.proteins is not None:
-        proteins = checks.check(check_file, args.proteins, "Protein file")
+        proteins = checks.check(check_fasta_file, args.proteins, "Protein file")
     elif args.alignment is None:
         checks.check(check_pyrodigal)
 
     if args.alignment is not None:
-        alignment = checks.check(check_file, args.alignment, "Alignment file")
+        alignment = checks.check(check_file_not_empty, args.alignment, "Alignment file")
         if args.proteins is None:
             checks.add(InputError(
                 "An existing alignment also requires its protein FASTA.",
@@ -225,20 +322,27 @@ def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | Non
 
 def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
     checks = ValErrorCollector()
+    log.info(f"Validating execution arguments")
     execution = checks.check(validate_execution, args)
+    log.info(f"Validating classification arguments")
     classification = checks.check(validate_classification, args.range_, args.fraction)
+    log.info(f"Validating alignment arguments")
     aligner_name = checks.check(validate_aligner_name, args.aligner)
     top = checks.check(check_integer, args.top, "top", 0, 100)
+    log.info(f"Validating file arguments")
     files = checks.check(validate_cat_files, args, aligner_name)
 
     tmpdir = args.tmpdir if args.tmpdir is not None else args.output_prefix.parent / "tmp"
     diamond = None
     if args.alignment is None:
         if aligner_name == "diamond":
+            log.debug(f"Using diamond")
+            log.info(f"Validating diamond arguments")
             diamond = checks.check(validate_diamond, args.diamond)
             if classification is not None and top is not None and top <= classification.range_:
                 checks.add(InputError("Top must be higher than range."))
         elif aligner_name == "mmseqs2":
+            log.debug(f"Using mmseqs2")
             checks.add(InputError(
                 "MMseqs2 execution is not implemented yet.",
                 hint="Use --aligner diamond or supply an existing alignment and proteins.",
@@ -260,7 +364,8 @@ def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
         return BatSettings(
             threads=execution.threads, quiet=execution.quiet,
             verbose=execution.verbose, debug=execution.debug,
-            files=files, aligner=aligner, pyrodigal=classification.pyrodigal,
+            files=files, aligner=aligner,
+            memory=execution.memory,
             range_=classification.range_, fraction=classification.fraction,
             log_file=args.log_path, no_stars=args.no_stars,
         )
@@ -268,7 +373,8 @@ def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
         return CatSettings(
             threads=execution.threads, quiet=execution.quiet,
             verbose=execution.verbose, debug=execution.debug,
-            files=files, aligner=aligner, pyrodigal=classification.pyrodigal,
+            files=files, aligner=aligner,
+            memory=execution.memory,
             range_=classification.range_, fraction=classification.fraction,
             log_file=args.log_path #TODO: Add no stars compatibility
         )
@@ -278,8 +384,10 @@ def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
 
 def get_validated_settings(args: CatOptions | BatOptions | PrepareOptions) -> CatSettings | BatSettings | PrepareSettings:
     if isinstance(args, (CatOptions, BatOptions)):
+        log.debug(f"Starting validation on CatOptions or BatOptions")
         return validate_cat(args)
     if type(args) == PrepareOptions:
+        log.debug(f"Starting validation on PrepareOptions")
         return validate_prepare(args)
     raise TypeError(f"Hmmm, that type of options class I don't know yet")
 

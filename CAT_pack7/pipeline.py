@@ -3,13 +3,18 @@ from contextlib import ExitStack
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
+from tarfile import TarError
 
+from CAT_pack7.io.download import (
+    DownloadQueueReport, DownloadReport, multi_download,
+    check_files, process_files, cleanup_downloads,
+)
 from . import tax
 from .classification import ClassificationEngine
-from .config.options import BatOptions, CatOptions, PrepareOptions
-from .config.settings import BatFiles, BatSettings, CatFiles, CatSettings, DiamondSettings
+from .config.options import BatOptions, CatOptions, PrepareOptions, DownloadOptions
+from .config.settings import BatFiles, BatSettings, CatFiles, CatSettings, DiamondSettings, DownloadOutputs
 from .config.validation import check_orfs_match_contigs, get_file_names, get_validated_settings, make_prefix, \
-    validate_prepare
+    validate_prepare, validate_download, get_download_file_names
 from .io.parsers import ClassificationParser
 from .io.writers import ClassificationWriter
 from .prepare import (
@@ -40,7 +45,7 @@ class Step:
         return self.name
 
 
-def build_plan(args: CatOptions | BatOptions | PrepareOptions, files=None) -> list[Step]:
+def build_plan(args: CatOptions | BatOptions | PrepareOptions | DownloadOptions, files=None) -> list[Step]:
     if type(args) == PrepareOptions:
         return [
             Step("Input validation"),
@@ -62,6 +67,14 @@ def build_plan(args: CatOptions | BatOptions | PrepareOptions, files=None) -> li
             ),
             Step("Alignment", supplied=args.alignment is not None),
             Step("Classify"),
+        ]
+    if isinstance(args, DownloadOptions):
+        return [
+            Step("Input validation"),
+            Step("Downloading"),
+            Step("Check files"),
+            Step("Process files"),
+            Step("Cleanup", supplied=not args.cleanup),
         ]
     raise CatError("I haven't figured out how to build that specific plan")
 
@@ -135,6 +148,7 @@ def run_annotation(
             "ORF classifications": settings.files.orf_report,
             "Log": settings.log_file,
         }
+    # TODO: Move files from temp to final out
 
     except KeyboardInterrupt:
         report(current_step.name, Status.CANCELLED, 0, None)
@@ -156,7 +170,7 @@ def run_annotation(
             error.step = current_step.name
             error.log_file = args.log_path if args.log_path.is_file() else None
             raise error
-
+        # TODO: REMOVE incomplete files
         # Catch all other exceptions
         raise
     finally:
@@ -168,26 +182,31 @@ def run_classification(
     files: CatFiles | BatFiles,
     report: Report,
 ) -> tuple[int, int, str, Decimal]:
-    """Load and validate inputs, then classify and write the results."""
+    """Load inputs, classify all entities, then write their reports."""
     log = logging.getLogger("CAT_pack")
-    inputs = ClassificationParser(files, settings.range_).parse()
-    check_orfs_match_contigs(inputs.contig_names, inputs.contig2ORFs, files.proteins_fasta)
+    inputs = ClassificationParser(
+        files, settings.range_, workers=settings.threads
+    ).parse()
+    check_orfs_match_contigs(
+        inputs.contig_names, inputs.contig2ORFs, files.proteins_fasta
+    )
     engine = ClassificationEngine(
-        taxid2parent=inputs.taxid2parent,
+        taxonomy=inputs.taxonomy,
         fastaid2taxid=inputs.fastaid2taxid,
         fraction=settings.fraction,
+        threads=settings.threads,
     )
 
-    if isinstance(files, BatFiles):
-        tool = "BAT"
-        action = "flying"
-    else:
-        tool = "CAT"
-        action = "spinning"
-    log.info(f"{tool} is {action}! Files {files.report} and {files.orf_report} are created.")
-    n_classified = 0
     total = len(inputs.entity2ORFs)
     report("Classify", Status.RUNNING, 0, total)
+    result = engine.classify(
+        inputs.entity_type, inputs.entity2ORFs, inputs.alignment
+    )
+
+    log.info(
+        "Writing classifications to %s and %s.",
+        files.report, files.orf_report,
+    )
     with (
         files.report.open("w", encoding="utf-8") as classification_out,
         files.orf_report.open("w", encoding="utf-8") as orf_out,
@@ -201,17 +220,14 @@ def run_classification(
             branches=inputs.branches,
             no_stars=getattr(settings, "no_stars", False),
         )
-        for index, entity_id in enumerate(sorted(inputs.entity2ORFs), start=1):
-            result = engine.classify_group(
-                entity_id=entity_id,
-                orf_ids=inputs.entity2ORFs[entity_id],
-                orf2hits=inputs.alignment.orf2hits,
-            )
-            writer.write(result)
-            if result.assigned:
-                n_classified += 1
-            report("Classify", Status.RUNNING, index, total)
-    classification_summary(n_classified, total, inputs.entity_type, settings.fraction)
+        for entity in range(len(result)):
+            writer.write(result, entity)
+            report("Classify", Status.RUNNING, entity + 1, total)
+
+    n_classified = result.n_assigned
+    classification_summary(
+        n_classified, total, inputs.entity_type, settings.fraction
+    )
     return n_classified, total, inputs.entity_type, settings.fraction
 
 
@@ -275,7 +291,7 @@ def run_prepare(args: PrepareOptions, report: Report):
                 make_mmseqs2_database(settings)
             else:
                 if taxid2parent is None:
-                    taxid2parent, _ = tax.import_nodes(files.nodes)
+                    taxid2parent = tax.read_nodes(files.nodes)
                 if current_step.name == "Make fastaid2LCAtaxid":
                     make_fastaid2LCAtaxid_file(
                         files.fastaid2LCAtaxid, settings.db_fasta, settings.acc2tax,
@@ -310,6 +326,71 @@ def run_prepare(args: PrepareOptions, report: Report):
         if isinstance(error, CatError):
             error.step = current_step.name
             error.log_file = files.log_file if files.log_file.is_file() else None
+            raise error
+        raise
+    finally:
+        locks.close()
+
+def run_download(
+    args: DownloadOptions, report: Report,
+    download_report: DownloadReport,
+    queue_report: DownloadQueueReport
+) -> DownloadOutputs:
+    files = get_download_file_names(args)
+    plan = build_plan(args)
+    step_index = 0
+    current_step = plan[step_index]
+    log = logging.getLogger("CAT_pack")
+    locks = ExitStack()
+
+    try:
+        files.data_folder.parent.mkdir(parents=True, exist_ok=True)
+        locks.enter_context(lock_outputs([files.data_folder]))
+        for step_index, current_step in enumerate(plan):
+            # A bit of a missuse of the term supplied. this is for if cleanup isnt enabled
+            if current_step.supplied:
+                report(current_step.name, Status.SKIPPED, 0, None)
+                continue
+            report(current_step.name, Status.RUNNING, 0, None)
+            log.info(f"Starting: {current_step.name}")
+            if step_index == 0:
+                settings = validate_download(args, files)
+                files.data_folder.mkdir(parents=True, exist_ok=True)
+                if not settings.no_log:
+                    locks.enter_context(file_logging(log, files.log_file, settings.debug))
+            elif current_step.name == "Downloading":
+                multi_download(settings, report, download_report, queue_report)
+            elif current_step.name == "Check files":
+                check_files(files, report)
+            elif current_step.name == "Process files":
+                process_files(files, report)
+            elif current_step.name == "Cleanup":
+                cleanup_downloads(files)
+
+            report(current_step.name, Status.COMPLETE, 1, 1)
+            log.info(f"Completed: {current_step.name}")
+
+        log.info(f"Download complete. {settings.db_type.upper()} inputs are ready for CAT_pack7 prepare.")
+        return files
+
+    except KeyboardInterrupt:
+        report(current_step.name, Status.CANCELLED, 0, None)
+        for skipped_steps in plan[step_index + 1:]:
+            report(skipped_steps.name, Status.SKIPPED, 0, None)
+        log.error("Run cancelled by the user :(")
+        raise
+
+    except Exception as error:
+        report(current_step.name, Status.FAILED, 0, None)
+        for remaining_step in plan[step_index + 1:]:
+            report(remaining_step.name, Status.SKIPPED, 0, None)
+        log.error("Download failed during %s: %s", current_step.name, error)
+
+        if isinstance(error, (OSError, UnicodeError, EOFError, TarError)):
+            error = CatError(str(error), path=files.data_folder)
+        if isinstance(error, CatError):
+            error.step = current_step.name
+            error.log_file = files.log_file if not args.no_log and files.log_file.is_file() else None
             raise error
         raise
     finally:

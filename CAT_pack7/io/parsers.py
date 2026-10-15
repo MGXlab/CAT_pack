@@ -1,17 +1,27 @@
 """input parsers"""
+import bz2
 import gzip
 import logging
+import os
+import pathlib
+import tarfile
+from array import array
+from contextlib import ExitStack, closing
 from dataclasses import dataclass
 from decimal import Decimal
+from itertools import chain, islice
 from pathlib import Path
 from typing import Iterator
 
+import numpy as np
+
+from .reference_mapping import read_fastaid2LCAtaxid
 from .. import tax
-from ..config.settings import BatFiles, CatFiles
-from ..utils.check import check_file
+from ..config.settings import BatFiles, CatFiles, ParserSettings
 from ..utils.errors import InputError
 
 log = logging.getLogger("CAT_pack")
+parser_settings = ParserSettings()
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,7 +41,8 @@ class FastaParser:
         # https://github.com/idptools/sparrow/blob/03aa232abcbe191d96daf55ee28e1f7881979a68/sparrow/sequence_analysis/plaac/plaac.py#L318-L350
         record_name = None
         sequence_lines: list[str] = []
-        with self.path.open(encoding="utf-8") as source:
+        opener = gzip.open if self.path.suffix == ".gz" else bz2.open if self.path.suffix == ".bz2" else open
+        with opener(self.path, "rt", encoding="utf-8") as source:
             for line in source:
                 line = line.strip()
                 if not line:
@@ -49,11 +60,12 @@ class FastaParser:
             yield FastaRecord(record_name, "".join(sequence_lines))
 
     def iter_headers(self) -> Iterator[str]:
-        with self.path.open(encoding="utf-8") as source:
+        opener = gzip.open if self.path.suffix == ".gz" else bz2.open if self.path.suffix == ".bz2" else open
+        with opener(self.path, "rt", encoding="utf-8") as source:
             for line in source:
-                line = line.strip()
+                line = line.lstrip()
                 if line.startswith(">"):
-                    yield self._parse_header(line)
+                    yield self._parse_header(line.rstrip())
 
     def _parse_header(self, header: str) -> str:
         name = header[1:].split(" ", 1)[0]
@@ -105,8 +117,8 @@ class BinParser:
         self.path = path
         self.suffix = suffix
 
-    def parse(self) -> BinInput:
-        paths = self._find_bin_paths()
+    def parse(self, paths=None) -> BinInput:
+        paths = self.find_bin_paths() if paths is None else paths
         bin2contigs: dict[str, list[str]] = {}
         contig2bin: dict[str, str] = {}
 
@@ -135,9 +147,9 @@ class BinParser:
             log.info(f"{len(paths):,d} bins found!")
         return BinInput(bin2contigs=bin2contigs, bin_paths=paths)
 
-    def _find_bin_paths(self) -> tuple[Path, ...]:
+    def find_bin_paths(self) -> tuple[Path, ...]:
         if not self.path.is_dir():
-            return (check_file(self.path, "Bin fasta"),)
+            return (self.path,)
 
         log.info(f"Importing bins from {self.path}.")
         paths = []
@@ -146,7 +158,7 @@ class BinParser:
                 continue
             if path.name.startswith(".") or ".concatenated." in path.name:
                 continue
-            if path.name.endswith(self.suffix):
+            if path.name.endswith((self.suffix, f"{self.suffix}.gz", f"{self.suffix}.bz2")):
                 paths.append(path)
 
         if not paths:
@@ -158,73 +170,222 @@ class BinParser:
         return tuple(paths)
 
 
+def parse_bitscore(text: str) -> int:
+    whole_number, _, decimal = text.strip().partition(".")
+    return int(whole_number) * parser_settings.bit_score_multiplier + int(decimal[:1] or "0")
+
+
+def format_bitscore(bitscore: int) -> str:
+    whole_number = bitscore // parser_settings.bit_score_multiplier
+    decimal = bitscore % parser_settings.bit_score_multiplier
+    if decimal == 0:
+        return str(whole_number)
+    return f"{whole_number}.{decimal}"
+
 @dataclass(frozen=True, slots=True)
 class AlignmentInput:
-    orf2hits: dict[str, list[tuple[str, Decimal]]]
-    all_hits: set[str]
+    orf_names: list[str]
+    orf_index: dict[str, int]
+    orf_offsets: np.ndarray
+    hit_ids: np.ndarray
+    bitscores: np.ndarray
+    hit_names: list[str]
+
+    def hits_of(self, orf: int) -> slice:
+        return slice(self.orf_offsets[orf], self.orf_offsets[orf + 1])
+
+    def hit_names_of(self, orf: int) -> list[str]:
+        return [self.hit_names[hit] for hit in self.hit_ids[self.hits_of(orf)].tolist()]
+
+
+class _HitIndex:
+    def __init__(self):
+        import polars as pl
+
+        self.hit_name_dtype = pl.Categorical(pl.Categories.random())
+        # Keep the hit-name mapping across multiple batches
+        self.hit_name_keep = pl.Series([], dtype=self.hit_name_dtype)
+        self.hit_code2hit_id = np.full(1024, -1, dtype=np.int32)
+        self.new_hit_codes_by_batch = []
+        self.n_hit_names = 0
+
+    def index_hits(self, hit_names):
+        encoded_hit_names = hit_names.cast(self.hit_name_dtype)
+        hit_name_codes = encoded_hit_names.to_physical().to_numpy()
+
+        if not len(hit_name_codes):
+            return np.empty(0, dtype=np.int32)
+
+        unique_hit_name_codes = encoded_hit_names.unique(maintain_order=True).to_physical().to_numpy()
+        required_code_capacity = int(unique_hit_name_codes.max()) + 1
+
+        if required_code_capacity > len(self.hit_code2hit_id):
+            capacity = max(required_code_capacity, len(self.hit_code2hit_id) * 2)
+            expanded_hit_code2hit_id = np.full(capacity, -1, dtype=np.int32)
+            expanded_hit_code2hit_id[:len(self.hit_code2hit_id)] = self.hit_code2hit_id
+            self.hit_code2hit_id = expanded_hit_code2hit_id
+
+        new_hit_name_codes = unique_hit_name_codes[self.hit_code2hit_id[unique_hit_name_codes] < 0]
+        self.hit_code2hit_id[new_hit_name_codes] = np.arange(
+            self.n_hit_names, self.n_hit_names + len(new_hit_name_codes), dtype=np.int32,
+        )
+        self.new_hit_codes_by_batch.append(new_hit_name_codes)
+        self.n_hit_names += len(new_hit_name_codes)
+        return self.hit_code2hit_id[hit_name_codes]
+
+    def get_hit_names(self):
+        import polars as pl
+
+        if not self.n_hit_names:
+            return []
+        hit_name_codes = np.concatenate(self.new_hit_codes_by_batch)
+        return pl.Series(hit_name_codes, dtype=pl.UInt32).cat.to(self.hit_name_dtype).cast(pl.String).to_list()
 
 
 class AlignmentParser:
-    """Keep hits within range_ percent of each ORF's highest bit score.
+    """Load DIAMOND hits within range_
 
-    Validate that input is grouped by ORF, bitscores must be descending per ORF
+    DEVNOTE: The input is asseumed to be grouped by ORF!
+    DEVNOTE 2: the Alignment file is not validated during loading.
+               Users responsibility to supply correct files or let cat_pack generate it
+
+    Bitscore comparison products are assumed to fit in int64.
+
     """
 
-    def __init__(self, path: Path, range_: Decimal) -> None:
+    _chunk_rows = 100_000
+
+    def __init__(self, path: Path, range_: Decimal, cat_only: bool | None = None, workers: int = 1) -> None:
         self.path = path
-        self.minimum_score_fraction = (Decimal(100) - range_) / Decimal(100)
+        self.cutoff_numerator, self.cutoff_denominator = ((Decimal(100) - range_)/Decimal(100)).as_integer_ratio()
+        self.cat_only = cat_only
+        self.workers = workers
+
+    def _read_in_batches(self, source, first_line, bitscore_index):
+        import polars as pl
+
+        column_names = [f"field_{i}" for i in range(bitscore_index + 1)]
+        schema = dict.fromkeys(column_names, pl.String)
+        selected_columns = [column_names[0], column_names[1], column_names[-1]]
+        # Parse one decimal place. After that it's stored in integers (decimal * 10)
+        bitscore_column = (
+            pl.col(selected_columns[-1]).cast(pl.Decimal(precision=38, scale=1))
+            .to_physical().cast(pl.Int64).alias("bitscore")
+        )
+        reader_options = dict(
+            has_header=False, separator="\t", quote_char=None, schema=schema,
+            empty_string_is_null=False, raise_if_empty=False,
+            missing_columns="insert", extra_columns="ignore",
+        )
+        log.info(f"Loading alignment with Polars using a total of {pl.thread_pool_size()} threads.")
+
+        if self.path.suffix == ".bz2":
+            alignment_lines = chain((first_line,), source)
+            for lines in iter(lambda: list(islice(alignment_lines, self._chunk_rows)), []):
+                alignment_batch = pl.read_csv("".join(lines).encode("utf-8"), **reader_options).with_columns(
+                    bitscore_column,
+                ).select([selected_columns[0], selected_columns[1], "bitscore"])
+                if alignment_batch.height:
+                    yield alignment_batch, selected_columns
+            return
+
+        alignment_scan = (
+            pl.scan_csv(self.path, glob=False, **reader_options)
+            .with_columns(bitscore_column)
+            .select([selected_columns[0], selected_columns[1], "bitscore"])
+        )
+        batches = alignment_scan.collect_batches(chunk_size=self._chunk_rows, maintain_order=True)
+        try:
+            for alignment_batch in batches:
+                if alignment_batch.height:
+                    yield alignment_batch, selected_columns
+        finally:
+            del batches
 
     def parse(self) -> AlignmentInput:
         log.info(f"Parsing alignment file {self.path}.")
-        opener = gzip.open if self.path.suffix == ".gz" else open
-        orf2hits: dict[str, list[tuple[str, Decimal]]] = {}
-        all_hits: set[str] = set()
-        current_orf = None
-        minimum_bitscore = Decimal(0)
-        below_cutoff = False
-        previous_bitscore = None
-        with opener(self.path, "rt", encoding="utf-8") as source:
-            for line_number, line in enumerate(source, start=1):
-                if not line.strip():
-                    continue
-                fields = line.rstrip().split("\t")
-                orf_id = fields[0]
-                hit_id = fields[1]
-                bitscore = Decimal(fields[11])
+        # https://docs.pola.rs/api/python/stable/reference/api/polars.thread_pool_size.html
+        # DEVNOTE: During testing the sweetspot was 16 cores at 76 seconds and 8 cores around 77 secons
+        #  10-12 cores need to be tested
+        os.environ.setdefault("POLARS_MAX_THREADS", str(min(self.workers, os.cpu_count() or 1)))
 
-                if orf_id != current_orf:
-                    if orf_id in orf2hits:
-                        raise InputError(
-                            f"Alignment hits for ORF {orf_id} are not grouped at line {line_number}.",
-                            path=self.path,
-                            hint="Group alignment rows by ORF, with descending bit scores within each group.",
-                        )
-                    # The first row gives this ORF's highest bit score.
-                    current_orf = orf_id
-                    minimum_bitscore = self.minimum_score_fraction * bitscore
-                    orf2hits[orf_id] = []
-                    below_cutoff = False
-                    previous_bitscore = None
+        # Import AFTER threads setting, so Polars initializes with the correct core count!
+        import polars as pl
 
-                if previous_bitscore is not None and bitscore > previous_bitscore:
-                    raise InputError(
-                        f"Alignment bit scores for ORF {orf_id} are not descending at line {line_number}.",
-                        path=self.path,
-                        hint="Sort each ORF's alignment hits by descending bit score.",
-                    )
-                previous_bitscore = bitscore
+        if self.path.suffix == ".gz":
+            source_file = gzip.open(self.path, "rt", encoding="utf-8")
+        elif self.path.suffix == ".bz2":
+            source_file = bz2.open(self.path, "rt", encoding="utf-8")
+        else:
+            source_file = open(self.path, "rt", encoding="utf-8", buffering=1024 * 1024)
+        orf_names: list[str] = []
+        orf_index: dict[str, int] = {}
+        orf_offsets = array("q")
+        hit_ids = array("i")
+        bitscores = array("q")
+        hit_index = _HitIndex()
+        with source_file as source, ExitStack() as cleanup:
+            current_ORF = None
+            top_bitscore = 0
+            below_cutoff = False
+            first_line = next(source, None)
+            if self.cat_only is None:
+                bitscore_index = 11
+            else:
+                bitscore_index = 2 if self.cat_only else 11
 
-                if below_cutoff:
-                    continue
-                if bitscore < minimum_bitscore:
-                    # Remaining rows for this ORF have lower scores too.
-                    below_cutoff = True
-                    continue
+            batches = cleanup.enter_context(closing(self._read_in_batches(source, first_line, bitscore_index))) if first_line is not None else ()
+            for alignment_batch, selected_columns in batches:
+                batch_bitscores = alignment_batch["bitscore"].to_numpy()
+                ORF_groups = alignment_batch[selected_columns[0]].rle()
+                n_hits_per_ORF = ORF_groups.struct.field("len").to_numpy().astype(np.int64)
+                ORF_names = np.asarray(ORF_groups.struct.field("value").to_list(), dtype=object)
+                ORF_starts = np.concatenate(([0], np.cumsum(n_hits_per_ORF)[:-1]))
+                continues_ORF = ORF_names[0] == current_ORF
+                new_ORF_starts = ORF_starts[1:] if continues_ORF else ORF_starts
+                new_ORF_names = ORF_names[1:] if continues_ORF else ORF_names
+                first_ORF_index = len(orf_names)
+                orf_index.update(zip(new_ORF_names, range(first_ORF_index, first_ORF_index + len(new_ORF_names))))
+                orf_names.extend(new_ORF_names)
 
-                orf2hits[orf_id].append((hit_id, bitscore))
-                all_hits.add(hit_id)
+                top_bitscores = batch_bitscores[ORF_starts]
+                if continues_ORF:
+                    top_bitscores[0] = top_bitscore
+                cutoff_numerator, cutoff_denominator = self.cutoff_numerator, self.cutoff_denominator
+                # Compare B * denominator with H * numerator
+                # DEVNOTE: Logic being here that
+                #  B >= Fraction * H  <-> B * denominator >= H * numerator
+                #  This keeps the comparison Integer only
+                hits_below_cutoff = (batch_bitscores * cutoff_denominator < np.repeat(top_bitscores * cutoff_numerator, n_hits_per_ORF))
 
-        return AlignmentInput(orf2hits=orf2hits, all_hits=all_hits)
+                row_indices = np.arange(len(batch_bitscores))
+                first_below_cutoff = np.minimum.reduceat(np.where(hits_below_cutoff, row_indices, len(batch_bitscores)), ORF_starts)
+
+                if continues_ORF and below_cutoff:
+                    first_below_cutoff[0] = -1
+
+                keep_hits = row_indices < np.repeat(first_below_cutoff, n_hits_per_ORF)
+                n_kept_before = np.concatenate(([0], np.cumsum(keep_hits)))
+                orf_offsets.frombytes((len(hit_ids) + n_kept_before[new_ORF_starts]).astype(np.int64).tobytes())
+
+                hit_names = alignment_batch[selected_columns[1]].filter(pl.Series(keep_hits))
+                batch_hit_ids = hit_index.index_hits(hit_names)
+                hit_ids.frombytes(batch_hit_ids.tobytes())
+                bitscores.frombytes(batch_bitscores[keep_hits].tobytes())
+
+                current_ORF = ORF_names[-1]
+                top_bitscore = int(top_bitscores[-1])
+                below_cutoff = first_below_cutoff[-1] < len(batch_bitscores)
+
+        orf_offsets.append(len(hit_ids))
+        return AlignmentInput(
+            orf_names=orf_names,
+            orf_index=orf_index,
+            orf_offsets=np.frombuffer(orf_offsets, dtype=np.int64),
+            hit_ids=np.frombuffer(hit_ids, dtype=np.int32),
+            bitscores=np.frombuffer(bitscores, dtype=np.int64),
+            hit_names=hit_index.get_hit_names(),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -234,17 +395,20 @@ class ClassificationInputs:
     contig_names: set[str]
     contig2ORFs: dict[str, list[str]]
     alignment: AlignmentInput
-    taxid2parent: dict[str, str]
-    fastaid2taxid: dict[str, str]
+    taxonomy: tax.Taxonomy
+    fastaid2taxid: np.ndarray  # tax.NO_TAXID for absent or unknown taxids
     branches: set[str]
 
 
 class ClassificationParser:
     """Load ORF groups, accepted alignment hits, and their taxonomy data."""
 
-    def __init__(self, files: CatFiles | BatFiles, range_: Decimal) -> None:
+    def __init__(self, files: CatFiles | BatFiles, range_: Decimal,
+                 cat_only: bool | None = None, workers: int = 1) -> None:
         self.files = files
         self.range_ = range_
+        self.cat_only = cat_only
+        self.workers = workers
 
     def parse(self) -> ClassificationInputs:
         contig2ORFs = FastaParser(self.files.proteins_fasta).parse_ORFs()
@@ -261,9 +425,11 @@ class ClassificationParser:
             for contig in contig_names:
                 entity2ORFs[contig] = contig2ORFs.get(contig, [])
 
-        alignment = AlignmentParser(self.files.alignment, self.range_).parse()
-        taxid2parent, _ = tax.import_nodes(self.files.nodes)
-        fastaid2taxid = tax.import_fastaid2LCAtaxid(self.files.fastaid2LCA, alignment.all_hits)
+        alignment = AlignmentParser(self.files.alignment, self.range_, self.cat_only, workers=self.workers).parse()
+        taxonomy = tax.Taxonomy.import_nodes(self.files.nodes)
+
+        fastaid2LCAtaxid = read_fastaid2LCAtaxid(self.files.fastaid2LCA, set(alignment.hit_names), workers=self.workers)
+        fastaid2taxid = taxonomy.taxid_of_hits(alignment.hit_names, fastaid2LCAtaxid)
         branches = tax.import_taxids_with_multiple_offspring(self.files.branches)
 
         return ClassificationInputs(
@@ -272,7 +438,7 @@ class ClassificationParser:
             contig_names=contig_names,
             contig2ORFs=contig2ORFs,
             alignment=alignment,
-            taxid2parent=taxid2parent,
+            taxonomy=taxonomy,
             fastaid2taxid=fastaid2taxid,
             branches=branches,
         )
@@ -289,3 +455,51 @@ class ClassificationParser:
                 orfs.extend(contig2ORFs.get(contig, []))
             bin2ORFs[bin_name] = orfs
         return bin2ORFs
+
+
+def is_gz(file_path):
+    """Check if given file_path is gzipped based on suffix."""
+    if isinstance(file_path, Path):
+        file_path = file_path.name
+    return file_path.endswith(".gz") or file_path.endswith(".z")
+
+
+def optionally_compressed_handle(file_path, mode):
+    """Return an appropriate file handle to operate on.
+
+    Arguments:
+      file_path: str or PathLike: File path.
+      mode: str: The passed mode to open the file on.
+
+    Return:
+        A file handle either gzip opened or plainly opened for
+        reading/writing/appending in text mode.
+    """
+    if mode == "r" or mode == "rb":
+        mode = "rt"
+    if mode == "w" or mode == "wb":
+        mode = "wt"
+    if mode == "a" or mode == "ab":
+        mode = "at"
+
+    if is_gz(file_path):
+        return gzip.open(file_path, mode=mode)
+    else:
+        return open(file_path, mode=mode)
+
+
+def tar_extraction(file: pathlib.Path, output_dir: pathlib.Path, prefix: str = "", files_to_extract: list[str] = None):
+    files = {}
+    with tarfile.open(file, "r:gz") as tar:
+        for dmp in files_to_extract:
+            log.info("Extracting {0} from taxdump.tar.gz".format(dmp))
+
+            tar.extract(dmp, path=output_dir)
+
+            # Timestamp the extracted dmp file
+            outf1 = output_dir / pathlib.Path(dmp)
+            timestamped_fname = "{0}.{1}".format(prefix, dmp)
+            timestamped_outf1 = output_dir / pathlib.Path(timestamped_fname)
+            outf1.rename(timestamped_outf1)
+            files[dmp] = timestamped_fname
+    return files

@@ -1,37 +1,63 @@
 #!/usr/bin/env python3
+import bz2
+import gzip
 import importlib
 import os
 import shutil
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-from .errors import InputError, ExternalToolError, ValErrorCollector
+from .errors import InputError, ExternalToolError, ValErrorCollector, CheckSumError
 
 
-def check_folder(path: Path, label: str) -> Path:
-    if not path.is_dir():
+def check_folder(path: Path, label: str, make: bool=False) -> Path:
+    if not path.is_dir() and not make:
         raise InputError(
             f"{label} was not found.",
             hint="Double check if the folder exists.",
             path=path,
         )
+    # Make/create the folder if it does not exist yet :)
+    if make and not path.exists():
+        path.mkdir(parents=True)
     return path
 
 
-def check_file(path: Path, label: str) -> Path:
+def check_file(path: Path, label: str, exist=True) -> Path:
     if not path.is_file():
+        if not exist:
+            return path
         raise InputError(
             f"{label} was not found.",
             hint="Double check if the file exists.",
             path=path,
         )
+    if not exist:
+        raise InputError(
+            f"{label} was found.",
+            hint="Please remove the file, or choose another out folder",
+            path=path,
+        )
+    return path
+
+def check_file_not_empty(path: Path, label: str) -> Path:
+    path = check_file(path, label)
+    if os.path.getsize(path) == 0:
+        raise InputError(f"{label} is empty",
+                         hint=f"Please make sure the {label} is not empty.",
+                         path=path)
     return path
 
 def check_fasta_file(path: Path, label: str) -> Path:
     path = check_file(path, label)
-    # check if fasta file is empty
-    os.lockf(path)
-
+    opener = gzip.open if path.suffix == ".gz" else bz2.open if path.suffix == ".bz2" else open
+    with opener(path, "rb") as fasta_file:
+        first_character = fasta_file.read(1)
+    if not first_character:
+        raise InputError(f"{label} is empty.", path=path)
+    if first_character != b">":
+        raise InputError(f"{label} must start with a FASTA header (>).", path=path)
+    return path
 
 def check_db_file(folder: Path, suffix: str, label: str) -> Path:
     matches = sorted(
@@ -123,3 +149,32 @@ def check_outputs(paths: list[Path]) -> None:
                 hint="Choose a different output location",
             ))
     checks.finish()
+
+
+def check_md5_gz(gz_file, md5_file):
+    checks = ValErrorCollector()
+    with open(md5_file, "r") as f1:
+        md5_exp = f1.read().strip().split(" ")[0]
+
+    if md5_exp == "":
+
+        checks.add(CheckSumError("no MD5 found in {0}. Integrity of {1} cannot be "
+                "established.".format(md5_file, gz_file)))
+    else:
+        md5 = gz_md5(gz_file)
+
+        if md5 != md5_exp:
+            checks.add(CheckSumError("MD5 of {0} does not check out.".format(gz_file)))
+
+    checks.finish()
+    return
+
+
+def gz_md5(input_gz, block_size=4096):
+    import hashlib
+    md5 = hashlib.md5()
+    with open(input_gz, "rb") as f1:
+        for chunk in iter(lambda: f1.read(block_size), b""):
+            md5.update(chunk)
+
+    return md5.hexdigest()
