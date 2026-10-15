@@ -243,14 +243,12 @@ class NRUrls:
 @dataclass
 class GTDBUrls:
     urls: list[str]
-    version: str
 
     def __init__(self):
-        import urllib.request
         # Using "latest" as an entry point.
         # This needs to be checked for future versions.
         # Use the European mirror.
-        parent_url = "https://data.gtdb.aau.ecogenomic.org/releases/latest/"
+        parent_url = "https://data.gtdb.aau.ecogenomic.org/releases/latest"
 
         file_list = [
             "VERSION.txt",
@@ -263,12 +261,6 @@ class GTDBUrls:
         ]
         self.urls = [f"{parent_url}/{file_}" for file_ in file_list]
 
-        version_url = f"{parent_url}/VERSION.txt"
-        with urllib.request.urlopen(version_url) as f:
-            version_data = f.read().decode()
-
-        self.version = "{0} ({3})".format(*version_data.split("\n"))
-
 
 @dataclass(frozen=True)
 class DownloadOutputs(TaxonomyFiles):
@@ -277,8 +269,18 @@ class DownloadOutputs(TaxonomyFiles):
     log_file: Path
     db_fasta: Path
     acc2tax: Path
-    taxonomy_archive: Path
+    taxonomy_archive: Path | None
     downloads: tuple[DownloadFile, ...]
+
+
+@dataclass(frozen=True)
+class GTDBDownloadOutputs(DownloadOutputs):
+    protein_archive: Path
+    taxonomy_tables: tuple[Path, Path]
+    trees: tuple[Path, Path]
+    tree: Path
+    version: Path
+    checksums: Path
 
 
 @dataclass(frozen=True)

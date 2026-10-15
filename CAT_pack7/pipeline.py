@@ -6,8 +6,8 @@ from pathlib import Path
 from tarfile import TarError
 
 from CAT_pack7.io.download import (
-    DownloadQueueReport, DownloadReport, multi_download, check_nr_md5s,
-    extract_nr_taxonomy, cleanup_nr_downloads,
+    DownloadQueueReport, DownloadReport, multi_download,
+    check_files, process_files, cleanup_downloads,
 )
 from . import tax
 from .classification import ClassificationEngine
@@ -361,16 +361,16 @@ def run_download(
             elif current_step.name == "Downloading":
                 multi_download(settings, report, download_report, queue_report)
             elif current_step.name == "Check files":
-                check_nr_md5s(settings, report)
+                check_files(files, report)
             elif current_step.name == "Process files":
-                extract_nr_taxonomy(files, report)
+                process_files(files, report)
             elif current_step.name == "Cleanup":
-                cleanup_nr_downloads(settings)
+                cleanup_downloads(files)
 
             report(current_step.name, Status.COMPLETE, 1, 1)
             log.info(f"Completed: {current_step.name}")
 
-        log.info("Download complete. NR inputs are ready for CAT_pack7 prepare.")
+        log.info(f"Download complete. {settings.db_type.upper()} inputs are ready for CAT_pack7 prepare.")
         return files
 
     except KeyboardInterrupt:

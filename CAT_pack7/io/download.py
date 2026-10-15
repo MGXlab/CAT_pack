@@ -1,19 +1,24 @@
 #!/usr/bin/env python3
 
+import gzip
 import hashlib
+import io
 import logging
-import os
 import pathlib
+import re
 import shutil
-import sys
 import tarfile
 import urllib.request
 from collections import namedtuple
+from contextlib import ExitStack, contextmanager, nullcontext
+from functools import singledispatch
+from itertools import chain
 from typing import Callable
 
-from CAT_pack7.config.settings import DownloadOutputs, DownloadSettings
+from CAT_pack7.config.settings import DownloadOutputs, DownloadSettings, GTDBDownloadOutputs
 from CAT_pack7.io.parsers import optionally_compressed_handle
 from CAT_pack7.utils import check
+from CAT_pack7.utils.errors import CheckSumError
 from CAT_pack7.utils.logging import Report, Status
 
 log = logging.getLogger("CAT_pack")
@@ -21,7 +26,7 @@ DownloadReport = Callable[[pathlib.Path, int, int | None], None]
 DownloadQueueReport = Callable[[list[pathlib.Path]], None]
 
 
-def download_singleton(target_url: str, local_path: pathlib.Path, report: DownloadReport) -> None:
+def download_singleton(target_url: str, local_path: pathlib.Path, report: DownloadReport = lambda *_: None) -> None:
     """Download a single file to the specified location."""
     partial = local_path.with_name(f"{local_path.name}.part")
 
@@ -47,7 +52,7 @@ def download_singleton(target_url: str, local_path: pathlib.Path, report: Downlo
 def multi_download(settings: DownloadSettings, report: Report,
     download_report: DownloadReport, queue_report: DownloadQueueReport
 ):
-    """Download all required nr files in the specified output dir."""
+    """Download all required nr or GTDB files in the specified output dir."""
     queue_report([item.path for item in settings.files.downloads])
     report("Downloading", Status.RUNNING, 0, len(settings.files.downloads))
     for index, item in enumerate(settings.files.downloads, 1):
@@ -56,9 +61,9 @@ def multi_download(settings: DownloadSettings, report: Report,
         report("Downloading", Status.RUNNING, index, len(settings.files.downloads))
 
 
-def check_nr_md5s(settings: DownloadSettings, report: Report) -> None:
+def check_nr_md5s(files: DownloadOutputs, report: Report) -> None:
     """Check only this run's explicit data/checksum pairs."""
-    pairs = [item for item in settings.files.downloads if item.checksum is not None]
+    pairs = [item for item in files.downloads if item.checksum is not None]
     for index, item in enumerate(pairs, 1):
         check.check_md5_gz(item.path, item.checksum)
         report("Check files", Status.RUNNING, index, len(pairs))
@@ -86,12 +91,27 @@ def extract_nr_taxonomy(files: DownloadOutputs, report: Report) -> None:
             report("Process files", Status.RUNNING, index, len(targets))
 
 
-def cleanup_nr_downloads(settings: DownloadSettings) -> None:
-    targets = [settings.files.taxonomy_archive]
-    targets.extend(item.checksum for item in settings.files.downloads if item.checksum is not None)
+def cleanup_nr_downloads(files: DownloadOutputs) -> None:
+    targets = [files.taxonomy_archive]
+    targets.extend(item.checksum for item in files.downloads if item.checksum is not None)
     for target in targets:
-        log.info("Removing %s.", target)
+        log.info(f"Removing {target}")
         target.unlink()
+
+
+@singledispatch
+def check_files(files: DownloadOutputs, report: Report) -> None:
+    check_nr_md5s(files, report)
+
+
+@singledispatch
+def process_files(files: DownloadOutputs, report: Report) -> None:
+    extract_nr_taxonomy(files, report)
+
+
+@singledispatch
+def cleanup_downloads(files: DownloadOutputs) -> None:
+    cleanup_nr_downloads(files)
 
 
 # GTDB.
@@ -107,62 +127,60 @@ prefixes_to_rank_names = {
         "s__": "species",
         }
 
-fastaRecord = namedtuple(
-        "fastaRecord",
-        ["id", "seq", "uid", "taxid"],
-        )
 
-## FUNCTIONS.
-def get_gtdb_latest_version(parent_url):
-    """Read the version number from the VERSION file.
-    """
-    version_url = "{0}/VERSION.txt".format(parent_url)
-
-    with urllib.request.urlopen(version_url) as f:
-        version_data = f.read().decode()
-
-    version = "{0} ({3})".format(*version_data.split("\n"))
-
-    return version
+@contextmanager
+def staged_outputs(paths: list[pathlib.Path]):
+    """Publish completed outputs only after every writer has closed successfully."""
+    partials = [path.with_name(f"{path.name}.part") for path in paths]
+    try:
+        yield partials
+        for partial, target in zip(partials, paths):
+            partial.replace(target)
+    finally:
+        for partial in partials:
+            partial.unlink(missing_ok=True)
 
 
-def load_gtdb_md5sums(md5sums_file):
-    """Create a dictionary from the MD5SUMS file."""
+def load_gtdb_md5sums(md5sums_file: pathlib.Path) -> dict[str, str]:
+    # The latest/ aliases omit release suffixes present in MD5SUM.txt.
     md5_dict = {}
-    
-    with open(md5sums_file, "r") as f1:
-        for line in f1:
-            fields = [f.strip() for f in line.split()]
-            fname = pathlib.Path(fields[1]).name
-            md5_dict[fname] = fields[0]
-            
+    for line in md5sums_file.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        fields = line.split(maxsplit=1)
+        fname = pathlib.PurePosixPath(fields[1].lstrip("*")).name
+        fname = re.sub(r"_r[0-9]+(?=\.)", "", fname)
+        md5_dict[fname] = fields[0].lower()
     return md5_dict
 
 
-def check_gtdb_md5s(data_dir, md5_dict, log_file, quiet):
-    for f in data_dir.glob("*.gz"):
-        if f.name not in md5_dict:
-            continue
-            
-        md5 = check.gz_md5(f)
-        if md5_dict[f.name] != md5:
-            log.info("MD5 of {0} does not check out.".format(f.resolve()))
+@check_files.register
+def check_gtdb_md5s(files: GTDBDownloadOutputs, report: Report) -> None:
+    md5_dict = load_gtdb_md5sums(files.checksums)
+    # As in the original downloader, check only gzip files listed in MD5SUM.txt.
+    inputs = [item for item in files.downloads
+              if item.path.suffix == ".gz" and item.url.rsplit("/", 1)[-1] in md5_dict]
+    for index, item in enumerate(inputs, 1):
+        fname = item.url.rsplit("/", 1)[-1]
+        md5_exp = md5_dict[fname]
+        md5 = check.gz_md5(item.path, block_size=1024 * 1024)
+        if md5 != md5_exp:
+            raise CheckSumError(f"MD5 of {fname} does not check out.", path=item.path)
+        log.info("MD5 of %s checks out.", item.path.resolve())
+        report("Check files", Status.RUNNING, index, len(inputs))
+    version = " ".join(files.version.read_text(encoding="utf-8").split())
+    log.info("Downloaded GTDB %s.", version)
 
-            sys.exit(1)
-        else:
-            log.info("MD5 of {0} checks out.".format(f.resolve()))
-            
-    return
 
-
-def concatenate_taxonomies_gz(ar_tsv_gz, bac_tsv_gz, output_tsv):
-    with open(output_tsv, "w") as outf1:
-        for f in [ar_tsv_gz, bac_tsv_gz]:
-            with optionally_compressed_handle(f, "r") as f1:
-                for line in f1:
-                    outf1.write(line)
-
-    return
+@contextmanager
+def _taxonomy_handle(taxonomies_tsv):
+    """Read the two downloaded taxonomy tables through the original writers."""
+    if isinstance(taxonomies_tsv, (str, pathlib.Path)):
+        taxonomies_tsv = (taxonomies_tsv,)
+    with ExitStack() as stack:
+        handles = [stack.enter_context(optionally_compressed_handle(path, "r"))
+                   for path in taxonomies_tsv]
+        yield chain.from_iterable(handles)
 
 
 def parent_child_pairs(lineage_string):
@@ -184,27 +202,27 @@ def parent_child_pairs(lineage_string):
     with_root = ";".join(["root", lineage_string])
     lineage_list = with_root.split(";")
     pairs = []
-    
+
     for i in range(0, len(lineage_list) - 1):
         parent, child = lineage_list[i], lineage_list[i + 1]
         pairs.append((parent, child))
-        
+
     return pairs
 
 
 def write_nodes_dmp(taxonomies_tsv, nodes_dmp):
     """Write the nodes.dmp from the taxonomy files."""
     seen_taxids = set()
-    
-    with open(taxonomies_tsv, "r") as f1, open(nodes_dmp, "w") as outf1:
+
+    with _taxonomy_handle(taxonomies_tsv) as f1, open(nodes_dmp, "w") as outf1:
         for line in f1:
             fields = [f.strip() for f in line.split("\t")]
             lineage_string = fields[1]
             pairs = parent_child_pairs(lineage_string)
-            
+
             for pair in pairs:
                 parent, child = pair[0], pair[1]
-                
+
                 if parent not in seen_taxids:
                     if parent == "root":
                         outf1.write(
@@ -216,7 +234,7 @@ def write_nodes_dmp(taxonomies_tsv, nodes_dmp):
                         seen_taxids.add("root")
                     else:
                         seen_taxids.add(parent)
-                        
+
                 if child not in seen_taxids:
                     seen_taxids.add(child)
                     outf1.write(
@@ -231,15 +249,15 @@ def write_nodes_dmp(taxonomies_tsv, nodes_dmp):
                                 "\t|\n"
                                 )
                             )
-                    
+
     return
 
 
 def write_names_dmp(taxonomies_tsv, names_dmp):
     """Write the names.dmp from the taxonomy files."""
     seen_taxids = set()
-    
-    with open(taxonomies_tsv, "r") as f1, open(names_dmp, "w") as outf1:
+
+    with _taxonomy_handle(taxonomies_tsv) as f1, open(names_dmp, "w") as outf1:
         outf1.write(
                 "{0}{1}".format(
                     "\t|\t".join(["root", "root", "", "scientific name"]),
@@ -275,186 +293,15 @@ def genome_id_to_taxid(taxonomy_tsv):
     """Return a dictionary with GTDB taxid for each genome.
     """
     mapping = {}
-    
-    with open(taxonomy_tsv, "r") as f1:
+
+    with _taxonomy_handle(taxonomy_tsv) as f1:
         for line in f1:
             fields = [f.strip() for f in line.split("\t")]
             genome_id = fields[0]
             taxid = fields[1].split(";")[-1]
             mapping[genome_id] = taxid
-            
+
     return mapping
-
-
-def fastaIterator_gz(fasta_in_gz, gid2taxid):
-    """Yield fastaRecord tuples with more information.
-
-    This is adapted from biopython's SimpleFastaParser.
-    https://github.com/biopython/biopython/blob/eec86d4bcb04bfcf86495f92f12faf3ff98a288d/Bio/SeqIO/FastaIO.py#L24
-
-    The gid2taxid dictionary holds the mapping of a given genome accession
-    (RS_GCF_XXXX or GB_GCA_XXXX). The taxid is propagated to all protein
-    sequences of that genome.
-
-    Positional argunents:
-      fasta_in: pathlib.Path object: Path to the fasta.
-      gid2taxid: dict: A dictionary with taxid for a genome accession of the
-        form {"RS_CCF_XXXXX" : "s__Escherichia coli", ...}.
-
-    Return:
-      None, if the file is not a valid fasta. Breaks the iteration.
-
-    Yields fastaRecord objects which are named tuples holding the following
-    information:
-      - id: str: Unique id of the fasta header, anything between the ">" and
-        the first space.
-      - seq: str: The sequence, capitalized and with trailing "*" stripped off
-      - uid: str: Unique id, "_" joined md5sum and length.
-      - taxid: str: GTDB taxonomy that was assigned to the genome.
-    """
-    origin = fasta_in_gz.name.replace("_protein.faa.gz", "")
-    taxid = gid2taxid[origin]
-    with optionally_compressed_handle(fasta_in_gz, "r") as f1:
-        for line in f1:
-            if line[0] == ">":
-                title = line[1:].rstrip()
-                break
-            else:
-                # No break encountered - probably an empty file.
-                return
-            
-        lines = []
-        for line in f1:
-            if line[0] == ">":
-                name = title.split(" ")[0]
-                seq = "".join(
-                        lines).replace(" ", "").replace("\r", "").rstrip("*")
-                length = len(seq)
-                md5sum = hashlib.md5(seq.encode()).hexdigest()
-                uid = "_".join([md5sum, str(length)])
-                
-                yield fastaRecord(name, seq, uid, taxid)
-                
-                lines = []
-                title = line[1:].rstrip()
-                
-                continue
-            
-            lines.append(line.rstrip())
-
-        name = title.split(" ")[0]
-        seq = "".join(lines).replace(" ", "").replace("\r", "").rstrip("*")
-        length = len(seq)
-        md5sum = hashlib.md5(seq.encode()).hexdigest()
-        uid = "_".join([md5sum, str(length)])
-        
-        yield fastaRecord(name, seq, uid, taxid)
-
-
-def extract_duplicates(proteins_dir, gid2taxid, acc2taxid_fp, log_file, quiet):
-    """Get a dictionary of duplicate uids (md5sum + length)."""
-    seen_uids = {}
-    multiplets = {}
-    seq_counter, file_counter = 0, 0
-    
-    with optionally_compressed_handle(acc2taxid_fp, "w") as outf1:
-        outf1.write("accession.version\ttaxid\n")
-        
-        for f in proteins_dir.rglob("*/*.faa.gz"):
-            file_counter += 1
-            
-            for record in fastaIterator_gz(f, gid2taxid):
-                # Write an entry.
-                outf1.write("{0}\t{1}\n".format(record.id, record.taxid))
-
-                # Check if duplicate.
-                is_multiplet = False
-                if record.uid not in seen_uids:
-                    # Store the first occurrence id.
-                    seen_uids[record.uid] = record.id
-                else:
-                    is_multiplet = True
-
-                if is_multiplet is True:
-                    if record.uid not in multiplets:
-                        multiplets[record.uid] = fastaRecord(
-                                "\x01".join(
-                                    [seen_uids[record.uid], record.id]),
-                                record.seq,
-                                None,
-                                None,
-                                )
-                    else:
-                        old_rec = multiplets[record.uid]
-                        new_rec = fastaRecord(
-                                "\x01".join([old_rec.id, record.id]),
-                                old_rec.seq,
-                                None,
-                                None,
-                                )
-
-                        multiplets[record.uid] = new_rec
-
-                seq_counter += 1
-
-            if file_counter % 1000 == 0 and file_counter != 0:
-                log.info("Parsed {0:,d} sequences from {1:,d} files.".format(
-                        seq_counter, file_counter))
-        # This else is part of the outter for-loop.
-        # It executes when the for loop finishes.
-        else:
-            # Create some whitespace for aligned printing.
-            padding = len("[YYYY-MM-DD HH:MM:SS] ") * " "
-            
-            # Calculate the total number of identified multiplets.
-            redundants = sum(map(len, [v for v in multiplets.values()]))
-            
-            log.info(
-                    "    Total files: {0:>12,d}\n"
-                    "{1}Total sequences: {2:>12,d}\n"
-                    "{3}     Multiplets: {4:>12,d}\n"
-                    "{5}of which unique: {6:>12,d}"
-                    "".format(
-                        file_counter,
-                        padding,
-                        seq_counter,
-                        padding,
-                        redundants,
-                        padding,
-                        len(multiplets),
-                        )
-                    )
-            
-    return multiplets
-
-
-def write_singletons(
-    proteins_dir, duplicates, gid2taxid, singletons_fp, log_file, quiet):
-    seq_counter, file_counter, skipped = 0, 0, 0
-    
-    with optionally_compressed_handle(singletons_fp, "w") as outf1:
-        for f in proteins_dir.rglob("*/*.faa.gz"):
-            file_counter += 1
-            
-            for record in fastaIterator_gz(f, gid2taxid):
-                if record.uid not in duplicates:
-                    outf1.write(">{0}\n{1}\n".format(record.id, record.seq))
-                    seq_counter += 1
-                else:
-                    skipped += 1
-                    
-            if file_counter % 1000 == 0 and file_counter != 0:
-                log.info("Written {0:,d} sequences from {1:,d} files "
-                        "({2:,d} skipped).".format(
-                            seq_counter, file_counter, skipped)
-                        )
-        else:
-            log.info("Written {0:,d} sequences from {1:,d} files "
-                    "({2:,d} skipped).".format(
-                        seq_counter, file_counter, skipped)
-                    )
-            
-    return
 
 
 def concatenate_trees(bac_tree_fp, ar_tree_fp, all_tree_fp):
@@ -465,206 +312,126 @@ def concatenate_trees(bac_tree_fp, ar_tree_fp, all_tree_fp):
     bac_tree = bac_tree.rstrip().replace(
         "d__Bacteria;", "'100.0:d__Bacteria':1.0"
     )
-    
+
     # Load the Archaea tree as a string and make it a subtree.
     ar_tree = ar_tree_fp.read_text()
     ar_tree = ar_tree.rstrip().replace("d__Archaea;", "'100.0:d__Archaea':1.0")
-    
+
     # Concatenate the subtrees under a node named root.
     all_tree = "({0},{1})root;\n".format(ar_tree, bac_tree)
-    
+
     # Write the file.
-    all_tree_fp.write_text(all_tree)
-    
+    with staged_outputs([all_tree_fp]) as (partial,):
+        partial.write_text(all_tree, encoding="utf-8")
+
     return
 
 
-def process_gtdb(output_dir, log_file, quiet, cleanup=False):
-    # Using "latest" as an entry point.
-    # This needs to be checked for future versions.
-    # Use the European mirror.
-    parent_url = "https://data.gtdb.aau.ecogenomic.org/releases/latest/"
+fastaRecord = namedtuple("fastaRecord", ["id", "seq", "uid", "taxid"])
 
-    version = get_gtdb_latest_version(parent_url)
-    
-    log.info("CAT_pack will download files from GTDB {0}.".format(version))
-    
 
-    file_list = [
-            "VERSION.txt",
-            "ar53_taxonomy.tsv.gz",
-            "bac120_taxonomy.tsv.gz",
-            "MD5SUM.txt",
-            "bac120.tree",
-            "ar53.tree",
-            "genomic_files_reps/gtdb_proteins_aa_reps.tar.gz"
-            ]
-    gtdb_urls = ["{0}/{1}".format(parent_url, file_) for file_ in file_list]
-
-    # Fetch files.
-    multi_download(gtdb_urls, output_dir, log_file, quiet, prefix=None)
-
-    # Check files.
-    md5sums_file = output_dir / pathlib.Path("MD5SUM.txt")
-    md5sums_dict = load_gtdb_md5sums(md5sums_file)
-    check_gtdb_md5s(output_dir, md5sums_dict, log_file, quiet)
-
-    # Concatenate taxonomies.
-    bacteria_tsv_gz = list(output_dir.glob("*bac*_taxonomy*"))[0]
-    archaea_tsv_gz = list(output_dir.glob("*ar*_taxonomy*"))[0]
-    all_taxa_tsv = output_dir / pathlib.Path("all_taxonomies.tsv")
-    if not all_taxa_tsv.exists():
-        concatenate_taxonomies_gz(
-                archaea_tsv_gz, bacteria_tsv_gz, all_taxa_tsv)
-
-    # Concatenate newick trees.
-    bac_tree_fp = list(output_dir.glob("*bac*.tree"))[0]
-    ar_tree_fp = list(output_dir.glob("*ar*.tree"))[0]
-    concatenated_tree_fp = output_dir / pathlib.Path("gtdb.tree")
-    if not concatenated_tree_fp.exists():
-        log.info("Concatenating newick trees.")
-        
-        concatenate_trees(bac_tree_fp, ar_tree_fp, concatenated_tree_fp)
-
-    # Extract protein files from archive.
-    proteins_tar = list(output_dir.glob("*proteins_aa_reps*"))[0]
-    proteins_dir = output_dir / pathlib.Path("protein_faa_reps")
-    if not proteins_dir.is_dir():
-        with tarfile.open(proteins_tar, "r:gz") as tar:
-            # Fix for CVE-2007-4559.
-            def is_within_directory(directory, target):
-                abs_directory = os.path.abspath(directory)
-                abs_target = os.path.abspath(target)
-            
-                prefix = os.path.commonprefix([abs_directory, abs_target])
-                
-                return prefix == abs_directory
-            
-            def safe_extract(
-                    tar, path=".", members=None, *, numeric_owner=False):
-                for member in tar.getmembers():
-                    member_path = os.path.join(path, member.name)
-                    if not is_within_directory(path, member_path):
-                        raise Exception("Attempted Path Traversal in Tar File")
-            
-                tar.extractall(path, members, numeric_owner=numeric_owner)
-                
-            safe_extract(tar, output_dir)
-    else:
-        log.info("Proteins directory {0} already exists.".format(
-                proteins_dir.resolve()))
-        
-
-    # Process files.
-    # NODES.
-    nodes_dmp = output_dir / pathlib.Path("nodes.dmp")
-    if not nodes_dmp.exists():
-        log.info("Writing nodes information to {0}.".format(
-                nodes_dmp.resolve()))
-        
-        write_nodes_dmp(all_taxa_tsv, nodes_dmp)
-    else:
-        log.info("Nodes file found : {0}.".format(nodes_dmp.resolve()))
-        
-
-    # NAMES.
-    names_dmp = output_dir / pathlib.Path("names.dmp")
-    if not names_dmp.exists():
-        log.info("Writing names information to {0}.".format(
-                names_dmp.resolve()))
-        
-        
-        write_names_dmp(all_taxa_tsv, names_dmp)
-    else:
-        log.info("Names file found : {0}.".format(names_dmp.resolve()))
-        
-
-    gid2taxid = genome_id_to_taxid(all_taxa_tsv)
-
-    # SEQUENCES.
-    duplicates_fp = output_dir / pathlib.Path("dups.fa.gz")
-    singletons_fp = output_dir / pathlib.Path("singletons.fa.gz")
-    all_seqs_fp = output_dir / pathlib.Path("gtdb_seqs.fa.gz")
-    acc2taxid_fp = output_dir / pathlib.Path("prot.accession2taxid.txt.gz")
-    
-    if not acc2taxid_fp.exists():
-        log.info("1st pass: Extracting multiplets.")
-        
-        
-        ## 1st pass.
-        ## Write acc2taxid file, extract duplicates in their own fasta.
-        duplicates = extract_duplicates(
-            proteins_dir, gid2taxid, acc2taxid_fp, log_file, quiet)
-        with optionally_compressed_handle(duplicates_fp, "w") as outf1:
-            for rec in duplicates.values():
-                outf1.write(">{0}\n{1}\n".format(rec.id, rec.seq))
-
-        # 2nd pass.
-        # Write the unique sequences to a separate file.
-        log.info("2nd pass: Retrieving unique sequences.")
-        
-        
-        write_singletons(
-                proteins_dir,
-                duplicates,
-                gid2taxid,
-                singletons_fp,
-                log_file,
-                quiet
-                )
-
-        log.info("Concatenating sequence files.")
-        
-        
-        # Concatenate the two files into one.
-        with optionally_compressed_handle(all_seqs_fp, "w") as outf1:
-            for f in [duplicates_fp, singletons_fp]:
-                with optionally_compressed_handle(f, "r") as f1:
-                    for line in f1:
-                        outf1.write(line)
-
-    if cleanup is True:
-        remove_targets = [
-                proteins_dir,
-                bac_tree_fp,
-                ar_tree_fp,
-                duplicates_fp,
-                singletons_fp,
-                bacteria_tsv_gz,
-                archaea_tsv_gz,
-                all_taxa_tsv,
-                proteins_tar,
-                ]
-        log.info("Cleanup specified. Removing unnecessary files and folders.")
-        
-
-        for target in remove_targets:
-            if target.is_dir():
-                shutil.rmtree(target)
+def fastaIterator_gz(fasta_in_gz, gid2taxid, *, handle=None):
+    """Yield the original record shape, optionally using an open archive member."""
+    origin = pathlib.Path(fasta_in_gz).name.removesuffix(".gz").removesuffix("_protein.faa")
+    taxid = gid2taxid[origin]
+    source = nullcontext(handle) if handle is not None else optionally_compressed_handle(fasta_in_gz, "r")
+    with source as f1:
+        title = None
+        lines = []
+        for line in f1:
+            if not line.strip():
+                continue
+            if line.startswith(">"):
+                if title is not None:
+                    name = title.split(" ")[0]
+                    seq = "".join(lines).upper().rstrip("*")
+                    uid = (hashlib.md5(seq.encode()).digest(), len(seq))
+                    yield fastaRecord(f"{origin}~{name}", seq, uid, taxid)
+                title = line[1:].rstrip()
+                lines = []
+            elif title is None:
+                return
             else:
-                target.unlink()
-                
-    log.info(
-            "\n-----------------\n\n"
-            "Done!\n\n"
-            "A CAT_pack database can be build with:\n\n"
-            "CAT_pack prepare \\\n"
-            "--db_fasta {0} \\\n"
-            "--names {1} \\\n"
-            "--nodes {2} \\\n"
-            "--acc2tax {3} \\\n"
-            "--db_dir path/to/prepare_output\n".format(
-                all_seqs_fp.resolve(),
-                names_dmp.resolve(),
-                nodes_dmp.resolve(),
-                acc2taxid_fp.resolve(),
+                lines.append("".join(line.split()))
+        if title is not None:
+            name = title.split(" ")[0]
+            seq = "".join(lines).upper().rstrip("*")
+            uid = (hashlib.md5(seq.encode()).digest(), len(seq))
+            yield fastaRecord(f"{origin}~{name}", seq, uid, taxid)
+
+
+def iter_gtdb_proteins(proteins_tar: pathlib.Path, gid2taxid: dict[str, str]):
+    with tarfile.open(proteins_tar, "r|gz") as archive:
+        for member in archive:
+            name = pathlib.PurePosixPath(member.name).name
+            if not name.endswith(("_protein.faa.gz", "_protein.faa")):
+                continue
+            with ExitStack() as stack:
+                raw = stack.enter_context(archive.extractfile(member))
+                source = stack.enter_context(gzip.GzipFile(fileobj=raw)) if name.endswith(".gz") else raw
+                handle = stack.enter_context(io.TextIOWrapper(source, encoding="utf-8"))
+                yield from fastaIterator_gz(pathlib.Path(name), gid2taxid, handle=handle)
+
+
+def extract_duplicates(proteins_tar, gid2taxid, acc2taxid_fp):
+    """Write the accession table and return duplicate sequence records."""
+    seen_uids = {}
+    multiplets = {}
+    seq_counter = 0
+    with gzip.open(acc2taxid_fp, "wt", encoding="utf-8") as outf1:
+        outf1.write("accession.version\ttaxid\n")
+        for record in iter_gtdb_proteins(proteins_tar, gid2taxid):
+            outf1.write(f"{record.id}\t{record.taxid}\n")
+            if record.uid not in seen_uids:
+                seen_uids[record.uid] = record.id
+            elif record.uid not in multiplets:
+                multiplets[record.uid] = fastaRecord(
+                    "\x01".join([seen_uids[record.uid], record.id]), record.seq, None, None,
                 )
-            )
+            else:
+                old_rec = multiplets[record.uid]
+                multiplets[record.uid] = fastaRecord(
+                    "\x01".join([old_rec.id, record.id]), old_rec.seq, None, None,
+                )
+            seq_counter += 1
+            if seq_counter % 100000 == 0:
+                log.info("Indexed %s GTDB proteins.", f"{seq_counter:,}")
+    log.info("Indexed %s GTDB proteins in total.", f"{seq_counter:,}")
+    return multiplets
 
 
-    
-    return
+def write_singletons(proteins_tar, duplicates, gid2taxid, singletons_fp, *, append=False):
+    with gzip.open(singletons_fp, "at" if append else "wt", encoding="utf-8") as outf1:
+        for record in iter_gtdb_proteins(proteins_tar, gid2taxid):
+            if record.uid not in duplicates:
+                outf1.write(f">{record.id}\n{record.seq}\n")
 
-if __name__ == "__main__":
-    sys.exit("Run \'CAT_pack download\' to download and preprocess data from "
-            "NCBI nr or GTDB.")
+
+@process_files.register
+def process_gtdb(files: GTDBDownloadOutputs, report: Report) -> None:
+    taxonomies_tsv = files.taxonomy_tables
+    with staged_outputs([files.nodes, files.names]) as (nodes_dmp, names_dmp):
+        write_nodes_dmp(taxonomies_tsv, nodes_dmp)
+        write_names_dmp(taxonomies_tsv, names_dmp)
+    gid2taxid = genome_id_to_taxid(taxonomies_tsv)
+    report("Process files", Status.RUNNING, 1, 4)
+    ar_tree_fp, bac_tree_fp = files.trees
+    concatenate_trees(bac_tree_fp, ar_tree_fp, files.tree)
+    report("Process files", Status.RUNNING, 2, 4)
+    proteins_tar = files.protein_archive
+    with staged_outputs([files.db_fasta, files.acc2tax]) as (all_seqs_fp, acc2taxid_fp):
+        duplicates = extract_duplicates(proteins_tar, gid2taxid, acc2taxid_fp)
+        report("Process files", Status.RUNNING, 3, 4)
+        with gzip.open(all_seqs_fp, "wt", encoding="utf-8") as outf1:
+            for rec in duplicates.values():
+                outf1.write(f">{rec.id}\n{rec.seq}\n")
+        write_singletons(proteins_tar, duplicates, gid2taxid, all_seqs_fp, append=True)
+    report("Process files", Status.RUNNING, 4, 4)
+
+
+@cleanup_downloads.register
+def cleanup_gtdb_downloads(files: GTDBDownloadOutputs) -> None:
+    for item in files.downloads:
+        if item.path != files.version:
+            log.info("Removing %s.", item.path)
+            item.path.unlink()
