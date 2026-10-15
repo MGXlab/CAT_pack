@@ -12,7 +12,7 @@ from .settings import (
     BatFiles, BatSettings, CatFiles, CatSettings, ClassificationSettings, DatabaseFiles, DiamondParameters,
     DiamondPrepareSettings, DiamondSettings, ExecutionSettings, MMseqsPrepareSettings,
     PrepareOutputs, PrepareSettings, TaxonomyFiles, MemorySettings,
-    DownloadFile, DownloadOutputs, DownloadSettings, NRUrls,
+    DownloadFile, DownloadOutputs, DownloadSettings, NRUrls, GTDBUrls, GTDBDownloadOutputs,
 )
 from ..io.parsers import BinParser
 from ..utils.check import (
@@ -142,6 +142,27 @@ def get_file_names(args: PrepareOptions) -> PrepareOutputs:
 def get_download_file_names(args: DownloadOptions) -> DownloadOutputs:
     prefix = f"{datetime.now():%Y-%m-%d}"
     folder = args.out_dir
+    db_type = args.db_type.lower().strip()
+    if db_type not in {"nr", "gtdb"}:
+        raise InputError("Incorrect database selected. Please select nr or gtdb.")
+    if db_type == "gtdb":
+        urls = {url.rsplit("/", 1)[-1]: url for url in GTDBUrls().urls}
+        paths = {name: folder / f"{prefix}.{name}" for name in urls}
+        return GTDBDownloadOutputs(
+            prefix=prefix, data_folder=folder,
+            log_file=folder / f"{prefix}.download.log",
+            db_fasta=folder / f"{prefix}.gtdb_seqs.fa.gz",
+            acc2tax=folder / f"{prefix}.prot.accession2taxid.txt.gz",
+            taxonomy_archive=None,
+            names=folder / f"{prefix}.names.dmp",
+            nodes=folder / f"{prefix}.nodes.dmp",
+            downloads=tuple(DownloadFile(url, paths[name]) for name, url in urls.items()),
+            protein_archive=paths["gtdb_proteins_aa_reps.tar.gz"],
+            taxonomy_tables=(paths["ar53_taxonomy.tsv.gz"], paths["bac120_taxonomy.tsv.gz"]),
+            trees=(paths["ar53.tree"], paths["bac120.tree"]),
+            tree=folder / f"{prefix}.gtdb.tree",
+            version=paths["VERSION.txt"], checksums=paths["MD5SUM.txt"],
+        )
     urls = {url.rsplit("/", 1)[-1]: url for url in NRUrls().urls}
     paths = {name: folder / f"{prefix}.{name}" for name in urls}
     downloads = []
@@ -159,20 +180,28 @@ def get_download_file_names(args: DownloadOptions) -> DownloadOutputs:
     )
 
 
-def validate_download(args: DownloadOptions, files: DownloadOutputs) -> DownloadSettings:
+def validate_download(args: DownloadOptions, files: DownloadOutputs | None = None) -> DownloadSettings:
     match args.db_type.lower().strip():
         case "nr":
             db_type = "nr"
         case "gtdb":
-            raise InputError("GTDB downloads are not implemented yet.", hint="Use --db nr for now.")
+            db_type = "gtdb"
         case _:
             raise InputError("Incorrect database selected. Please select nr or gtdb.")
+    files = files or get_download_file_names(args)
     checks = ValErrorCollector()
-    checks.check(check_folder, files.data_folder, "Download folder", make=True)
-    outputs = [item.path for item in files.downloads] + [files.names, files.nodes]
+    if files.data_folder.exists() and not files.data_folder.is_dir():
+        checks.add(InputError("Download output location must be a directory.", path=files.data_folder))
+    outputs = {item.path for item in files.downloads} | {
+        files.names, files.nodes, files.db_fasta, files.acc2tax,
+    }
+    if not args.no_log:
+        outputs.add(files.log_file)
+    if isinstance(files, GTDBDownloadOutputs):
+        outputs.add(files.tree)
     for path in outputs:
         checks.check(check_file, path, path.name, exist=False)
-        checks.finish()
+    checks.finish()
 
     return DownloadSettings(db_type=db_type, files=files, cleanup=args.cleanup,
                         quiet=args.quiet, no_log=args.no_log, debug=args.debug)
