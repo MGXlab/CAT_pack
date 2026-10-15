@@ -11,7 +11,8 @@ from .options import AlignerName, BatOptions, CatOptions, ExecutionOptions, Diam
 from .settings import (
     BatFiles, BatSettings, CatFiles, CatSettings, ClassificationSettings, DatabaseFiles, DiamondParameters,
     DiamondPrepareSettings, DiamondSettings, ExecutionSettings, MMseqsPrepareSettings,
-    PrepareOutputs, PrepareSettings, TaxonomyFiles, MemorySettings, DownloadSettings, NRUrls, GTDBUrls
+    PrepareOutputs, PrepareSettings, TaxonomyFiles, MemorySettings,
+    DownloadFile, DownloadOutputs, DownloadSettings, NRUrls,
 )
 from ..io.parsers import BinParser
 from ..utils.check import (
@@ -122,10 +123,6 @@ def make_prefix(args: PrepareOptions) -> PrepareOptions:
         return args
     return replace(args, common_prefix=f"{datetime.now():%Y-%m-%d}_CAT_pack")
 
-# FIXME: Clean this up with the above funtion and merge. Just for now
-def get_date():
-    return f"{datetime.now():%Y-%m-%d}"
-
 def get_file_names(args: PrepareOptions) -> PrepareOutputs:
     prefix = make_prefix(args).common_prefix
     folder = args.db_dir
@@ -142,39 +139,43 @@ def get_file_names(args: PrepareOptions) -> PrepareOutputs:
     )
 
 
-def validate_download(args: DownloadOptions) -> DownloadSettings:
-    checks = ValErrorCollector()
-    out_dir = checks.check(check_folder, args.out_dir, "outdir", make=True)
+def get_download_file_names(args: DownloadOptions) -> DownloadOutputs:
+    prefix = f"{datetime.now():%Y-%m-%d}"
+    folder = args.out_dir
+    urls = {url.rsplit("/", 1)[-1]: url for url in NRUrls().urls}
+    paths = {name: folder / f"{prefix}.{name}" for name in urls}
+    downloads = []
+    for name, url in urls.items():
+        downloads.append(DownloadFile(url, paths[name], paths.get(f"{name}.md5")))
+    return DownloadOutputs(
+        prefix=prefix, data_folder=folder,
+        log_file=folder / f"{prefix}.download.log",
+        db_fasta=paths["nr.gz"],
+        acc2tax=paths["prot.accession2taxid.FULL.gz"],
+        taxonomy_archive=paths["taxdump.tar.gz"],
+        names=folder / f"{prefix}.names.dmp",
+        nodes=folder / f"{prefix}.nodes.dmp",
+        downloads=tuple(downloads),
+    )
 
-    urls = NRUrls() # DEVNOTE here in case of faulty entry
-    db_type = None
+
+def validate_download(args: DownloadOptions, files: DownloadOutputs) -> DownloadSettings:
     match args.db_type.lower().strip():
         case "nr":
             db_type = "nr"
         case "gtdb":
-            db_type = "gtdb"
-            urls = GTDBUrls()
+            raise InputError("GTDB downloads are not implemented yet.", hint="Use --db nr for now.")
         case _:
-            checks.add(InputError("Incorrect database selected. Please select one of the following: nr or gtdb."))
+            raise InputError("Incorrect database selected. Please select nr or gtdb.")
+    checks = ValErrorCollector()
+    checks.check(check_folder, files.data_folder, "Download folder", make=True)
+    outputs = [item.path for item in files.downloads] + [files.names, files.nodes]
+    for path in outputs:
+        checks.check(check_file, path, path.name, exist=False)
+        checks.finish()
 
-
-    settings = DownloadSettings(
-        db_type=db_type,
-        out_dir=args.out_dir,
-        cleanup=args.cleanup,
-        quiet=args.quiet,
-        no_log=False, # FIXME there is a Typererror in cli.py with double no_log, why??
-        urls=urls,
-    )
-
-    # FIXME naming of the Downloadsettings urls, lots of urls urls now :)))
-    for url in settings.urls.urls:
-        url_leaf = url.split("/")[-1]
-        output_path = settings.out_dir / Path(f"{get_date()}.{url_leaf}")
-        checks.check(check_file, output_path, url.split("/")[-1], exist=False)
-
-    checks.finish()
-    return settings
+    return DownloadSettings(db_type=db_type, files=files, cleanup=args.cleanup,
+                        quiet=args.quiet, no_log=args.no_log, debug=args.debug)
 
 
 def validate_prepare(args: PrepareOptions, files: PrepareOutputs | None = None) -> PrepareSettings:

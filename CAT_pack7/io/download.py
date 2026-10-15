@@ -11,8 +11,7 @@ import urllib.request
 from collections import namedtuple
 from typing import Callable
 
-from CAT_pack7.config.settings import DownloadSettings
-from CAT_pack7.config.validation import get_date
+from CAT_pack7.config.settings import DownloadOutputs, DownloadSettings
 from CAT_pack7.io.parsers import optionally_compressed_handle
 from CAT_pack7.utils import check
 from CAT_pack7.utils.logging import Report, Status
@@ -22,8 +21,10 @@ DownloadReport = Callable[[pathlib.Path, int, int | None], None]
 DownloadQueueReport = Callable[[list[pathlib.Path]], None]
 
 
-def download_singleton(target_url, local_path: pathlib.Path, report: DownloadReport) -> None:
+def download_singleton(target_url: str, local_path: pathlib.Path, report: DownloadReport) -> None:
     """Download a single file to the specified location."""
+    partial = local_path.with_name(f"{local_path.name}.part")
+
     def reporthook(blocknum: int, blocksize: int, totalsize: int):
         total = totalsize if totalsize >= 0 else None
         downloaded = blocknum * blocksize
@@ -32,16 +33,14 @@ def download_singleton(target_url, local_path: pathlib.Path, report: DownloadRep
         report(local_path, downloaded, total)
 
     try:
-        if report is not None:
-            report(local_path, 0, None)
-        urllib.request.urlretrieve(target_url, local_path, reporthook=reporthook)
-    except Exception:
-        log.info("Failed downloading file: {0}.".format(target_url))
-        raise
-        
-    return
-
-
+        partial.unlink(missing_ok=True)
+        report(local_path, 0, None)
+        urllib.request.urlretrieve(target_url, partial, reporthook=reporthook)
+        size = partial.stat().st_size
+        partial.replace(local_path)
+        report(local_path, size, size)
+    finally:
+        partial.unlink(missing_ok=True)
 
 
 
@@ -49,113 +48,51 @@ def multi_download(settings: DownloadSettings, report: Report,
     download_report: DownloadReport, queue_report: DownloadQueueReport
 ):
     """Download all required nr files in the specified output dir."""
-    #existing_files = list([p.resolve() for p in settings.out_dir.iterdir()])
-
-    urls = settings.urls.urls
-    prefix = get_date()
-    output_paths = {url.split('/')[-1]: settings.out_dir / f"{prefix}.{url.split('/')[-1]}" for url in urls}
-    if queue_report is not None:
-        queue_report(list(output_paths.values()))
-    if report is not None:
-        report("Downloading", Status.RUNNING, 0, len(urls))
-
-    for index, (url, output_path) in enumerate(zip(urls, output_paths.values()), start=1):
-        url_leaf = url.split("/")[-1]
-        # @Bastiaan want to keep this functionality in?
-        # if output_path in existing_files:
-        #     log.info(
-        #             "Skipping download of file {0}. It already exists.".format(
-        #                 output_path.name
-        #                 )
-        #             )
-        log.info("Downloading {0}.".format(url_leaf))
-            
-        download_singleton(url, output_path, download_report)
-        if report is not None:
-            report("Downloading", Status.RUNNING, index, len(urls))
-
-    return output_paths
+    queue_report([item.path for item in settings.files.downloads])
+    report("Downloading", Status.RUNNING, 0, len(settings.files.downloads))
+    for index, item in enumerate(settings.files.downloads, 1):
+        log.info("Downloading %s.", item.path.name)
+        download_singleton(item.url, item.path, download_report)
+        report("Downloading", Status.RUNNING, index, len(settings.files.downloads))
 
 
-def check_nr_md5s(settings: DownloadSettings):
-    """Check integrity of all files in a dir with their paired .md5 files.
-    """
-    md5_files = list([p.resolve() for p in settings.out_dir.glob("*.md5")])
-    
-    for md5_file in md5_files:
-        data_file = md5_file.with_suffix("")
-        check.check_md5_gz(data_file, md5_file)
-                        
-    return
+def check_nr_md5s(settings: DownloadSettings, report: Report) -> None:
+    """Check only this run's explicit data/checksum pairs."""
+    pairs = [item for item in settings.files.downloads if item.checksum is not None]
+    for index, item in enumerate(pairs, 1):
+        check.check_md5_gz(item.path, item.checksum)
+        report("Check files", Status.RUNNING, index, len(pairs))
 
 
-def process_nr(output_dir, log_file, quiet, prefix, cleanup):
-    nr_urls = [
-        "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz",
-        "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz.md5",
-        ("ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/"
-            "accession2taxid/prot.accession2taxid.FULL.gz"),
-        ("ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/"
-            "accession2taxid/prot.accession2taxid.FULL.gz.md5"),
-        "ftp://ftp.ncbi.nlm.nih.gov/blast/db/FASTA/nr.gz",
-        "ftp://ftp.ncbi.nlm.nih.gov/blast/db/FASTA/nr.gz.md5",
-        ]
-    
-    # Fetch files.
-    multi_download(nr_urls, output_dir, log_file, quiet, prefix)
+def extract_nr_taxonomy(files: DownloadOutputs, report: Report) -> None:
+    """Copy only regular taxonomy members directly to their planned output paths."""
+    targets = (("names.dmp", files.names), ("nodes.dmp", files.nodes))
+    with tarfile.open(files.taxonomy_archive, "r:gz") as archive:
+        members = []
+        for name, target in targets:
 
-    # Check files.
-    check_nr_md5s(output_dir, log_file, quiet)
+            member = archive.getmember(name)
+            members.append((member, target))
+        for index, (member, target) in enumerate(members, 1):
+            log.info("Extracting %s to %s.", member.name, target)
+            partial = target.with_name(f"{target.name}.part")
+            try:
+                partial.unlink(missing_ok=True)
+                with archive.extractfile(member) as source, partial.open("wb") as output:
+                    shutil.copyfileobj(source, output)
+                partial.replace(target)
+            finally:
+                partial.unlink(missing_ok=True)
+            report("Process files", Status.RUNNING, index, len(targets))
 
-    # Process files.
-    tax_tar = "{0}.{1}".format(prefix, "taxdump.tar.gz")
-    tax_tar_path = output_dir / pathlib.Path(tax_tar)
 
-    with tarfile.open(tax_tar_path, "r:gz") as tar:
-        for dmp in ["names.dmp", "nodes.dmp"]:
-            message = "Extracting {0} from taxdump.tar.gz".format(dmp)
-            
-            tar.extract(dmp, path=output_dir)
+def cleanup_nr_downloads(settings: DownloadSettings) -> None:
+    targets = [settings.files.taxonomy_archive]
+    targets.extend(item.checksum for item in settings.files.downloads if item.checksum is not None)
+    for target in targets:
+        log.info("Removing %s.", target)
+        target.unlink()
 
-            # Timestamp the extracted dmp file
-            outf1 = output_dir / pathlib.Path(dmp)
-            timestamped_fname = "{0}.{1}".format(prefix, dmp)
-            timestamped_outf1 = output_dir / pathlib.Path(timestamped_fname)
-            outf1.rename(timestamped_outf1)
-
-    if cleanup is True:
-        targets = [tax_tar_path.resolve()]
-        
-        for i in output_dir.glob("*.md5"):
-            targets.append(i.resolve())
-            
-        for t in targets:
-            t.unlink()
-
-    # CAT prepare
-    nr_gz = list(output_dir.glob("*nr.gz"))[0]
-    names_dmp = list(output_dir.glob("*names.dmp"))[0]
-    nodes_dmp = list(output_dir.glob("*nodes.dmp"))[0]
-    acc2taxid_gz = list(output_dir.glob("*accession2taxid.FULL.gz"))[0]
-    
-    log.info(
-            "\n-----------------\n\n"
-            "Done!\n\n"
-            "A CAT_pack database can be build with:\n\n"
-            "CAT_pack prepare \\\n"
-            "--db_fasta {0} \\\n"
-            "--names {1} \\\n"
-            "--nodes {2} \\\n"
-            "--acc2tax {3} \\\n"
-            "--db_dir path/to/prepare_output\n".format(
-                nr_gz.resolve(),
-                names_dmp.resolve(),
-                nodes_dmp.resolve(),
-                acc2taxid_gz.resolve(),
-                )
-            )
-    
-    return
 
 # GTDB.
 

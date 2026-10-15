@@ -92,10 +92,9 @@ class PrepareOptions(ExecutionOptions):
     build_mmseqs2: bool = False
     path_to_mmseqs: Path | None = None
 
-@dataclass
-class DownloadOptions():
+@dataclass(frozen=True, kw_only=True)
+class DownloadOptions(ExecutionOptions):
     db_type: str
     out_dir: Path
     cleanup: bool = False
-    quiet: bool = False
     no_log: bool = False
