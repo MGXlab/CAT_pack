@@ -660,8 +660,12 @@ def rat(contigs_fasta: Annotated[
         ],
         mode: Annotated[
             str, Option("--mode", "-m")
-              ],
-
+        ],
+        read_file: Annotated[
+            tuple[str, str], Option("--read_file", "-r",
+                                    help="Path to (forward) read file. Please note that RAT does not currently support interlaced read files. Please supply a single read file or two files for paired-end reads",
+                                    )
+        ] = (None, None),
         *, execution: ExecutionOptions,
         diamond: DiamondOptions,
         mmseqs: MMseqsOptions,
@@ -674,5 +678,6 @@ def rat(contigs_fasta: Annotated[
     - 'cr': integrate annotations from contigs and reads.
     - 'mr': integrate annotations from MAGs and reads.
     """
+    var = contigs_fasta, taxonomy_folder, mode, read_file
     pass
 
