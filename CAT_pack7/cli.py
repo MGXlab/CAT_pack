@@ -23,7 +23,7 @@ from .cli_options import (
     DiamondPathOption, diamond_options, execution_options, mmseqs_options, memory_options, with_option_groups,
 )
 from .config.options import BatOptions, CatOptions, ExecutionOptions, DiamondOptions, MMseqsOptions, PrepareOptions, \
-    MemoryOptions, DownloadOptions
+    MemoryOptions, DownloadOptions, RatModes, RatOptions
 from .config.validation import get_file_names, make_prefix
 from .pipeline import run_annotation, build_plan, Status, run_prepare, run_download
 from .utils.errors import CatError, show_error
@@ -654,30 +654,34 @@ def rat(contigs_fasta: Annotated[
             Path, Option("--contigs_fasta", "-c" ,
                    help="Contigs fasta file", metavar="<FILE[.gz|.bz2]>")
         ],
-        taxonomy_folder: Annotated[
-            Path, Option("--taxonomy_folder", "-t" ,
-                         help="Directory that contains taxonomy files.", metavar="<DIR>")
-        ],
-        mode: Annotated[
-            str, Option("--mode", "-m")
-        ],
-        read_file: Annotated[
-            tuple[str, str], Option("--read_file", "-r",
-                                    help="Path to (forward) read file. Please note that RAT does not currently support interlaced read files. Please supply a single read file or two files for paired-end reads",
-                                    )
-        ] = (None, None),
+        taxonomy_folder: Annotated[RatOptions.mode, Option("--taxonomy_folder", "-t" ,
+                         help="Directory that contains taxonomy files.", metavar="<DIR>")],
+        mode: Annotated[RatModes,
+                        Option("--mode", "-m", help="Classification mode")],
+        read_file: Annotated[list[Path], Option("--read_file", "-r",
+                                    help="""Path to (paired-end) read file. Use --read_file path/to/read_file_1 --read_file path/to/read_file_2 to supply two files for paired-end reads""")] = None,
+        bam_file: Annotated[list[Path],
+        Option("--bam_file", "-b", help="Path to sorted mapping file.")] = None,
+        alignment_unmapped: Annotated[Path,
+            Option("--alignment_unmapped",
+                   help="Path to alignment file of reads and contigs "
+                        "that could not be classified by CAT/BAT.")] = None,
+        bin_fasta_or_folder: Annotated[Path, Option("--bin_fasta", "-b", "--bin-folder", help="Bin fasta file or directory containing bins.", metavar="<FILE[.gz|.bz2]|DIR>")] = None,
+        bin_suffix: Annotated[str, Option("--bin_suffix", "-s", help="Suffix of bins in bin directory")] = ".fna",
+        contigs2classification: Annotated[Path, Option("--c2c", help="Path to contign2classification file.")] = None,
+        bin2classification: Annotated[Path, Option("--b2c", help="Path to bin2classification file.")] = None,
+        read2classification: Annotated[bool, Option("--read2classification", help="Includes read classification step.")] = None,
+        unmapped2classification: Annotated[Path, Option("--u2c", help="Path to unmapped2classification file.")] = None,
+        # mapping_quality: Annotated[Path, Option("", help="")] = None,
+        # path_to_bwa: Annotated[Path, Option("", help="")] = None,
+        # path_to_samtools: Annotated[Path, Option("", help="")] = None,
+
+
         *, execution: ExecutionOptions,
         diamond: DiamondOptions,
         mmseqs: MMseqsOptions,
         memory: MemoryOptions):
-    """Read Annotation Tool
-
-
-    Classification modes:
-    - 'mcr': integrate annotations from MAGs, contigs, and reads.
-    - 'cr': integrate annotations from contigs and reads.
-    - 'mr': integrate annotations from MAGs and reads.
-    """
+    """Read Annotation Tool"""
     var = contigs_fasta, taxonomy_folder, mode, read_file
     pass
 
