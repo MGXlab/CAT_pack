@@ -3,34 +3,41 @@
 import logging
 import sys
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from time import perf_counter
+from typing import Any, Iterable, Mapping, Sequence
 
 import numpy as np
+from numpy import dtype, ndarray
+from numpy.typing import ArrayLike, NDArray
 
 from .io.reference_mapping import read_fastaid2LCAtaxid
+from .typing import Taxid
 from .utils.errors import InputError
 
 log = logging.getLogger("CAT_pack")
 
-NO_TAXID = -1
+NO_TAXID: int = -1
 
 class Taxonomy:
-    def __init__(self, parents, taxid_index, taxids):
-        self.root = None
-        self.depth = None
-        self.parents = parents
-        self.taxid_index = taxid_index
-        self.taxids = taxids
-        self.no_rank = 1
-        self.no_taxid = NO_TAXID
+    def __init__(
+        self, parents: NDArray[np.int32], taxid_index: dict[str, int], taxids: list[str],
+    ) -> None:
+        self.root: NDArray[np.int32] | None = None
+        self.depth: NDArray[np.int64] | None = None
+        self.parents: NDArray[np.int32] = parents
+        self.taxid_index: dict[str, int] = taxid_index
+        self.taxids: list[str] = taxids
+        self.no_rank: int = 1
+        self.no_taxid: int = NO_TAXID
         self.prepare_LCA()
 
     @classmethod
-    def import_nodes(cls, nodes_dmp: Path):
+    def import_nodes(cls, nodes_dmp: Path) -> "Taxonomy":
         log.info(f"Loading file {nodes_dmp}.")
 
-        taxid2parent = {}
+        taxid2parent: dict[str, str] = {}
 
         with open(nodes_dmp) as f1:
             for line in f1:
@@ -47,7 +54,7 @@ class Taxonomy:
 
         return cls(parents, taxid_index, taxids)
 
-    def prepare_LCA(self):
+    def prepare_LCA(self) -> None:
         parents = self.parents
         taxids_indents = np.arange(len(parents))
 
@@ -67,7 +74,7 @@ class Taxonomy:
         self.root = parents_copy
 
 
-    def taxid_of_hits(self, hits, fastaid2taxid):
+    def taxid_of_hits(self, hits: Iterable[str], fastaid2taxid: Mapping[str, str]) -> ndarray[tuple[Any, ...], dtype[np.int32]]:
         taxids = []
 
         for hit in hits:
@@ -76,7 +83,7 @@ class Taxonomy:
 
         return np.array(taxids, dtype=np.int32)
 
-    def find_lineage(self, taxid):
+    def find_lineage(self, taxid: int | str | np.integer[Any]) -> NDArray[np.int32]:
         lineage = []
         taxid = int(taxid)
 
@@ -90,7 +97,7 @@ class Taxonomy:
 
         return np.array(lineage, dtype=np.int32)
 
-    def find_lca(self, taxids):
+    def find_lca(self, taxids: Iterable[int | np.integer[Any]]) -> int:
         taxids = [int(taxid) for taxid in taxids if taxid != self.no_taxid]
 
         if not taxids:
@@ -107,7 +114,7 @@ class Taxonomy:
         return self.no_taxid
 
 
-    def find_LCA(self, taxids_a, taxids_b):
+    def find_LCA(self, taxids_a: ArrayLike, taxids_b: ArrayLike) -> NDArray[np.int32]:
         taxids_a = np.asarray(taxids_a, dtype=np.int32)
         taxids_b = np.asarray(taxids_b, dtype=np.int32)
 
@@ -134,7 +141,9 @@ class Taxonomy:
 
 
 
-    def find_LCA_for_ORF(self, orf_hit_offsets, hits):
+    def find_LCA_for_ORF(
+        self, orf_hit_offsets: NDArray[np.int64], hits: NDArray[np.int32],
+    ) -> NDArray[np.int32]:
         batch_started = perf_counter()
         orf_count = len(orf_hit_offsets) - 1
 
@@ -200,38 +209,44 @@ class Taxonomy:
 
 @dataclass
 class WeightedLCA:
-    total: np.ndarray
-    assignment_entity: np.ndarray
-    assignment_taxon: np.ndarray
-    lineage_offsets: np.ndarray
-    lineage_taxids: np.ndarray
-    lineage_bitscores: np.ndarray
+    total: NDArray[np.int64]
+    assignment_entity: NDArray[np.int64]
+    assignment_taxon: NDArray[np.int64]
+    lineage_offsets: NDArray[np.int64]
+    lineage_taxids: NDArray[np.int32]
+    lineage_bitscores: NDArray[np.int64]
 
     @classmethod
     def find(
-        cls, taxonomy, entity_of_orf, orf_lca,
-        bitscore, fraction, n_entities,
-    ):
+        cls, taxonomy: Taxonomy, entity_of_orf: NDArray[np.int64], orf_lca: NDArray[np.int32],
+        bitscore: NDArray[np.int64], fraction: Decimal | float, n_entities: int,
+    ) -> "WeightedLCA":
         return find_weighted_LCA(
             taxonomy, entity_of_orf, orf_lca,
             bitscore, fraction, n_entities,
         )
 
     # TODO: Continue
-    def lineage_support_of(self, assignment):
+    def lineage_support_of(self, assignment: int | np.integer[Any]) -> list[int]:
         start, end = self.lineage_offsets[assignment:assignment + 2]
         return self.lineage_bitscores[start:end].tolist()
 
 
-def sum_bitscores(orf_type, lca_per_orf, top_bitscores, n):
+def sum_bitscores(
+    orf_type: NDArray[np.int64], lca_per_orf: NDArray[np.int32],
+    top_bitscores: NDArray[np.int64], n: int,
+) -> NDArray[np.int64]:
     taxid_mask = lca_per_orf != NO_TAXID
     total_bitscore = np.zeros(n, dtype=np.int64)
     np.add.at(total_bitscore, orf_type[taxid_mask], top_bitscores[taxid_mask])
     return total_bitscore
 
-def sum_taxid_bitscores(taxonomy, orf_type, lca_per_orf, top_bitscores):
+def sum_taxid_bitscores(
+    taxonomy: Taxonomy, orf_type: NDArray[np.int64],
+    lca_per_orf: NDArray[np.int32], top_bitscores: NDArray[np.int64],
+) -> tuple[NDArray[np.int64], NDArray[np.int64], NDArray[np.int64]]:
     log.info("Starting support expansion.")
-    stage_started = perf_counter()
+    stage_started: float = perf_counter()
     orf_pos = np.flatnonzero(lca_per_orf != NO_TAXID)
     known_orfs = len(orf_pos)
 
@@ -293,7 +308,10 @@ def sum_taxid_bitscores(taxonomy, orf_type, lca_per_orf, top_bitscores):
     return pairs, taxid_bitscores, first_orf
 
 
-def find_weighted_LCA(taxonomy, orf_type, lca_per_orf, top_bitscores, f, n):
+def find_weighted_LCA(
+    taxonomy: Taxonomy, orf_type: NDArray[np.int64], lca_per_orf: NDArray[np.int32],
+    top_bitscores: NDArray[np.int64], f: Decimal | float, n: int,
+) -> WeightedLCA:
     stage_started = perf_counter()
     total_bitscore = sum_bitscores(orf_type, lca_per_orf, top_bitscores, n)
     elapsed = perf_counter() - stage_started
@@ -411,19 +429,22 @@ def read_nodes(path: Path) -> dict[str, str]:
     return parents
 
 
-def import_fastaid2LCAtaxid(fastaid2LCAtaxid_file: Path, all_hits, *, workers=1):
+def import_fastaid2LCAtaxid(fastaid2LCAtaxid_file: Path, all_hits: set[str], *, workers: int=1) -> dict[str, str]:
     log.info(f"Loading file {fastaid2LCAtaxid_file}.")
     return read_fastaid2LCAtaxid(fastaid2LCAtaxid_file, all_hits, workers)
 
 
-def import_taxids_with_multiple_offspring(taxids_with_multiple_offspring_file):
+def import_taxids_with_multiple_offspring(taxids_with_multiple_offspring_file: str | Path) -> set[str]:
     log.info(f"Loading file {taxids_with_multiple_offspring_file}.")
 
     with open(taxids_with_multiple_offspring_file, encoding="utf-8") as f1:
         return {taxid for line in f1 if (taxid := line.strip())}
 
 
-def find_lineage(taxid, parents):
+def find_lineage(
+    taxid: int | str | np.integer[Any],
+    parents: Sequence[int | str] | NDArray[np.integer[Any]],
+) -> NDArray[np.int32]:
     lineage = []
     taxid = int(taxid)
 
@@ -439,7 +460,7 @@ def find_lineage(taxid, parents):
 
 
 # noinspection PyTypeChecker
-def find_LCA(list_of_lineages):
+def find_LCA(list_of_lineages: Sequence[Iterable[Taxid]]) -> Taxid | None:
     overlap = set.intersection(*map(set, list_of_lineages))
 
     for taxid in list_of_lineages[0]:
