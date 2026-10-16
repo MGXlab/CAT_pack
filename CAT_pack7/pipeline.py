@@ -11,7 +11,7 @@ from CAT_pack7.io.download import (
 )
 from . import tax
 from .classification import ClassificationEngine
-from .config.options import BatOptions, CatOptions, PrepareOptions, DownloadOptions
+from .config.options import BatOptions, CatOptions, PrepareOptions, DownloadOptions, RatOptions
 from .config.settings import BatFiles, BatSettings, CatFiles, CatSettings, DiamondSettings, DownloadOutputs
 from .config.validation import check_orfs_match_contigs, get_file_names, get_validated_settings, make_prefix, \
     validate_prepare, validate_download, get_download_file_names
@@ -45,7 +45,7 @@ class Step:
         return self.name
 
 
-def build_plan(args: CatOptions | BatOptions | PrepareOptions | DownloadOptions, files=None) -> list[Step]:
+def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | DownloadOptions, files=None) -> list[Step]:
     if type(args) == PrepareOptions:
         return [
             Step("Input validation"),
@@ -68,6 +68,64 @@ def build_plan(args: CatOptions | BatOptions | PrepareOptions | DownloadOptions,
             Step("Alignment", supplied=args.alignment is not None),
             Step("Classify"),
         ]
+    if isinstance(args, RatOptions):
+        mode = args.mode.value
+        direct_classification = "r" in mode
+        needs_alignment = (
+                direct_classification
+                and args.unmapped2classification is None
+        )
+        needs_sequences = (
+                needs_alignment
+                and args.alignment_unmapped is None
+        )
+
+        return [
+            Step("Input validation"),
+            Step("Read mapping", supplied=bool(args.bam_file)),
+
+            *([
+                  Step(
+                      "Classify contigs",
+                      supplied=args.contigs2classification is not None,
+                  ),
+              ] if "c" in mode else []),
+
+            *([
+                  Step(
+                      "Classify bins",
+                      supplied=args.bin2classification is not None,
+                  ),
+              ] if "m" in mode else []),
+
+            Step("Process mappings"),
+
+            *([
+                  Step("Extract unclassified sequences"),
+              ] if needs_sequences else []),
+
+            *([
+                  Step(
+                      "Align unclassified sequences",
+                      supplied=args.alignment_unmapped is not None,
+                  ),
+              ] if needs_alignment else []),
+
+            *([
+                  Step(
+                      "Classify unclassified sequences",
+                      supplied=args.unmapped2classification is not None,
+                  ),
+              ] if direct_classification else []),
+
+            Step("Calculate abundances"),
+
+            *([
+                  Step("Assign read classifications"),
+              ] if args.read2classification else []),
+
+            Step("Write reports"),
+        ]
     if isinstance(args, DownloadOptions):
         return [
             Step("Input validation"),
@@ -77,6 +135,11 @@ def build_plan(args: CatOptions | BatOptions | PrepareOptions | DownloadOptions,
             Step("Cleanup", supplied=not args.cleanup),
         ]
     raise CatError("I haven't figured out how to build that specific plan")
+
+
+def run_rat(args: RatOptions, report: Report):
+    return "YES"
+
 
 def run_annotation(
     args: CatOptions | BatOptions, report: Report,
@@ -397,3 +460,5 @@ def run_download(
         raise
     finally:
         locks.close()
+
+

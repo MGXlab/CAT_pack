@@ -7,12 +7,12 @@ from decimal import Decimal
 from pathlib import Path
 
 from .options import AlignerName, BatOptions, CatOptions, ExecutionOptions, DiamondOptions, PrepareOptions, \
-    MemoryOptions, DownloadOptions
+    MemoryOptions, DownloadOptions, RatOptions
 from .settings import (
     BatFiles, BatSettings, CatFiles, CatSettings, ClassificationSettings, DatabaseFiles, DiamondParameters,
     DiamondPrepareSettings, DiamondSettings, ExecutionSettings, MMseqsPrepareSettings,
     PrepareOutputs, PrepareSettings, TaxonomyFiles, MemorySettings,
-    DownloadFile, DownloadOutputs, DownloadSettings, NRUrls, GTDBUrls, GTDBDownloadOutputs,
+    DownloadFile, DownloadOutputs, DownloadSettings, NRUrls, GTDBUrls, GTDBDownloadOutputs, RatFiles,
 )
 from ..io.parsers import BinParser
 from ..utils.check import (
@@ -380,6 +380,10 @@ def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
         )
     else:
         raise TypeError(f"Hmmm, that type of options I don't know yet")
+
+
+def validate_rat_files(args: RatOptions) -> RatFiles:
+    checks = ValErrorCollector()
 
 
 def get_validated_settings(args: CatOptions | BatOptions | PrepareOptions) -> CatSettings | BatSettings | PrepareSettings:

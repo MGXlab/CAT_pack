@@ -11,6 +11,7 @@ import typer
 from rich.console import Console, Group
 from rich.live import Live
 from rich.panel import Panel
+from rich.pretty import Pretty
 from rich.progress import (
     Progress, ProgressColumn, BarColumn, DownloadColumn, TaskProgressColumn,
     TextColumn, TimeElapsedColumn, TimeRemainingColumn, TransferSpeedColumn,
@@ -19,13 +20,14 @@ from rich.table import Table
 from rich.text import Text
 from typer import Option
 
+from . import about
 from .cli_options import (
     DiamondPathOption, diamond_options, execution_options, mmseqs_options, memory_options, with_option_groups,
 )
 from .config.options import BatOptions, CatOptions, ExecutionOptions, DiamondOptions, MMseqsOptions, PrepareOptions, \
     MemoryOptions, DownloadOptions, RatModes, RatOptions
 from .config.validation import get_file_names, make_prefix
-from .pipeline import run_annotation, build_plan, Status, run_prepare, run_download
+from .pipeline import run_annotation, build_plan, Status, run_prepare, run_download, run_rat
 from .utils.errors import CatError, show_error
 from .utils.logging import init_logging
 
@@ -662,9 +664,9 @@ def rat(contigs_fasta: Annotated[
             Path,
             Option("--output-prefix", "--out_prefix", "-o", metavar="<prefix>", help="Prefix for output files.")
         ] = RatOptions.output_prefix,
-        read_file: Annotated[list[Path], Option("--read_file", "-r",
+        read_file: Annotated[tuple[Path], Option("--read_file", "-r",
                                     help="""Path to (paired-end) read file. Use --read_file path/to/read_file_1 --read_file path/to/read_file_2 to supply two files for paired-end reads""", metavar="<FILE[.gz|.bz2]>")] = RatOptions.read_file,
-        bam_file: Annotated[list[Path],
+        bam_file: Annotated[tuple[Path],
         Option("--bam_file", "-b", help="Path to sorted mapping file.", metavar="<FILE[.gz|.bz2]>")] = RatOptions.bam_file,
         alignment_unmapped: Annotated[Path,
             Option("--alignment_unmapped",
@@ -694,15 +696,14 @@ def rat(contigs_fasta: Annotated[
         mmseqs: MMseqsOptions,
         memory: MemoryOptions):
     """Read Annotation Tool"""
-    var = contigs_fasta, database, mode, read_file
 
-    args = RatOptions(
+    arguments = RatOptions(
         contigs_fasta=contigs_fasta,
         database=database,
         mode=mode,
         output_prefix=output_prefix,
-        read_file=tuple(read_file),
-        bam_file=tuple(bam_file),
+        read_file=read_file,
+        bam_file=bam_file,
         alignment_unmapped=alignment_unmapped,
         bin_fasta_or_folder=bin_fasta_or_folder,
         bin_suffix=bin_suffix,
@@ -712,8 +713,53 @@ def rat(contigs_fasta: Annotated[
         unmapped2classification=unmapped2classification,
         mapping_quality=mapping_quality,
         path_to_bwa=path_to_bwa,
-        path_to_samtools=path_to_samtools
+        path_to_samtools=path_to_samtools,
+        diamond=diamond,
+        mmseqs=mmseqs,
+        memory=memory,
+        threads=execution.threads,
+        quiet=execution.quiet,
+        verbose=execution.verbose,
+        debug=execution.debug,
+        # TODO add CAT/BAT specific arguments
     )
 
-    pass
+    log = init_logging(arguments.debug, quiet=arguments.quiet,
+                       console=console)
+    log.info("Loaded all arguments")
+
+    content = [Text(f"CAT_pack v{about.__version__}\n", style='underline'),
+        Text("Running command", style="bold"),
+        Text(f"$ {shlex.join(sys.argv)}", style="cyan")]
+
+    if arguments.debug:
+        content.extend([Pretty(arguments)])
+    log.info(f"Running command: $ {shlex.join(sys.argv)}")
+    log.info(f"{arguments!r}")
+
+    if not arguments.quiet: console.print(Panel(Group(*content), title=f"RAT"))
+
+    progress, tasks = make_progress(
+        [step.name for step in build_plan(arguments)],
+    )
+    progress.disable = arguments.quiet
+    report = partial(update_progress, progress, tasks)
+    try:
+        with progress:
+            outputs = run_rat(arguments, report)
+    except KeyboardInterrupt:
+        console.print("\nRun cancelled :(")
+        raise typer.Exit(code=130)
+
+    except CatError as error:
+        show_error(error, console)
+        raise typer.Exit(code=1)
+
+    except Exception:
+        log.exception("Unexpected error", exc_info=False)
+        log.error("Check the run log or use --debug for a full traceback")
+        if arguments.debug:
+            console.print_exception(show_locals=True)  # TODO: before release back to False
+        raise typer.Exit(code=1)
+
 
