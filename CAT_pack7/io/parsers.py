@@ -245,7 +245,7 @@ class _HitIndex:
 class AlignmentParser:
     """Load DIAMOND hits within range_
 
-    DEVNOTE: The input is asseumed to be grouped by ORF!
+    DEVNOTE: The input is assumed to be grouped by ORF!
     DEVNOTE 2: the Alignment file is not validated during loading.
                Users responsibility to supply correct files or let cat_pack generate it
 
@@ -305,7 +305,7 @@ class AlignmentParser:
     def parse(self) -> AlignmentInput:
         log.info(f"Parsing alignment file {self.path}.")
         # https://docs.pola.rs/api/python/stable/reference/api/polars.thread_pool_size.html
-        # DEVNOTE: During testing the sweetspot was 16 cores at 76 seconds and 8 cores around 77 secons
+        # DEVNOTE: During testing the sweetspot was 16 cores at 76 seconds and 8 cores around 77 seconds
         #  10-12 cores need to be tested
         os.environ.setdefault("POLARS_MAX_THREADS", str(min(self.workers, os.cpu_count() or 1)))
 
