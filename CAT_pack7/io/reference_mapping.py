@@ -77,7 +77,7 @@ def _make_hit_filter(all_hits: set[str]) -> tuple[shared_memory.SharedMemory, in
     hit_mask = bits - 1
     hit_filter = shared_memory.SharedMemory(create=True, size=bits // 8)
     for hit in all_hits:
-        bit = crc32(hit.encode("utf-8")) & hit_mask
+        bit = crc32(hit.encode()) & hit_mask
         hit_filter.buf[bit >> 3] |= 1 << (bit & 7)
     return hit_filter, hit_mask
 
