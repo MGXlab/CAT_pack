@@ -209,6 +209,8 @@ class PrepareSettings(ExecutionSettings):
 
 @dataclass()
 class ParserSettings:
+    # Feedback from @Bastiaan
+    # DEVnote to make the multiplier dependent on the significance of the bitscore.
     bit_score_multiplier = 10
 
 

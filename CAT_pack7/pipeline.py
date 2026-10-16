@@ -32,7 +32,7 @@ from .utils.logging import Status, Report, file_logging
 @dataclass()
 class Step:
     """
-    A simple dataclass currently acting like a dictionairy that stores the
+    A simple dataclass currently acting like a dictionary that stores the
     name of the step and reuse, if reuse is true it will use userprovided data
     """
 
@@ -82,6 +82,7 @@ def run_annotation(
     args: CatOptions | BatOptions, report: Report,
 ) -> dict[str, Path | tuple[int, int, str, Decimal] | list[Step]]:
     """Bin/Contig annotation tool (BAT/CAT) run"""
+    results = None
     is_bat = isinstance(args, BatOptions)
 
     plan = build_plan(args)
@@ -263,6 +264,7 @@ def run_prepare(args: PrepareOptions, report: Report):
     log = logging.getLogger("CAT_pack")
     locks = ExitStack()
     taxid2parent = None
+    settings = None
 
     try:
         files.data_folder.parent.mkdir(parents=True, exist_ok=True)
@@ -342,12 +344,12 @@ def run_download(
     current_step = plan[step_index]
     log = logging.getLogger("CAT_pack")
     locks = ExitStack()
-
+    settings = None
     try:
         files.data_folder.parent.mkdir(parents=True, exist_ok=True)
         locks.enter_context(lock_outputs([files.data_folder]))
         for step_index, current_step in enumerate(plan):
-            # A bit of a missuse of the term supplied. this is for if cleanup isnt enabled
+            # A bit of a misuse of the term supplied. this is for if cleanup isn't enabled
             if current_step.supplied:
                 report(current_step.name, Status.SKIPPED, 0, None)
                 continue

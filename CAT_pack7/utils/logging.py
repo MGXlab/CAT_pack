@@ -27,7 +27,7 @@ class Report(Protocol):
     the amount of work is not known (yet).
 
     Within status make the choice: Running, complete, reused, skipped or failed
-    Cancelled can also be used if user canceld the run
+    Cancelled can also be used if user canceled the run
     """
 
     def __call__(self, step: str, status: Status, completed: int,
@@ -37,7 +37,7 @@ class Report(Protocol):
 def add_handler(
     logger: logging.Logger, log_file: Path, debug: bool = False,
 ) -> logging.FileHandler:
-    handler = logging.FileHandler(log_file, mode="a", encoding="utf-8")
+    handler = logging.FileHandler(log_file, encoding="utf-8")
     handler.setLevel(logging.NOTSET if debug else logging.INFO)
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s\t%(message)s"))
     logger.setLevel(logging.DEBUG)
@@ -66,13 +66,7 @@ def init_logging(debug: bool = False,quiet: bool = False,
     console = console or Console(stderr=True)
 
     if not quiet:
-        rich_handler = RichHandler(
-            console=console,
-            show_time=True,
-            show_path=debug,
-            rich_tracebacks=debug,
-            markup=True,
-        )
+        rich_handler = RichHandler(console=console, show_path=debug, rich_tracebacks=debug, markup=True)
         rich_handler.setLevel(logging.DEBUG if debug else logging.WARNING)
         logger.addHandler(rich_handler)
 

@@ -52,7 +52,7 @@ class ProcessingSpeedColumn(ProgressColumn):
     def render(self, task) -> Text:
         unit = task.fields.get("unit")
         if not unit or not task.started:
-            return Text("")
+            return Text()
         return Text(f"{task.speed or 0:,.1f} {unit}/s", style="cyan")
 
 
@@ -562,7 +562,7 @@ def run_annotation_cli(arguments: CatOptions | BatOptions):
     content = Group(
         Text("Supplied command", style="bold"),
         Text(f"$ {shlex.join(sys.argv)}", style="cyan"),
-        Text(""), info
+        Text(), info
     )
     log.info(f"Command supplied: $ {shlex.join(sys.argv)}")
     log.info(f"{arguments!r}")
@@ -631,7 +631,7 @@ def run_annotation_cli(arguments: CatOptions | BatOptions):
         content.extend([Text("Results are saved at:"), results])
         citation_notes = [step.citation for step in outputs["Steps"] if step.citation]
         if citation_notes:
-            content.extend([Text(""), Text("Citation notes", style="bold cyan")])
+            content.extend([Text(), Text("Citation notes", style="bold cyan")])
             content.extend(Text(note) for note in citation_notes)
 
         console.print(Panel(
