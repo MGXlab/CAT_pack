@@ -80,6 +80,29 @@ class BatOptions(AnnotationOptions):
     output_prefix: Path = Path("out.BAT")
     no_stars: bool = False
 
+class RatModes(str, Enum):
+    MCR = "mcr"
+    CR = "cr"
+    MR = "mr"
+
+@dataclass(frozen=True, kw_only=True)
+class RatOptions(AnnotationOptions):
+    contigs_fasta: Path
+    mode: RatModes
+    output_prefix: Path = Path("out.RAT")
+    read_file: tuple[Path, ...] | None = None
+    bam_file: tuple[Path, ...] | None = None
+    alignment_unmapped: Path | None = None
+    bin_fasta_or_folder: Path | None = None
+    bin_suffix: str = ".fna"
+    contigs2classification: Path | None = None
+    bin2classification: Path | None = None
+    read2classification: bool
+    unmapped2classification: Path | None = None
+    mapping_quality: int = 2
+    path_to_bwa: Path = 'bwa'
+    path_to_samtools: Path = 'samtools'
+
 
 @dataclass(frozen=True, kw_only=True)
 class PrepareOptions(ExecutionOptions):
@@ -101,11 +124,3 @@ class DownloadOptions(ExecutionOptions):
     no_log: bool = False
 
 
-class RatModes(str, Enum):
-    MCR = "mcr"
-    CR = "cr"
-    MR = "mr"
-
-@dataclass(frozen=True, kw_only=True)
-class RatOptions():
-    mode = RatModes

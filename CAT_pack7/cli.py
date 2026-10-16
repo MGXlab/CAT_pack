@@ -654,34 +654,66 @@ def rat(contigs_fasta: Annotated[
             Path, Option("--contigs_fasta", "-c" ,
                    help="Contigs fasta file", metavar="<FILE[.gz|.bz2]>")
         ],
-        taxonomy_folder: Annotated[RatOptions.mode, Option("--taxonomy_folder", "-t" ,
-                         help="Directory that contains taxonomy files.", metavar="<DIR>")],
+        database: Annotated[Path, Option("--taxonomy_folder", "-t" ,
+                         help="Directory that contains database and taxonomy files", metavar="<DIR>")],
         mode: Annotated[RatModes,
                         Option("--mode", "-m", help="Classification mode")],
+        output_prefix: Annotated[
+            Path,
+            Option("--output-prefix", "--out_prefix", "-o", metavar="<prefix>", help="Prefix for output files.")
+        ] = RatOptions.output_prefix,
         read_file: Annotated[list[Path], Option("--read_file", "-r",
-                                    help="""Path to (paired-end) read file. Use --read_file path/to/read_file_1 --read_file path/to/read_file_2 to supply two files for paired-end reads""")] = None,
+                                    help="""Path to (paired-end) read file. Use --read_file path/to/read_file_1 --read_file path/to/read_file_2 to supply two files for paired-end reads""", metavar="<FILE[.gz|.bz2]>")] = RatOptions.read_file,
         bam_file: Annotated[list[Path],
-        Option("--bam_file", "-b", help="Path to sorted mapping file.")] = None,
+        Option("--bam_file", "-b", help="Path to sorted mapping file.", metavar="<FILE[.gz|.bz2]>")] = RatOptions.bam_file,
         alignment_unmapped: Annotated[Path,
             Option("--alignment_unmapped",
                    help="Path to alignment file of reads and contigs "
-                        "that could not be classified by CAT/BAT.")] = None,
-        bin_fasta_or_folder: Annotated[Path, Option("--bin_fasta", "-b", "--bin-folder", help="Bin fasta file or directory containing bins.", metavar="<FILE[.gz|.bz2]|DIR>")] = None,
-        bin_suffix: Annotated[str, Option("--bin_suffix", "-s", help="Suffix of bins in bin directory")] = ".fna",
-        contigs2classification: Annotated[Path, Option("--c2c", help="Path to contign2classification file.")] = None,
-        bin2classification: Annotated[Path, Option("--b2c", help="Path to bin2classification file.")] = None,
-        read2classification: Annotated[bool, Option("--read2classification", help="Includes read classification step.")] = None,
-        unmapped2classification: Annotated[Path, Option("--u2c", help="Path to unmapped2classification file.")] = None,
-        # mapping_quality: Annotated[Path, Option("", help="")] = None,
-        # path_to_bwa: Annotated[Path, Option("", help="")] = None,
-        # path_to_samtools: Annotated[Path, Option("", help="")] = None,
-
-
+                        "that could not be classified by CAT/BAT.", metavar="<FILE[.gz|.bz2]>")] = RatOptions.alignment_unmapped,
+        bin_fasta_or_folder: Annotated[
+            Path, Option("--bin_fasta", "-b", "--bin-folder", help="Bin fasta file or directory containing bins.", metavar="<FILE[.gz|.bz2]|DIR>")] = RatOptions.bin_fasta_or_folder,
+        bin_suffix: Annotated[
+            str, Option("--bin_suffix", "-s", help="Suffix of bins in bin directory")] = RatOptions.bin_suffix,
+        contigs2classification: Annotated[
+            Path, Option("--c2c", help="Path to contign2classification file.", metavar="<FILE[.gz|.bz2]>")] = RatOptions.contigs2classification,
+        bin2classification: Annotated[
+            Path, Option("--b2c", help="Path to bin2classification file.", metavar="<FILE[.gz|.bz2]>")] = RatOptions.bin2classification,
+        read2classification: Annotated[
+            bool, Option("--read2classification", help="Includes read classification step.")] = RatOptions.read2classification,
+        unmapped2classification: Annotated[
+            Path, Option("--u2c", help="Path to unmapped2classification file.", metavar="<FILE[.gz|.bz2]>")] = RatOptions.unmapped2classification,
+        mapping_quality: Annotated[
+            int, Option("--mapping_quality", help="Minimum mapping quality phred score")] = RatOptions.mapping_quality,
+        # TODO: Look into the use of bwa mem 2 as well
+        path_to_bwa: Annotated[
+            Path, Option("--path_to_bwa", help="Path to bwa binaries. Supply if RAT cannot find bwa.", metavar="<EXC>")] = RatOptions.path_to_bwa,
+        path_to_samtools: Annotated[
+            Path, Option("--path_to_samtools", help="Path to Samtools binaries. Supply if RAT cannot find Samtools.", metavar="<EXC>")] = RatOptions.path_to_samtools,
         *, execution: ExecutionOptions,
         diamond: DiamondOptions,
         mmseqs: MMseqsOptions,
         memory: MemoryOptions):
     """Read Annotation Tool"""
-    var = contigs_fasta, taxonomy_folder, mode, read_file
+    var = contigs_fasta, database, mode, read_file
+
+    args = RatOptions(
+        contigs_fasta=contigs_fasta,
+        database=database,
+        mode=mode,
+        output_prefix=output_prefix,
+        read_file=tuple(read_file),
+        bam_file=tuple(bam_file),
+        alignment_unmapped=alignment_unmapped,
+        bin_fasta_or_folder=bin_fasta_or_folder,
+        bin_suffix=bin_suffix,
+        contigs2classification=contigs2classification,
+        bin2classification=bin2classification,
+        read2classification=read2classification,
+        unmapped2classification=unmapped2classification,
+        mapping_quality=mapping_quality,
+        path_to_bwa=path_to_bwa,
+        path_to_samtools=path_to_samtools
+    )
+
     pass
 
