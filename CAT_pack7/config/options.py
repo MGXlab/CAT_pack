@@ -6,6 +6,7 @@ And can easily build or extend classes.
 """
 from dataclasses import dataclass, field
 from decimal import Decimal
+from enum import Enum
 from pathlib import Path
 from typing import Literal
 
@@ -98,3 +99,13 @@ class DownloadOptions(ExecutionOptions):
     out_dir: Path
     cleanup: bool = False
     no_log: bool = False
+
+
+class RatModes(str, Enum):
+    MCR = "mcr"
+    CR = "cr"
+    MR = "mr"
+
+@dataclass(frozen=True, kw_only=True)
+class RatOptions():
+    mode = RatModes
