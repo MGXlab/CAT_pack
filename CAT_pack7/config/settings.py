@@ -143,6 +143,24 @@ class BatSettings(ExecutionSettings, ClassificationSettings):
     no_stars: bool
 
 
+@dataclass(frozen=True)
+class RatFiles:
+    contigs_fasta: Path
+    read_files: tuple[Path, ...]
+    bam_files: tuple[Path, ...]
+    bin_paths: tuple[Path, ...]
+    bin2contigs: dict[str, list[str]]
+    contigs2classification: Path | None
+    bin2classification: Path | None
+    unmapped2classification: Path | None
+    unclassified_fasta: Path | None
+    alignment_unmapped: Path | None
+    contig_abundance: Path
+    complete_abundance: Path
+    bin_abundance: Path | None
+    read_classification: Path | None
+
+
 # Database preparation settings and outputs.
 @dataclass(frozen=True)
 class DiamondPrepareSettings:
@@ -161,7 +179,7 @@ class DiamondPrepareSettings:
         ]
         if not self.verbose:
             command.append("--quiet")
-        return command
+        return [str(arg) for arg in command if arg != ""]
 
 
 @dataclass(frozen=True)

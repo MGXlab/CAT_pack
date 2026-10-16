@@ -66,6 +66,8 @@ class AnnotationOptions(ExecutionOptions):
         return self.log_file if self.log_file is not None else Path(f"{self.output_prefix}.log")
 
 
+
+
 @dataclass(frozen=True, kw_only=True)
 class CatOptions(AnnotationOptions):
     contigs: Path
@@ -97,7 +99,7 @@ class RatOptions(AnnotationOptions):
     bin_suffix: str = ".fna"
     contigs2classification: Path | None = None
     bin2classification: Path | None = None
-    read2classification: bool
+    read2classification: bool = False
     unmapped2classification: Path | None = None
     mapping_quality: int = 2
     path_to_bwa: Path = 'bwa'
