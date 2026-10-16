@@ -640,4 +640,39 @@ def run_annotation_cli(arguments: CatOptions | BatOptions):
             border_style="green",
         ))
 
+@app.command("reads", hidden=True, deprecated=True)
+@app.command(options_metavar="-m [mode] -c [contigs] -t [database] [options]",
+             epilog="""Classification modes:
+    - 'mcr': integrate annotations from MAGs, contigs, and reads.
+    - 'cr': integrate annotations from contigs and reads.
+    - 'mr': integrate annotations from MAGs and reads.""")
+@with_option_groups(
+    execution=execution_options, diamond=diamond_options, mmseqs=mmseqs_options,
+    memory=memory_options,
+)
+def rat(contigs_fasta: Annotated[
+            Path, Option("--contigs_fasta", "-c" ,
+                   help="Contigs fasta file", metavar="<FILE[.gz|.bz2]>")
+        ],
+        taxonomy_folder: Annotated[
+            Path, Option("--taxonomy_folder", "-t" ,
+                         help="Directory that contains taxonomy files.", metavar="<DIR>")
+        ],
+        mode: Annotated[
+            str, Option("--mode", "-m")
+              ],
+
+        *, execution: ExecutionOptions,
+        diamond: DiamondOptions,
+        mmseqs: MMseqsOptions,
+        memory: MemoryOptions):
+    """Read Annotation Tool
+
+
+    Classification modes:
+    - 'mcr': integrate annotations from MAGs, contigs, and reads.
+    - 'cr': integrate annotations from contigs and reads.
+    - 'mr': integrate annotations from MAGs and reads.
+    """
+    pass
 
