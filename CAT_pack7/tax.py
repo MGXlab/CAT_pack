@@ -12,8 +12,8 @@ import numpy as np
 from numpy import dtype, ndarray
 from numpy.typing import ArrayLike, NDArray
 
+from CAT_pack7.utils.typing import Taxid
 from .io.reference_mapping import read_fastaid2LCAtaxid
-from .typing import Taxid
 from .utils.errors import InputError
 
 log = logging.getLogger("CAT_pack")
