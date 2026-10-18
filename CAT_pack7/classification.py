@@ -9,7 +9,7 @@ import numpy as np
 
 from . import tax
 from .io.parsers import AlignmentInput
-from .results import NO_HIT, Classification, ClassificationStatus
+from .results import Classification, ClassificationStatus
 
 log = logging.getLogger("CAT_pack")
 
@@ -87,8 +87,8 @@ class ClassificationEngine:
         n_ORFs = len(ORF_names)
 
         ORF2alignment_index = np.fromiter(
-            (alignment.orf_index.get(ORF, NO_HIT) for ORF in ORF_names), dtype=np.int64, count=n_ORFs)
-        ORF_has_hits = ORF2alignment_index != NO_HIT
+            (alignment.orf_index.get(ORF, ClassificationStatus.ORF.NO_HIT) for ORF in ORF_names), dtype=np.int64, count=n_ORFs)
+        ORF_has_hits = ORF2alignment_index != ClassificationStatus.ORF.NO_HIT
 
         alignment_indices = ORF2alignment_index[ORF_has_hits]
         hits_start = alignment.orf_offsets[alignment_indices]
