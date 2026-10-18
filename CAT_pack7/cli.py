@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import pprint
 import shlex
 import sys
 from contextlib import nullcontext
@@ -122,22 +121,17 @@ def update_progress(progress, tasks, step, status, completed=0, total=None):
 
 
 def argument_print(arguments, tool, log):
-    all_arguments = Text(pprint.pp(arguments))
-    
-    content = Group(
-        Text("Supplied command", style="bold"),
-        Text(f"$ {shlex.join(sys.argv)}", style="cyan"),
-        Text()
-    )
-    log.info(f"Command supplied: $ {shlex.join(sys.argv)}")
-    log.info(f"{arguments!r}")
-    
-        # print the group in a panel
-    if not arguments.quiet:
-        console.print(Panel(content, title="[bold]Rarw![/bold]",
-                                border_style="blue",), "\n")
-    
-    
+    content = [Text(f"CAT_pack v{about.__version__}\n", style='underline'),
+               Text("Running command", style="bold"),
+               Text(f"$ {shlex.join(sys.argv)}", style="cyan")]
+
+    if arguments.debug:
+        content.extend([Pretty(arguments)])
+    log.info(f"Running command: $ {shlex.join(sys.argv)}")
+    log.debug(f"{arguments!r}")
+
+    if not arguments.quiet: console.print(Panel(Group(*content), title=tool))
+
     if not arguments.quiet:
         console.print(f"Preparing for {tool} run\n\n")
     log.info(f"Preparing for {tool} run")
@@ -162,6 +156,8 @@ def download(
         debug=execution.debug,
         no_log=no_log,
     )
+    log = init_logging(args.debug, quiet=args.quiet, console=console)
+    argument_print(args, "download", log)
     progress, tasks = make_progress([step.name for step in build_plan(args)])
     progress.disable = args.quiet
     report = partial(update_progress, progress, tasks)
@@ -313,6 +309,8 @@ def prepare(
         debug=execution.debug,
     )
     args = make_prefix(args)
+    log = init_logging(args.debug, quiet=args.quiet, console=console)
+    argument_print(args, "prepare", log)
     progress, tasks = make_progress([step.name for step in build_plan(args)])
     progress.disable = execution.quiet
     report = partial(update_progress, progress, tasks)
@@ -680,7 +678,7 @@ def rat(contigs_fasta: Annotated[
             Path, Option("--contigs_fasta", "-c" ,
                    help="Contigs fasta file", metavar="<FILE[.gz|.bz2]>")
         ],
-        database: Annotated[Path, Option("--taxonomy_folder", "-t" ,
+        database: Annotated[Path, Option("--database", "-d",
                          help="Directory that contains database and taxonomy files", metavar="<DIR>")],
         mode: Annotated[RatModes,
                         Option("--mode", "-m", help="Classification mode")],
@@ -688,10 +686,10 @@ def rat(contigs_fasta: Annotated[
             Path,
             Option("--output-prefix", "--out_prefix", "-o", metavar="<prefix>", help="Prefix for output files.")
         ] = RatOptions.output_prefix,
-        read_file: Annotated[tuple[Path], Option("--read_file", "-r",
+        read_file: Annotated[list[Path], Option("--read_file", "--read-file", "-r",
                                     help="""Path to (paired-end) read file. Use --read_file path/to/read_file_1 --read_file path/to/read_file_2 to supply two files for paired-end reads""", metavar="<FILE[.gz|.bz2]>")] = RatOptions.read_file,
-        bam_file: Annotated[tuple[Path],
-        Option("--bam_file", "-b", help="Path to sorted mapping file.", metavar="<FILE[.gz|.bz2]>")] = RatOptions.bam_file,
+        bam_file: Annotated[list[Path],
+        Option("--bam_file", "--bam-file", help="Path to sorted BAM or SAM mapping file. Repeat for separate mate files.", metavar="<FILE>")] = RatOptions.bam_file,
         alignment_unmapped: Annotated[Path,
             Option("--alignment_unmapped",
                    help="Path to alignment file of reads and contigs "
@@ -701,15 +699,25 @@ def rat(contigs_fasta: Annotated[
         bin_suffix: Annotated[
             str, Option("--bin_suffix", "-s", help="Suffix of bins in bin directory")] = RatOptions.bin_suffix,
         contigs2classification: Annotated[
-            Path, Option("--c2c", help="Path to contign2classification file.", metavar="<FILE[.gz|.bz2]>")] = RatOptions.contigs2classification,
+            Path, Option("--c2c", help="Path to contig2classification file.", metavar="<FILE[.gz|.bz2]>")] = RatOptions.contigs2classification,
         bin2classification: Annotated[
             Path, Option("--b2c", help="Path to bin2classification file.", metavar="<FILE[.gz|.bz2]>")] = RatOptions.bin2classification,
         read2classification: Annotated[
-            bool, Option("--read2classification", help="Includes read classification step.")] = RatOptions.read2classification,
+            bool, Option("--read2classification", help="Write a classification row for each read/mate.")] = RatOptions.read2classification,
         unmapped2classification: Annotated[
             Path, Option("--u2c", help="Path to unmapped2classification file.", metavar="<FILE[.gz|.bz2]>")] = RatOptions.unmapped2classification,
         mapping_quality: Annotated[
-            int, Option("--mapping_quality", help="Minimum mapping quality phred score")] = RatOptions.mapping_quality,
+            int, Option("--mapping_quality", min=0, max=255, help="Minimum mapping quality phred score")] = RatOptions.mapping_quality,
+        proteins: Annotated[Path | None, Option("--proteins_fasta", "-p", help="Reuse predicted contig proteins for CAT/BAT.")] = RatOptions.proteins,
+        alignment: Annotated[Path | None, Option("--alignment_table", "-a", help="Reuse CAT/BAT protein alignments; also supply --proteins_fasta.")] = RatOptions.alignment,
+        range_: Annotated[float, Option("--range", min=0, max=100)] = float(RatOptions.range_),
+        fraction: Annotated[float, Option("--fraction", "-f", min=0, max=0.99)] = float(RatOptions.fraction),
+        top: Annotated[int, Option("--top", min=0, max=100)] = RatOptions.top,
+        tmpdir: Annotated[Path | None, Option("--tmpdir")] = RatOptions.tmpdir,
+        compress: Annotated[bool, Option("--compress", help="Compress generated CAT/BAT protein alignments.")] = RatOptions.compress,
+        no_stars: Annotated[bool, Option("--no-stars", "--no_stars")] = RatOptions.no_stars,
+        log_file: Annotated[Path | None, Option("--log-file")] = RatOptions.log_file,
+        aligner: Annotated[str, Option("--aligner", help="Protein aligner; direct nucleotide searches require DIAMOND.")] = RatOptions.aligner,
         # TODO: Look into the use of bwa mem 2 as well
         path_to_bwa: Annotated[
             Path, Option("--path_to_bwa", help="Path to bwa binaries. Supply if RAT cannot find bwa.", metavar="<EXC>")] = RatOptions.path_to_bwa,
@@ -726,8 +734,8 @@ def rat(contigs_fasta: Annotated[
         database=database,
         mode=mode,
         output_prefix=output_prefix,
-        read_file=read_file,
-        bam_file=bam_file,
+        read_file=tuple(read_file) if read_file else None,
+        bam_file=tuple(bam_file) if bam_file else None,
         alignment_unmapped=alignment_unmapped,
         bin_fasta_or_folder=bin_fasta_or_folder,
         bin_suffix=bin_suffix,
@@ -736,6 +744,16 @@ def rat(contigs_fasta: Annotated[
         read2classification=read2classification,
         unmapped2classification=unmapped2classification,
         mapping_quality=mapping_quality,
+        proteins=proteins,
+        alignment=alignment,
+        range_=Decimal(str(range_)),
+        fraction=Decimal(str(fraction)),
+        top=top,
+        tmpdir=tmpdir,
+        compress=compress,
+        no_stars=no_stars,
+        log_file=log_file,
+        aligner=aligner,
         path_to_bwa=path_to_bwa,
         path_to_samtools=path_to_samtools,
         diamond=diamond,
@@ -745,27 +763,13 @@ def rat(contigs_fasta: Annotated[
         quiet=execution.quiet,
         verbose=execution.verbose,
         debug=execution.debug,
-        # TODO add CAT/BAT specific arguments
     )
-
     log = init_logging(arguments.debug, quiet=arguments.quiet,
                        console=console)
     log.info("Loaded all arguments")
 
-    content = [Text(f"CAT_pack v{about.__version__}\n", style='underline'),
-        Text("Running command", style="bold"),
-        Text(f"$ {shlex.join(sys.argv)}", style="cyan")]
-
-    if arguments.debug:
-        content.extend([Pretty(arguments)])
-    log.info(f"Running command: $ {shlex.join(sys.argv)}")
-    log.info(f"{arguments!r}")
-
-    if not arguments.quiet: console.print(Panel(Group(*content), title=f"RAT"))
-
-    progress, tasks = make_progress(
-        [step.name for step in build_plan(arguments)],
-    )
+    argument_print(arguments, "RAT", log)
+    progress, tasks = make_progress([step.name for step in build_plan(arguments)])
     progress.disable = arguments.quiet
     report = partial(update_progress, progress, tasks)
     try:
@@ -781,9 +785,11 @@ def rat(contigs_fasta: Annotated[
 
     except Exception:
         log.exception("Unexpected error", exc_info=False)
-        log.error("Check the run log or use --debug for a full traceback")
         if arguments.debug:
             console.print_exception(show_locals=True)  # TODO: before release back to False
         raise typer.Exit(code=1)
+
+    if not arguments.quiet:
+        console.print(Panel(Text("Completed"),title="RAT completed", border_style="green"))
 
 
