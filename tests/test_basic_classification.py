@@ -6,7 +6,7 @@ import numpy as np
 from CAT_pack7.classification import ClassificationEngine
 from CAT_pack7.io.parsers import AlignmentInput
 from CAT_pack7.results import ClassificationStatus
-from CAT_pack7.tax import NO_TAXID, Taxonomy
+from CAT_pack7.tax import ORF, Taxonomy
 
 
 class BasicClassificationTests(unittest.TestCase):
@@ -35,7 +35,7 @@ class BasicClassificationTests(unittest.TestCase):
         result = engine.classify("contig", {"contig": ["contig_1"]}, alignment)
 
         self.assertEqual(result.get_status(0), ClassificationStatus.NO_HITS)
-        self.assertEqual(result.orf_lca.tolist(), [NO_TAXID])
+        self.assertEqual(result.orf_lca.tolist(), [ORF.NO_TAXID])
         self.assertEqual(result.orf_n_hits.tolist(), [0])
         self.assertEqual(list(result.get_assignments(0)), [])
 
