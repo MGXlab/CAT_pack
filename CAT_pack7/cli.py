@@ -6,6 +6,7 @@ from decimal import Decimal
 from functools import partial
 from pathlib import Path
 from typing import Annotated
+import pprint
 
 import typer
 from rich.console import Console, Group
@@ -116,6 +117,29 @@ def update_progress(progress, tasks, step, status, completed=0, total=None):
             progress.stop_task(task_id)
         case _: # catch all
             progress.update(task_id,status=status,refresh=True)
+
+
+def argument_print(arguments, tool):
+    all_arguments = Text(pprint.pp(arguments))
+    
+    content = Group(
+        Text("Supplied command", style="bold"),
+        Text(f"$ {shlex.join(sys.argv)}", style="cyan"),
+        Text(), info
+    )
+    log.info(f"Command supplied: $ {shlex.join(sys.argv)}")
+    log.info(f"{arguments!r}")
+    
+        # print the group in a panel
+    if not arguments.quiet:
+        console.print(Panel(content, title="[bold]Rarw![/bold]",
+                                border_style="blue",), "\n")
+    
+    
+    if not arguments.quiet:
+        console.print(f"Preparing for {tool} run\n\n")
+    log.info(f"Preparing for {tool} run")
+
 
 
 @app.command()
