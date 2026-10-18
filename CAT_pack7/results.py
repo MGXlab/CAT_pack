@@ -6,7 +6,6 @@ import numpy as np
 from .io.parsers import AlignmentInput
 from .tax import Taxonomy, WeightedLCA
 
-NO_HIT = -1
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +32,10 @@ class ClassificationStatus(IntEnum):
     NO_HITS = auto()
     NO_TAXIDS = auto()
     NO_LINEAGE_SUPPORT = auto()
+
+    class ORF(IntEnum):
+        NO_HIT = auto()
+        NO_TAXID = auto()
 
     @property
     def reason(self) -> str:
