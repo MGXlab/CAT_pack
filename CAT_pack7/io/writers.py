@@ -4,7 +4,7 @@ from typing import TextIO
 
 from .parsers import format_bitscore
 from ..results import Classification, ClassificationStatus, Lineage
-from ..tax import Taxonomy
+from ..tax import Taxonomy, ORF
 
 
 class ClassificationWriter:
@@ -85,12 +85,12 @@ class ClassificationWriter:
             prefix += f"\t{result.entities[entity]}"
 
         row = int(result.orf_row[orf])
-        if row == ClassificationStatus.ORF.NO_HIT:
+        if row == ORF.NO_HIT:
             self.orf_out.write(f"{prefix}\tORF has no hit to database\n")
             return
 
         taxid = int(result.orf_lca[orf])
-        if taxid == ClassificationStatus.ORF.NO_TAXID:
+        if taxid == ORF.NO_TAXID:
             hits = ";".join(result.alignment.hit_names_of(row))
             lineage = f"no taxid found ({hits})"
         else:

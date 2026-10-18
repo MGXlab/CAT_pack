@@ -4,6 +4,7 @@ import logging
 import sys
 from dataclasses import dataclass
 from decimal import Decimal
+from enum import IntEnum, auto
 from pathlib import Path
 from time import perf_counter
 from typing import Any, Iterable, Mapping, Sequence
@@ -15,10 +16,12 @@ from numpy.typing import ArrayLike, NDArray
 from CAT_pack7.utils.typing import Taxid
 from .io.reference_mapping import read_fastaid2LCAtaxid
 from .utils.errors import InputError
-from .results import ClassificationStatus
 
 log = logging.getLogger("CAT_pack")
 
+class ORF(IntEnum):
+    NO_HIT = auto()
+    NO_TAXID = auto()
 
 class Taxonomy:
     def __init__(
@@ -30,7 +33,7 @@ class Taxonomy:
         self.taxid_index: dict[str, int] = taxid_index
         self.taxids: list[str] = taxids
         self.no_rank: int = 1
-        self.no_taxid: int = ClassificationStatus.ORF.NO_TAXID
+        self.no_taxid: int = ORF.NO_TAXID
         self.prepare_LCA()
 
     @classmethod
@@ -236,7 +239,7 @@ def sum_bitscores(
     orf_type: NDArray[np.int64], lca_per_orf: NDArray[np.int32],
     top_bitscores: NDArray[np.int64], n: int,
 ) -> NDArray[np.int64]:
-    taxid_mask = lca_per_orf != ClassificationStatus.ORF.NO_TAXID
+    taxid_mask = lca_per_orf != ORF.NO_TAXID
     total_bitscore = np.zeros(n, dtype=np.int64)
     np.add.at(total_bitscore, orf_type[taxid_mask], top_bitscores[taxid_mask])
     return total_bitscore
@@ -247,7 +250,7 @@ def sum_taxid_bitscores(
 ) -> tuple[NDArray[np.int64], NDArray[np.int64], NDArray[np.int64]]:
     log.info("Starting support expansion.")
     stage_started: float = perf_counter()
-    orf_pos = np.flatnonzero(lca_per_orf != ClassificationStatus.ORF.NO_TAXID)
+    orf_pos = np.flatnonzero(lca_per_orf != ORF.NO_TAXID)
     known_orfs = len(orf_pos)
 
     orf_ids = orf_type[orf_pos]

@@ -16,7 +16,7 @@ MAX_FILTER_BYTES = 256 * 1024**2
 _hit_filter = None
 _hit_mask = 0
 
-
+# DEVNOTE: Multiple fastaid2LCAtaxid files? Could speed up parallel loading
 def read_fastaid2LCAtaxid(fastaid2LCAtaxid_file: Path, all_hits: set[str], workers: int = 1) -> dict[str, str]:
     log.info(f"Loading file {fastaid2LCAtaxid_file}.")
     workers = min(workers, MAX_WORKERS)

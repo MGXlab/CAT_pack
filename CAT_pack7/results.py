@@ -7,7 +7,6 @@ from .io.parsers import AlignmentInput
 from .tax import Taxonomy, WeightedLCA
 
 
-
 @dataclass(frozen=True, slots=True)
 class Lineage:
     taxids: tuple[str, ...]
@@ -32,10 +31,6 @@ class ClassificationStatus(IntEnum):
     NO_HITS = auto()
     NO_TAXIDS = auto()
     NO_LINEAGE_SUPPORT = auto()
-
-    class ORF(IntEnum):
-        NO_HIT = auto()
-        NO_TAXID = auto()
 
     @property
     def reason(self) -> str:
