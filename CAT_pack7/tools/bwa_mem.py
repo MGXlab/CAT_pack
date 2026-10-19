@@ -36,7 +36,7 @@ def run_bwa_mem(settings: RatSettings, report)-> None:
             else:
                 log.info("Indexing contigs FASTA...")
                 run_tool([str(settings.bwa), "index", str(files.contigs_fasta)],
-                    "BWA","index")
+                    "BWA MEM","index")
         except Exception as error:
             log.exception(error)
             raise ExternalToolError("BWA MEM", "An error occured during indexing (or checking for indexing): {error}")

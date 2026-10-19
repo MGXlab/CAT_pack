@@ -171,6 +171,8 @@ class RatSettings(ExecutionSettings):
     bwa: Path
     samtools: Path
     sort_memory_mib: int | None = None
+    cat: CatSettings | None = None
+    bat: BatSettings | None = None
 
 
 # Database preparation settings and outputs.

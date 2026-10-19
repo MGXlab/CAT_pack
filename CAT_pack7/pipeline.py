@@ -1,6 +1,6 @@
 import logging
 from contextlib import ExitStack
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from tarfile import TarError
 from typing import Any, Callable
@@ -13,7 +13,7 @@ from .classification import ClassificationEngine
 from .config.options import BatOptions, CatOptions, PrepareOptions, DownloadOptions, RatOptions
 from .config.settings import BatFiles, BatSettings, CatFiles, CatSettings, DownloadOutputs
 from .config.validation import check_orfs_match_contigs, get_file_names, get_validated_settings, make_prefix, \
-    validate_download, get_download_file_names
+    validate_download, get_download_file_names, make_cat_options, make_bat_options
 from .io.parsers import ClassificationParser
 from .io.writers import ClassificationWriter
 from .prepare import (
@@ -89,8 +89,10 @@ def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | Dow
         return [
             Step("Input validation"),
             Step("Read mapping", supplied=bool(args.bam_file), runner=run_bwa_mem),
-            *([Step("Classify contigs", supplied=args.contigs2classification is not None)] if "c" in mode else []),
-            *([Step("Classify bins", supplied=args.bin2classification is not None)] if "m" in mode else []),
+            *(annotation_steps(make_cat_options(args), "cat", "Contigs",
+                               args.contigs2classification is not None) if "c" in mode else []),
+            *(annotation_steps(make_bat_options(args), "bat", "Bins",
+                               args.bin2classification is not None) if "m" in mode else []),
             Step("Process mappings"),
             *([Step("Extract unclassified sequences")] if needs_sequences else []),
             *([Step("Align unclassified sequences",supplied=args.alignment_unmapped is not None)] if needs_alignment else []),
@@ -242,6 +244,23 @@ def run_download(
         raise
     finally:
         locks.close()
+
+def annotation_steps(options, settings_name: str, label: str, supplied: bool) -> list[Step]:
+    if supplied:
+        return [Step(f"Classify {label.lower()}", supplied=True)]
+
+    def adapt(step):
+        name = f"{label}: {step.name}"
+
+        def runner(settings, report):
+            def forward_progress(_, status, completed, total):
+                report(name, status, completed, total)
+
+            return step.runner(getattr(settings, settings_name), forward_progress)
+
+        return replace(step, name=name, runner=runner)
+
+    return [adapt(step) for step in build_plan(options)[1:]]
 
 
 def run(args: CatOptions | BatOptions | RatOptions | PrepareOptions, report: Report):

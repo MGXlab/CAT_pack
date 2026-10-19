@@ -1,13 +1,13 @@
 import logging
 import shutil
 import sys
-from dataclasses import replace
+from dataclasses import replace, fields
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
 from .options import AlignerName, BatOptions, CatOptions, ExecutionOptions, DiamondOptions, PrepareOptions, \
-    MemoryOptions, DownloadOptions, RatOptions
+    MemoryOptions, DownloadOptions, RatOptions, AnnotationOptions
 from .settings import (
     BatFiles, BatSettings, CatFiles, CatSettings, ClassificationSettings, DatabaseFiles, DiamondParameters,
     DiamondPrepareSettings, DiamondSettings, ExecutionSettings, MMseqsPrepareSettings,
@@ -482,24 +482,58 @@ def validate_rat_files(args: RatOptions) -> RatFiles:
     return replace(files, outputs=tuple(output_files))
 
 
+
+def make_cat_options(args: RatOptions) -> CatOptions:
+    shared = {
+        field.name: getattr(args, field.name)
+        for field in fields(AnnotationOptions)
+    }
+
+    shared.update(
+        output_prefix=Path(f"{args.output_prefix}.CAT"),
+        log_file=args.log_path,
+    )
+
+    return CatOptions(
+        contigs=args.contigs_fasta,
+        **shared,
+    )
+
+def make_bat_options(args: RatOptions) -> BatOptions:
+    shared = {field.name: getattr(args, field.name) for field in fields(AnnotationOptions)}
+    shared.update(output_prefix=Path(f"{args.output_prefix}.BAT"), log_file=args.log_path)
+    return BatOptions(bins=args.bin_fasta_or_folder, bin_suffix=args.bin_suffix,
+                      no_stars=args.no_stars, **shared)
+
+
+def validate_rat(args: RatOptions) -> RatSettings:
+    files = validate_rat_files(args)
+    execution = validate_execution(args)
+    bwa = shutil.which(str(args.path_to_bwa))
+    samtools = shutil.which(str(args.path_to_samtools))
+    if bwa is None:
+        raise InputError("BWA executable not found.")
+    if samtools is None:
+        raise InputError("SAMtools executable not found.")
+    cat_settings = None
+    if "c" in args.mode.value and args.contigs2classification is None:
+        cat_settings = validate_cat(make_cat_options(args))
+    bat_settings = None
+    if "m" in args.mode.value and args.bin2classification is None:
+        bat_settings = validate_cat(make_bat_options(args))
+
+    return RatSettings(
+        files=files, log_file=args.log_path,
+        bwa=Path(bwa), samtools=Path(samtools),
+        sort_memory_mib=args.sort_memory_mib,
+        threads=execution.threads, quiet=execution.quiet,
+        verbose=execution.verbose, debug=execution.debug,
+        memory=execution.memory, cat=cat_settings, bat=bat_settings
+    )
+
 def get_validated_settings(args: CatOptions | BatOptions | RatOptions | PrepareOptions) -> CatSettings | BatSettings | RatSettings | PrepareSettings:
     if isinstance(args, RatOptions):
-        files = validate_rat_files(args)
-        execution = validate_execution(args)
-        bwa = shutil.which(str(args.path_to_bwa))
-        samtools = shutil.which(str(args.path_to_samtools))
-        if bwa is None:
-            raise InputError("BWA executable not found.")
-        if samtools is None:
-            raise InputError("SAMtools executable not found.")
-        return RatSettings(
-            files=files, log_file=args.log_path,
-            bwa=Path(bwa), samtools=Path(samtools),
-            sort_memory_mib=args.sort_memory_mib,
-            threads=execution.threads, quiet=execution.quiet,
-            verbose=execution.verbose, debug=execution.debug,
-            memory=execution.memory,
-        )
+        return validate_rat(args)
     if isinstance(args, (CatOptions, BatOptions)):
         log.debug(f"Starting validation on CatOptions or BatOptions")
         return validate_cat(args)
