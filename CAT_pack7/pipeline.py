@@ -40,6 +40,9 @@ class Step:
     citation: str | None = None
     runner: Callable[[Any, Report], Any] | None = None
     result: Any = None
+    parent: str | None = None
+    display_name: str | None = None
+    unit: str | None = None
 
     def __str__(self) -> str:
         return self.name
@@ -79,7 +82,8 @@ def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | Dow
                 runner=lambda settings, report: run_aligner(settings.aligner, report),
                 citation="Please cite DIAMOND when using CAT or BAT in your publication."
             ),
-            Step("Classify", runner=run_classification),
+            Step("Classify", runner=run_classification,
+                 unit="bins" if isinstance(args, BatOptions) else "contigs"),
         ]
     if isinstance(args, RatOptions):
         mode = args.mode.value
@@ -258,7 +262,8 @@ def annotation_steps(options, settings_name: str, label: str, supplied: bool) ->
 
             return step.runner(getattr(settings, settings_name), forward_progress)
 
-        return replace(step, name=name, runner=runner)
+        return replace(step, name=name, runner=runner,
+                       parent=f"Classify {label.lower()}", display_name=step.name)
 
     return [adapt(step) for step in build_plan(options)[1:]]
 
