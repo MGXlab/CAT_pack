@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 from tarfile import TarError
+from typing import Iterable, Any
 
 from CAT_pack7.io.download import (
     DownloadQueueReport, DownloadReport, multi_download,
@@ -41,6 +42,7 @@ class Step:
     citation: str | None = None
     runner: callable | None = None
     tool_name: str | None = None
+    result: Iterable[str] | None = None
 
 
     def __str__(self) -> str:
@@ -68,8 +70,9 @@ def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | Dow
                 citation="Please cite Pyrodigal and Prodigal when using CAT or BAT in your publication.",
                 runner=run_protein_prediction, tool_name="Pyrodigal"
             ),
-            Step("Alignment", supplied=args.alignment is not None),
-            Step("Classify"),
+            Step("Alignment", supplied=args.alignment is not None,
+                 runner=run_aligner, tool_name="DIAMOND"),
+            Step("Classify", runner=run_classification),
         ]
     if isinstance(args, RatOptions):
         mode = args.mode.value
@@ -246,10 +249,11 @@ def run_annotation(
 
 def run_classification(
     settings: CatSettings | BatSettings,
-    files: CatFiles | BatFiles,
     report: Report,
+    *args: Any,
 ) -> tuple[int, int, str, Decimal]:
     """Load inputs, classify all entities, then write their reports."""
+    files: CatFiles | BatFiles = settings.files
     log = logging.getLogger("CAT_pack")
     inputs = ClassificationParser(
         files, settings.range_, workers=settings.threads
@@ -482,14 +486,21 @@ def run(args, report: Report):
         report(current_step.name, Status.COMPLETE, 1, 1)
         log.info(f"Completed: {current_step.name}")
 
-        for step_index, current_step in enumerate(plan):
+        for step_index, current_step in enumerate(plan[1:], start=1):
             if current_step.supplied:
                 report(current_step.name, Status.SUPPLIED, 1, 1)
                 log.info(f"Supplied file: {current_step.name}")
                 continue
             log.info(f"Starting: {current_step.name}")
-            current_step.runner(settings, report, current_step.tool_name)
-
+            current_step.result = current_step.runner(settings, report, current_step.tool_name)
+            completed_steps.append(current_step)
+        return {
+            "Results": completed_steps[-1].result,
+            "Steps": completed_steps,
+            "Classifications": settings.files.report,
+            "ORF classifications": settings.files.orf_report,
+            "Log": settings.log_file,
+        }
 
 
 
