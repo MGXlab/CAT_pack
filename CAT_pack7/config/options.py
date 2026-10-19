@@ -108,6 +108,7 @@ class RatOptions(AnnotationOptions):
     no_stars: bool = False
     path_to_bwa: Path = 'bwa'
     path_to_samtools: Path = 'samtools'
+    sort_memory_mib: int | None = None
 
 
 @dataclass(frozen=True, kw_only=True)

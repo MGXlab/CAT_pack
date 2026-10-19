@@ -723,6 +723,7 @@ def rat(contigs_fasta: Annotated[
             Path, Option("--path_to_bwa", help="Path to bwa binaries. Supply if RAT cannot find bwa.", metavar="<EXC>")] = RatOptions.path_to_bwa,
         path_to_samtools: Annotated[
             Path, Option("--path_to_samtools", help="Path to Samtools binaries. Supply if RAT cannot find Samtools.", metavar="<EXC>")] = RatOptions.path_to_samtools,
+        sort_memory_mib: Annotated[int | None, Option("--sort-memory-mib", min=1, help="SAMtools sort memory per thread in MiB")] = RatOptions.sort_memory_mib,
         *, execution: ExecutionOptions,
         diamond: DiamondOptions,
         mmseqs: MMseqsOptions,
@@ -756,6 +757,7 @@ def rat(contigs_fasta: Annotated[
         aligner=aligner,
         path_to_bwa=path_to_bwa,
         path_to_samtools=path_to_samtools,
+        sort_memory_mib=sort_memory_mib,
         diamond=diamond,
         mmseqs=mmseqs,
         memory=memory,

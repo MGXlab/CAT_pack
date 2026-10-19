@@ -24,7 +24,7 @@ def run_bwa_mem(settings: RatSettings, report)-> None:
     log.info(
         "Running bwa mem for read mapping. File {0}.sorted will be "
         "generated. Do not forget to cite bwa mem and Samtools when using "
-        "RAT in your publication!".format(files.mapping_bam))
+        "RAT in your publication!".format(files.mapping_sam))
     with (
         tempfile.TemporaryDirectory(prefix="RAT-", dir=files.bam_files[0].parent) as tmp,
         tool_output("BWA MEM") as bwa_output,
@@ -71,6 +71,8 @@ def run_bwa_mem(settings: RatSettings, report)-> None:
                     "-o", str(tmp_bam_file),
                     "-"
                 ]
+                if settings.sort_memory_mib is not None:
+                    command[2:2] = ["-m", f"{settings.sort_memory_mib}M"]
 
                 samtools_process = subprocess.Popen(command, stdin=bwa_process.stdout,
                                                     stdout=samtools_output,
