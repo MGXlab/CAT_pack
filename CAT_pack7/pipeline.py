@@ -39,6 +39,8 @@ class Step:
     name: str
     supplied: bool = False
     citation: str | None = None
+    runner: callable | None = None
+    tool_name: str | None = None
 
 
     def __str__(self) -> str:
@@ -64,6 +66,7 @@ def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | Dow
             Step(
                 "Protein prediction", supplied=args.proteins is not None,
                 citation="Please cite Pyrodigal and Prodigal when using CAT or BAT in your publication.",
+                runner=run_protein_prediction, tool_name="Pyrodigal"
             ),
             Step("Alignment", supplied=args.alignment is not None),
             Step("Classify"),
@@ -460,5 +463,65 @@ def run_download(
         raise
     finally:
         locks.close()
+
+
+def run(args, report: Report):
+    log = logging.getLogger("CAT_pack")
+    plan = build_plan(args)
+    completed_steps: list[Step] = []
+    step_index = 0
+    current_step = plan[step_index]
+    locks = ExitStack()
+
+    try:
+
+        log.info("Doing some pre-flight checks first.")
+        report(current_step.name, Status.RUNNING, 0, 1)
+        log.info(f"Starting: {current_step.name}")
+        settings = get_validated_settings(args)
+        report(current_step.name, Status.COMPLETE, 1, 1)
+        log.info(f"Completed: {current_step.name}")
+
+        for step_index, current_step in enumerate(plan):
+            if current_step.supplied:
+                report(current_step.name, Status.SUPPLIED, 1, 1)
+                log.info(f"Supplied file: {current_step.name}")
+                continue
+            log.info(f"Starting: {current_step.name}")
+            current_step.runner(settings, report, current_step.tool_name)
+
+
+
+
+
+
+
+    except KeyboardInterrupt:
+        report(current_step.name, Status.CANCELLED, 0, None)
+
+        for skipped_steps in plan[step_index + 1:]:
+            report(skipped_steps.name, Status.SKIPPED, 0, None)
+
+        if log is not None: log.error("Run cancelled")
+        raise
+
+    except Exception as error:
+        report(current_step.name, Status.FAILED, 0, None)
+        for remaining_step in plan[step_index + 1:]:
+            report(remaining_step.name, Status.SKIPPED, 0, None)
+
+        if isinstance(error, OSError):
+            error = CatError(str(error), path=args.output_prefix)
+        if isinstance(error, CatError):
+            error.step = current_step.name
+            error.log_file = args.log_path if args.log_path.is_file() else None
+            raise error
+        # TODO: REMOVE incomplete files
+        # Catch all other exceptions
+        raise
+    finally:
+        locks.close()
+
+
 
 
