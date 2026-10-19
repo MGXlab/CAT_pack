@@ -109,10 +109,6 @@ def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | Dow
     raise CatError("I haven't figured out how to build that specific plan")
 
 
-def run_rat(args: RatOptions, report: Report):
-    return "YES"
-
-
 def run_classification(settings: CatSettings | BatSettings, report: Report) -> tuple[int, int, str, Decimal]:
     """Load inputs, classify all entities, then write their reports."""
     files: CatFiles | BatFiles = settings.files
@@ -247,7 +243,7 @@ def run_download(
         locks.close()
 
 
-def run(args: CatOptions | BatOptions | PrepareOptions, report: Report):
+def run(args: CatOptions | BatOptions | RatOptions | PrepareOptions, report: Report):
     log = logging.getLogger("CAT_pack")
 
     is_prepare = isinstance(args, PrepareOptions)
@@ -282,6 +278,8 @@ def run(args: CatOptions | BatOptions | PrepareOptions, report: Report):
                 continue
             report(current_step.name, Status.RUNNING, 0, None)
             log.info(f"Starting: {current_step.name}")
+            if current_step.runner is None:
+                raise CatError(f"{current_step.name} is not implemented yet.")
             current_step.result = current_step.runner(settings, report)
             report(current_step.name, Status.COMPLETE, 1, 1)
             log.info(f"Completed: {current_step.name}")
@@ -289,6 +287,13 @@ def run(args: CatOptions | BatOptions | PrepareOptions, report: Report):
         if is_prepare:
             log.info("Preparation complete. Use -d %s with CAT_pack7 CAT or BAT.", settings.files.data_folder)
             return 0
+        if isinstance(args, RatOptions):
+            return {
+                "Steps": completed_steps,
+                "Contig abundance": settings.files.contig_abundance,
+                "Complete abundance": settings.files.complete_abundance,
+                "Log": settings.log_file,
+            }
         return {
             "Results": completed_steps[-1].result,
             "Steps": completed_steps,
