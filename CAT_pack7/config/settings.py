@@ -159,6 +159,8 @@ class RatFiles:
     complete_abundance: Path
     bin_abundance: Path | None
     read_classification: Path | None
+    mapping_sam: Path | None = None
+    mapping_bam: Path | None = None
     outputs: tuple[Path, ...] = ()
 
 
@@ -166,6 +168,8 @@ class RatFiles:
 class RatSettings(ExecutionSettings):
     files: RatFiles
     log_file: Path
+    bwa: Path
+    samtools: Path
 
 
 # Database preparation settings and outputs.

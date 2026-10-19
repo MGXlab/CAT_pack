@@ -22,6 +22,7 @@ from .prepare import (
     write_taxids_with_multiple_offspring_file,
 )
 from .tools.aligner import run_aligner
+from .tools.bwa_mem import run_bwa_mem
 from .tools.pyrodigal import run_protein_prediction
 from .utils.errors import CatError
 from .utils.locking import lock_outputs
@@ -87,7 +88,7 @@ def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | Dow
 
         return [
             Step("Input validation"),
-            Step("Read mapping", supplied=bool(args.bam_file)),
+            Step("Read mapping", supplied=bool(args.bam_file), runner=run_bwa_mem),
             *([Step("Classify contigs", supplied=args.contigs2classification is not None)] if "c" in mode else []),
             *([Step("Classify bins", supplied=args.bin2classification is not None)] if "m" in mode else []),
             Step("Process mappings"),

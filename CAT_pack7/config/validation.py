@@ -404,17 +404,20 @@ def validate_rat_files(args: RatOptions) -> RatFiles:
         for read_file in args.read_file:
             read_files.append(checks.check(check_file_not_empty, read_file, "Read file"))
 
+    mapping_sam = None
+    mapping_bam = None
+    bam_files = ()
     if args.bam_file is not None:
         if len(args.bam_file) > 2:
             checks.add(InputError("Too many bam files", hint="supply one or two bam files. One is preferred"))
         for bam_file in args.bam_file:
             checks.check(check_file_not_empty, bam_file, "Bam file")
         bam_files = args.bam_file
-    else:
-        bam_files = (Path(f"{prefix}.mapped.sorted.bam"),)
-        output_files += [*bam_files, Path(f"{prefix}.mapping.sam"), Path(f"{prefix}.mapping.contigs.fna")]
-        output_files += [Path(f"{prefix}.bwa_index.{suffix}") for suffix in ("amb", "ann", "bwt", "pac", "sa")]
-        output_files += [Path(f"{prefix}.mapping.reads{i}.fna") for i, file in enumerate(read_files, 1) if file.suffix == ".bz2"]
+    elif args.read_file:
+        mapping_sam = Path(f"{prefix}.{args.contigs_fasta.name}.{args.read_file[0].name}.bwamem")
+        mapping_bam = Path(f"{mapping_sam}.bam")
+        bam_files = (Path(f"{mapping_sam}.sorted"),)
+        output_files += [mapping_sam, mapping_bam, *bam_files]
 
     if not args.read_file and not args.bam_file:
         checks.add(InputError("No read files or bam files supplied.", hint="supply read files (--read_file) or bam files (--bam_file)."))
@@ -450,6 +453,8 @@ def validate_rat_files(args: RatOptions) -> RatFiles:
         contigs_fasta=args.contigs_fasta,
         read_files=tuple(read_files),
         bam_files=bam_files,
+        mapping_sam=mapping_sam,
+        mapping_bam=mapping_bam,
         bin_paths=bins.bin_paths if bins else (),
         bin2contigs=bins.bin2contigs if bins else {},
         contigs2classification=c2c if "c" in args.mode.value else None,
@@ -479,8 +484,15 @@ def get_validated_settings(args: CatOptions | BatOptions | RatOptions | PrepareO
     if isinstance(args, RatOptions):
         files = validate_rat_files(args)
         execution = validate_execution(args)
+        bwa = shutil.which(str(args.path_to_bwa))
+        samtools = shutil.which(str(args.path_to_samtools))
+        if bwa is None:
+            raise InputError("BWA executable not found.")
+        if samtools is None:
+            raise InputError("SAMtools executable not found.")
         return RatSettings(
             files=files, log_file=args.log_path,
+            bwa=Path(bwa), samtools=Path(samtools),
             threads=execution.threads, quiet=execution.quiet,
             verbose=execution.verbose, debug=execution.debug,
             memory=execution.memory,
