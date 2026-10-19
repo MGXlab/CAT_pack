@@ -162,6 +162,12 @@ class RatFiles:
     outputs: tuple[Path, ...] = ()
 
 
+@dataclass(frozen=True)
+class RatSettings(ExecutionSettings):
+    files: RatFiles
+    log_file: Path
+
+
 # Database preparation settings and outputs.
 @dataclass(frozen=True)
 class DiamondPrepareSettings:

@@ -27,7 +27,7 @@ from .cli_options import (
 from .config.options import BatOptions, CatOptions, ExecutionOptions, DiamondOptions, MMseqsOptions, PrepareOptions, \
     MemoryOptions, DownloadOptions, RatModes, RatOptions
 from .config.validation import get_file_names, make_prefix
-from .pipeline import build_plan, Status, run_download, run_rat, run
+from .pipeline import build_plan, Status, run_download, run
 from .utils.errors import CatError, show_error
 from .utils.logging import init_logging
 
@@ -774,7 +774,7 @@ def rat(contigs_fasta: Annotated[
     report = partial(update_progress, progress, tasks)
     try:
         with progress:
-            outputs = run_rat(arguments, report)
+            outputs = run(arguments, report)
     except KeyboardInterrupt:
         console.print("\nRun cancelled :(")
         raise typer.Exit(code=130)
