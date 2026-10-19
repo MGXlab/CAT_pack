@@ -86,6 +86,9 @@ class RatModes(str, Enum):
     MCR = "mcr"
     CR = "cr"
     MR = "mr"
+    MC = "mc"
+    C = "c"
+    M = "m"
 
 @dataclass(frozen=True, kw_only=True)
 class RatOptions(AnnotationOptions):
@@ -102,6 +105,7 @@ class RatOptions(AnnotationOptions):
     read2classification: bool = False
     unmapped2classification: Path | None = None
     mapping_quality: int = 2
+    no_stars: bool = False
     path_to_bwa: Path = 'bwa'
     path_to_samtools: Path = 'samtools'
 

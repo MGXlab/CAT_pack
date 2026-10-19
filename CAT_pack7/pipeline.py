@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 from tarfile import TarError
-from typing import Iterable, Any, Callable
+from typing import Any, Callable
 
 from CAT_pack7.io.download import (
     DownloadQueueReport, DownloadReport, multi_download,

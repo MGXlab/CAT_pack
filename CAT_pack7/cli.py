@@ -27,7 +27,7 @@ from .cli_options import (
 from .config.options import BatOptions, CatOptions, ExecutionOptions, DiamondOptions, MMseqsOptions, PrepareOptions, \
     MemoryOptions, DownloadOptions, RatModes, RatOptions
 from .config.validation import get_file_names, make_prefix
-from .pipeline import run_annotation, build_plan, Status, run_prepare, run_download, run_rat, run
+from .pipeline import build_plan, Status, run_download, run_rat, run
 from .utils.errors import CatError, show_error
 from .utils.logging import init_logging
 
