@@ -2,7 +2,6 @@ import logging
 from contextlib import ExitStack
 from dataclasses import dataclass
 from decimal import Decimal
-from pathlib import Path
 from tarfile import TarError
 from typing import Any, Callable
 
@@ -12,9 +11,9 @@ from CAT_pack7.io.download import (
 )
 from .classification import ClassificationEngine
 from .config.options import BatOptions, CatOptions, PrepareOptions, DownloadOptions, RatOptions
-from .config.settings import BatFiles, BatSettings, CatFiles, CatSettings, DiamondSettings, DownloadOutputs
+from .config.settings import BatFiles, BatSettings, CatFiles, CatSettings, DownloadOutputs
 from .config.validation import check_orfs_match_contigs, get_file_names, get_validated_settings, make_prefix, \
-    validate_prepare, validate_download, get_download_file_names
+    validate_download, get_download_file_names
 from .io.parsers import ClassificationParser
 from .io.writers import ClassificationWriter
 from .prepare import (
@@ -83,60 +82,20 @@ def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | Dow
         ]
     if isinstance(args, RatOptions):
         mode = args.mode.value
-        direct_classification = "r" in mode
-        needs_alignment = (
-                direct_classification
-                and args.unmapped2classification is None
-        )
-        needs_sequences = (
-                needs_alignment
-                and args.alignment_unmapped is None
-        )
+        needs_alignment = ("r" in mode and args.unmapped2classification is None)
+        needs_sequences = (needs_alignment and args.alignment_unmapped is None)
 
         return [
             Step("Input validation"),
             Step("Read mapping", supplied=bool(args.bam_file)),
-
-            *([
-                  Step(
-                      "Classify contigs",
-                      supplied=args.contigs2classification is not None,
-                  ),
-              ] if "c" in mode else []),
-
-            *([
-                  Step(
-                      "Classify bins",
-                      supplied=args.bin2classification is not None,
-                  ),
-              ] if "m" in mode else []),
-
+            *([Step("Classify contigs", supplied=args.contigs2classification is not None)] if "c" in mode else []),
+            *([Step("Classify bins", supplied=args.bin2classification is not None)] if "m" in mode else []),
             Step("Process mappings"),
-
-            *([
-                  Step("Extract unclassified sequences"),
-              ] if needs_sequences else []),
-
-            *([
-                  Step(
-                      "Align unclassified sequences",
-                      supplied=args.alignment_unmapped is not None,
-                  ),
-              ] if needs_alignment else []),
-
-            *([
-                  Step(
-                      "Classify unclassified sequences",
-                      supplied=args.unmapped2classification is not None,
-                  ),
-              ] if direct_classification else []),
-
+            *([Step("Extract unclassified sequences")] if needs_sequences else []),
+            *([Step("Align unclassified sequences",supplied=args.alignment_unmapped is not None)] if needs_alignment else []),
+            *([Step("Classify unclassified sequences",supplied=args.unmapped2classification is not None)] if "r" in mode else []),
             Step("Calculate abundances"),
-
-            *([
-                  Step("Assign read classifications"),
-              ] if args.read2classification else []),
-
+            *([Step("Assign read classifications")] if args.read2classification else []),
             Step("Write reports"),
         ]
     if isinstance(args, DownloadOptions):
@@ -154,111 +113,7 @@ def run_rat(args: RatOptions, report: Report):
     return "YES"
 
 
-def run_annotation(
-    args: CatOptions | BatOptions, report: Report,
-) -> dict[str, Path | tuple[int, int, str, Decimal] | list[Step]]:
-    """Bin/Contig annotation tool (BAT/CAT) run"""
-    results = None
-    is_bat = isinstance(args, BatOptions)
-
-    plan = build_plan(args)
-    completed_steps: list[Step] = []
-    step_index = 0
-    current_step = plan[step_index]
-    log = logging.getLogger("CAT_pack")
-    locks = ExitStack()
-
-    try:
-        locks.enter_context(lock_outputs([args.output_prefix, args.log_path]))
-        if args.alignment is None:
-            tmpdir = args.tmpdir if args.tmpdir is not None else args.output_prefix.parent / "tmp"
-            tmpdir.parent.mkdir(parents=True, exist_ok=True)
-            locks.enter_context(lock_outputs([tmpdir]))
-
-        locks.enter_context(file_logging(log, args.log_path, args.debug))
-
-        planned_steps = ", ".join(step.name for step in plan[1:] if not step.supplied)
-        log.info(f"{'BAT' if is_bat else 'CAT'} is running. Planned steps: {planned_steps}.")
-        log.info("Doing some pre-flight checks first.")
-        report(current_step.name, Status.RUNNING, 0, 1)
-        log.info(f"Starting: {current_step.name}")
-        settings = get_validated_settings(args)
-        report(current_step.name, Status.COMPLETE, 1, 1)
-        log.info(f"Completed: {current_step.name}")
-        completed_steps.append(current_step)
-        if is_bat:
-            log.info("Ready to fly!\n\n-----------------\n")
-
-        for step_index, current_step in enumerate(plan[1:], start=1):
-            if current_step.supplied:
-                report(current_step.name, Status.SUPPLIED, 1, 1)
-                log.info(f"Supplied file: {current_step.name}")
-                continue
-            report(current_step.name, Status.RUNNING, 0, None)
-            log.info(f"Starting: {current_step.name}")
-
-            if current_step.name == "Protein prediction":
-                run_protein_prediction(settings, report, "pyrodigal")
-            elif current_step.name == "Alignment":
-                run_aligner(settings.aligner, report)
-                if isinstance(settings.aligner, DiamondSettings):
-                    current_step.citation = (
-                        "Please cite DIAMOND when using CAT or BAT in your publication."
-                    )
-            elif current_step.name == "Classify":
-                results = run_classification(settings, settings.files, report)
-            else:
-                log.error(f"Can't spell that well, my misspelling:"
-                          f"{current_step.name}")
-
-            # always complete the step with 1 of 1 so 100% completion,
-            # errors will have caused the code to stop before this if there is
-            # an exception.
-            report(current_step.name, Status.COMPLETE, 1, 1)
-            log.info(f"Completed: {current_step.name}")
-            completed_steps.append(current_step)
-
-        return {
-            "Results": results,
-            "Steps": completed_steps,
-            f"{'Bin' if is_bat else 'Contig'} Classifications": settings.files.report,
-            "ORF classifications": settings.files.orf_report,
-            "Log": settings.log_file,
-        }
-    # TODO: Move files from temp to final out
-
-    except KeyboardInterrupt:
-        report(current_step.name, Status.CANCELLED, 0, None)
-
-        for skipped_steps in plan[step_index + 1:]:
-            report(skipped_steps.name, Status.SKIPPED, 0, None)
-
-        if log is not None: log.error("Run cancelled")
-        raise
-
-    except Exception as error:
-        report(current_step.name, Status.FAILED, 0, None)
-        for remaining_step in plan[step_index + 1:]:
-            report(remaining_step.name, Status.SKIPPED, 0, None)
-
-        if isinstance(error, OSError):
-            error = CatError(str(error), path=args.output_prefix)
-        if isinstance(error, CatError):
-            error.step = current_step.name
-            error.log_file = args.log_path if args.log_path.is_file() else None
-            raise error
-        # TODO: REMOVE incomplete files
-        # Catch all other exceptions
-        raise
-    finally:
-        locks.close()
-
-
-def run_classification(
-    settings: CatSettings | BatSettings,
-    report: Report,
-    *args: Any,
-) -> tuple[int, int, str, Decimal]:
+def run_classification(settings: CatSettings | BatSettings, report: Report) -> tuple[int, int, str, Decimal]:
     """Load inputs, classify all entities, then write their reports."""
     files: CatFiles | BatFiles = settings.files
     log = logging.getLogger("CAT_pack")
@@ -309,12 +164,7 @@ def run_classification(
     return n_classified, total, inputs.entity_type, settings.fraction
 
 
-def classification_summary(
-    n_classified: int,
-    total: int,
-    entity_type: str,
-    fraction: Decimal,
-) -> None:
+def classification_summary(n_classified: int, total: int, entity_type: str, fraction: Decimal) -> None:
     log = logging.getLogger("CAT_pack")
     tool = "CAT"
     if entity_type == "bin":
@@ -330,69 +180,6 @@ def classification_summary(
         log.warning(
             f"since f is set to smaller than 0.5, one {entity_type} may have multiple classifications."
         )
-
-
-def run_prepare(args: PrepareOptions, report: Report):
-    args = make_prefix(args)
-    files = get_file_names(args)
-    plan = build_plan(args, files)
-    step_index = 0
-    current_step = plan[step_index]
-    log = logging.getLogger("CAT_pack")
-    locks = ExitStack()
-    settings = None
-
-    try:
-        files.data_folder.parent.mkdir(parents=True, exist_ok=True)
-        locks.enter_context(lock_outputs([files.data_folder]))
-        plan = build_plan(args, files)
-        for step_index, current_step in enumerate(plan):
-            if current_step.name == "Make MMseqs2 database" and not args.build_mmseqs2:
-                report(current_step.name, Status.SKIPPED, 0, None)
-                log.info("MMseqs2 database creation was not requested.")
-                continue
-            if current_step.supplied:
-                report(current_step.name, Status.SUPPLIED, 1, 1)
-                log.info(f"Already exists, skipped making of: {current_step.name}")
-                continue
-
-            report(current_step.name, Status.RUNNING, 0, None)
-            log.info(f"Starting: {current_step.name}")
-            if step_index == 0:
-                settings = validate_prepare(args, files)
-                files.data_folder.mkdir(parents=True, exist_ok=True)
-                locks.enter_context(file_logging(log, files.log_file, args.debug))
-                copy_taxonomy(settings)
-            else:
-                current_step.runner(settings, report)
-            report(current_step.name, Status.COMPLETE, 1, 1)
-            log.info(f"Completed: {current_step.name}")
-
-        log.info("Preparation complete. Use -d %s with CAT_pack7 CAT or BAT.", files.data_folder)
-        return 0
-
-    except KeyboardInterrupt:
-        report(current_step.name, Status.CANCELLED, 0, None)
-        for skipped_steps in plan[step_index + 1:]:
-            report(skipped_steps.name, Status.SKIPPED, 0, None)
-        log.error("Run cancelled by the user :(")
-        raise
-
-    except Exception as error:
-        report(current_step.name, Status.FAILED, 0, None)
-        for remaining_step in plan[step_index + 1:]:
-            report(remaining_step.name, Status.SKIPPED, 0, None)
-        log.error("Preparation failed during %s: %s", current_step.name, error)
-
-        if isinstance(error, (OSError, UnicodeError, EOFError)):
-            error = CatError(str(error), path=files.data_folder)
-        if isinstance(error, CatError):
-            error.step = current_step.name
-            error.log_file = files.log_file if files.log_file.is_file() else None
-            raise error
-        raise
-    finally:
-        locks.close()
 
 def run_download(
     args: DownloadOptions, report: Report,
@@ -509,11 +296,6 @@ def run(args: CatOptions | BatOptions | PrepareOptions, report: Report):
             "ORF classifications": settings.files.orf_report,
             "Log": settings.log_file,
         }
-
-
-
-
-
 
     except KeyboardInterrupt:
         report(current_step.name, Status.CANCELLED, 0, None)
