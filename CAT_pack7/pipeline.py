@@ -4,13 +4,12 @@ from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 from tarfile import TarError
-from typing import Iterable, Any
+from typing import Iterable, Any, Callable
 
 from CAT_pack7.io.download import (
     DownloadQueueReport, DownloadReport, multi_download,
     check_files, process_files, cleanup_downloads,
 )
-from . import tax
 from .classification import ClassificationEngine
 from .config.options import BatOptions, CatOptions, PrepareOptions, DownloadOptions, RatOptions
 from .config.settings import BatFiles, BatSettings, CatFiles, CatSettings, DiamondSettings, DownloadOutputs
@@ -19,7 +18,7 @@ from .config.validation import check_orfs_match_contigs, get_file_names, get_val
 from .io.parsers import ClassificationParser
 from .io.writers import ClassificationWriter
 from .prepare import (
-    copy_taxonomy, find_offspring, make_diamond_database,
+    copy_taxonomy, make_diamond_database,
     make_fastaid2LCAtaxid_file, make_mmseqs2_database,
     write_taxids_with_multiple_offspring_file,
 )
@@ -36,14 +35,11 @@ class Step:
     A simple dataclass currently acting like a dictionary that stores the
     name of the step and reuse, if reuse is true it will use userprovided data
     """
-
     name: str
     supplied: bool = False
     citation: str | None = None
-    runner: callable | None = None
-    tool_name: str | None = None
-    result: Iterable[str] | None = None
-
+    runner: Callable[[Any, Report], Any] | None = None
+    result: Any = None
 
     def __str__(self) -> str:
         return self.name
@@ -54,24 +50,35 @@ def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | Dow
         return [
             Step("Input validation"),
             Step("Make DIAMOND database",
-                 supplied=files is not None and files.diamond_database.is_file()),
-            Step("Make MMseqs2 database",
-                 supplied=files is not None and files.mmseqs2_database.is_file()),
+                 supplied=files is not None and files.diamond_database.is_file(),
+                 runner=make_diamond_database),
+            *([Step("Make MMseqs2 database",
+                    supplied=files is not None and files.mmseqs2_database.is_file(),
+                    runner=make_mmseqs2_database)] if args.build_mmseqs2 else []),
             Step("Make fastaid2LCAtaxid",
-                 supplied=files is not None and files.fastaid2LCAtaxid.is_file()),
+                 supplied=files is not None and files.fastaid2LCAtaxid.is_file(),
+                 runner=make_fastaid2LCAtaxid_file),
             Step("Make taxids with multiple offspring",
-                 supplied=files is not None and files.taxids_with_multiple_offspring.is_file()),
+                 supplied=files is not None and files.taxids_with_multiple_offspring.is_file(),
+                 runner=write_taxids_with_multiple_offspring_file),
         ]
     if isinstance(args, (CatOptions, BatOptions)):
         return [
             Step("Input validation"),
             Step(
-                "Protein prediction", supplied=args.proteins is not None,
+                "Protein prediction",
+                supplied=args.proteins is not None,
                 citation="Please cite Pyrodigal and Prodigal when using CAT or BAT in your publication.",
-                runner=run_protein_prediction, tool_name="Pyrodigal"
+                runner=lambda settings, report: run_protein_prediction(
+                    settings, report, "pyrodigal"
+                ),
             ),
-            Step("Alignment", supplied=args.alignment is not None,
-                 runner=run_aligner, tool_name="DIAMOND"),
+            Step(
+                "Alignment",
+                supplied=args.alignment is not None,
+                runner=lambda settings, report: run_aligner(settings.aligner, report),
+                citation="Please cite DIAMOND when using CAT or BAT in your publication."
+            ),
             Step("Classify", runner=run_classification),
         ]
     if isinstance(args, RatOptions):
@@ -333,7 +340,6 @@ def run_prepare(args: PrepareOptions, report: Report):
     current_step = plan[step_index]
     log = logging.getLogger("CAT_pack")
     locks = ExitStack()
-    taxid2parent = None
     settings = None
 
     try:
@@ -357,23 +363,8 @@ def run_prepare(args: PrepareOptions, report: Report):
                 files.data_folder.mkdir(parents=True, exist_ok=True)
                 locks.enter_context(file_logging(log, files.log_file, args.debug))
                 copy_taxonomy(settings)
-            elif current_step.name == "Make DIAMOND database":
-                make_diamond_database(settings)
-            elif current_step.name == "Make MMseqs2 database":
-                make_mmseqs2_database(settings)
             else:
-                if taxid2parent is None:
-                    taxid2parent = tax.read_nodes(files.nodes)
-                if current_step.name == "Make fastaid2LCAtaxid":
-                    make_fastaid2LCAtaxid_file(
-                        files.fastaid2LCAtaxid, settings.db_fasta, settings.acc2tax,
-                        taxid2parent, report,
-                    )
-                elif current_step.name == "Make taxids with multiple offspring":
-                    taxid2offspring = find_offspring(files.fastaid2LCAtaxid, taxid2parent, report)
-                    write_taxids_with_multiple_offspring_file(
-                        files.taxids_with_multiple_offspring, taxid2offspring,
-                    )
+                current_step.runner(settings, report)
             report(current_step.name, Status.COMPLETE, 1, 1)
             log.info(f"Completed: {current_step.name}")
 
@@ -469,8 +460,13 @@ def run_download(
         locks.close()
 
 
-def run(args, report: Report):
+def run(args: CatOptions | BatOptions | PrepareOptions, report: Report):
     log = logging.getLogger("CAT_pack")
+
+    is_prepare = isinstance(args, PrepareOptions)
+    if is_prepare: args = make_prefix(args)
+    log_path = get_file_names(args).log_file if is_prepare else args.log_path
+
     plan = build_plan(args)
     completed_steps: list[Step] = []
     step_index = 0
@@ -483,6 +479,12 @@ def run(args, report: Report):
         report(current_step.name, Status.RUNNING, 0, 1)
         log.info(f"Starting: {current_step.name}")
         settings = get_validated_settings(args)
+
+        if is_prepare: settings.files.data_folder.mkdir(parents=True, exist_ok=True)
+        locks.enter_context(file_logging(log, log_path, args.debug))
+        if is_prepare: copy_taxonomy(settings)
+
+        plan = build_plan(args, settings.files)
         report(current_step.name, Status.COMPLETE, 1, 1)
         log.info(f"Completed: {current_step.name}")
 
@@ -491,9 +493,15 @@ def run(args, report: Report):
                 report(current_step.name, Status.SUPPLIED, 1, 1)
                 log.info(f"Supplied file: {current_step.name}")
                 continue
+            report(current_step.name, Status.RUNNING, 0, None)
             log.info(f"Starting: {current_step.name}")
-            current_step.result = current_step.runner(settings, report, current_step.tool_name)
+            current_step.result = current_step.runner(settings, report)
+            report(current_step.name, Status.COMPLETE, 1, 1)
+            log.info(f"Completed: {current_step.name}")
             completed_steps.append(current_step)
+        if is_prepare:
+            log.info("Preparation complete. Use -d %s with CAT_pack7 CAT or BAT.", settings.files.data_folder)
+            return 0
         return {
             "Results": completed_steps[-1].result,
             "Steps": completed_steps,
@@ -521,11 +529,11 @@ def run(args, report: Report):
         for remaining_step in plan[step_index + 1:]:
             report(remaining_step.name, Status.SKIPPED, 0, None)
 
-        if isinstance(error, OSError):
-            error = CatError(str(error), path=args.output_prefix)
+        if isinstance(error, (OSError, UnicodeError, EOFError)):
+            error = CatError(str(error), path=args.db_dir if is_prepare else args.output_prefix)
         if isinstance(error, CatError):
             error.step = current_step.name
-            error.log_file = args.log_path if args.log_path.is_file() else None
+            error.log_file = log_path
             raise error
         # TODO: REMOVE incomplete files
         # Catch all other exceptions
