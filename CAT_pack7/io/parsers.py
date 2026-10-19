@@ -330,7 +330,10 @@ class AlignmentParser:
             below_cutoff = False
             first_line = next(source, None)
             if self.cat_only is None:
-                bitscore_index = 11
+                n_fields = len(first_line.rstrip("\r\n").split("\t")) if first_line is not None else 12
+                if n_fields != 3 and n_fields < 12:
+                    raise InputError("Alignment must have three CAT columns or twelve BLAST6 columns.", path=self.path)
+                bitscore_index = 2 if n_fields == 3 else 11
             else:
                 bitscore_index = 2 if self.cat_only else 11
 
