@@ -73,7 +73,7 @@ class DiamondSettings(DiamondParameters):
     blast_flavour: str = "blastp"
     matrix: str = "BLOSUM62"
     evalue: str = "0.001"
-    cat_only = True
+    cat_only: bool = True
 
     def get_command(self):
         command = [
@@ -159,6 +159,7 @@ class RatFiles:
     complete_abundance: Path
     bin_abundance: Path | None
     read_classification: Path | None
+    outputs: tuple[Path, ...] = ()
 
 
 # Database preparation settings and outputs.
