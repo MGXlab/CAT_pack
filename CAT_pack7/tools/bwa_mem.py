@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 
 from CAT_pack7.config.settings import RatSettings
-from CAT_pack7.tools.tool_runner import run_tool
+from CAT_pack7.tools.tool_runner import run_tool, tool_output
 from CAT_pack7.utils.errors import ExternalToolError
 
 
@@ -25,7 +25,11 @@ def run_bwa_mem(settings: RatSettings, report)-> None:
         "Running bwa mem for read mapping. File {0}.sorted will be "
         "generated. Do not forget to cite bwa mem and Samtools when using "
         "RAT in your publication!".format(files.mapping_bam))
-    with tempfile.TemporaryDirectory(prefix="RAT-", dir=files.bam_files[0].parent) as tmp:
+    with (
+        tempfile.TemporaryDirectory(prefix="RAT-", dir=files.bam_files[0].parent) as tmp,
+        tool_output("BWA MEM") as bwa_output,
+        tool_output("SAMtools") as samtools_output,
+    ):
         try:
             if check_index(files.contigs_fasta):
                 log.info("Contigs FASTA is already indexed.")
@@ -39,12 +43,14 @@ def run_bwa_mem(settings: RatSettings, report)-> None:
 
         tmp = Path(tmp)
         tmp_bam_file = tmp / "sorted.bam"
+        bwa_process = None
+        samtools_process = None
         try:
             log.info("Running bwa mem...")
 
             bwa_command = [
                 str(settings.bwa), "mem",
-                "-t", str(settings.threads/2),
+                "-t", str(max(1, settings.threads // 2)),
                 str(files.contigs_fasta),
                 str(files.read_files[0])
             ]
@@ -52,20 +58,23 @@ def run_bwa_mem(settings: RatSettings, report)-> None:
             if len(files.read_files) == 2:
                 bwa_command.append(str(files.read_files[1]))
 
-            bwa_process = subprocess.Popen(bwa_command, stdout=subprocess.PIPE)
+            bwa_process = subprocess.Popen(bwa_command, stdout=subprocess.PIPE,
+                                           stderr=bwa_output)
 
 
             try:
                 command = [
                     str(settings.samtools), "sort",
-                    "-@", str(settings.threads/2),
+                    "-@", str(max(1, settings.threads // 2)),
                     "-O", "BAM",
-                    "-T", str(settings.tmp / "sort"),
+                    "-T", str(tmp / "sort"),
                     "-o", str(tmp_bam_file),
                     "-"
                 ]
 
-                samtools_process = subprocess.Popen(command, stdin=bwa_process.stdout)
+                samtools_process = subprocess.Popen(command, stdin=bwa_process.stdout,
+                                                    stdout=samtools_output,
+                                                    stderr=samtools_output)
             finally:
                 bwa_process.stdout.close()
 
