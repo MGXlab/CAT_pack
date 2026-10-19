@@ -392,6 +392,8 @@ def validate_rat_files(args: RatOptions) -> RatFiles:
     checks.check(check_output_prefix, args.log_path)
     checks.check(check_integer, args.threads, "Threads", 1, sys.maxsize)
     checks.check(check_integer, args.mapping_quality, "Mapping quality", 0, 255)
+    if args.sort_memory_mib is not None:
+        checks.check(check_integer, args.sort_memory_mib, "Sort memory (MiB)", 1, sys.maxsize)
     checks.check(validate_classification, args.range_, args.fraction)
     checks.check(validate_memory, args.memory)
 
@@ -493,6 +495,7 @@ def get_validated_settings(args: CatOptions | BatOptions | RatOptions | PrepareO
         return RatSettings(
             files=files, log_file=args.log_path,
             bwa=Path(bwa), samtools=Path(samtools),
+            sort_memory_mib=args.sort_memory_mib,
             threads=execution.threads, quiet=execution.quiet,
             verbose=execution.verbose, debug=execution.debug,
             memory=execution.memory,

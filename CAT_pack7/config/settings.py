@@ -170,6 +170,7 @@ class RatSettings(ExecutionSettings):
     log_file: Path
     bwa: Path
     samtools: Path
+    sort_memory_mib: int | None = None
 
 
 # Database preparation settings and outputs.
