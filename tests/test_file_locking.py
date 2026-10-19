@@ -4,11 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from textwrap import dedent
-from unittest.mock import Mock
 
-from CAT_pack7.config.options import CatOptions
-from CAT_pack7.pipeline import run
-from CAT_pack7.utils.errors import InputError
 from CAT_pack7.utils.locking import lock_outputs
 
 

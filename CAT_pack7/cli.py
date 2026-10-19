@@ -1,21 +1,14 @@
 #!/usr/bin/env python3
 import shlex
 import sys
-from contextlib import nullcontext
 from decimal import Decimal
-from functools import partial
 from pathlib import Path
 from typing import Annotated
 
 import typer
 from rich.console import Console, Group
-from rich.live import Live
 from rich.panel import Panel
 from rich.pretty import Pretty
-from rich.progress import (
-    Progress, ProgressColumn, BarColumn, DownloadColumn, TaskProgressColumn,
-    TextColumn, TimeElapsedColumn, TimeRemainingColumn, TransferSpeedColumn,
-)
 from rich.table import Table
 from rich.text import Text
 from typer import Option
@@ -27,100 +20,19 @@ from .cli_options import (
 from .config.options import BatOptions, CatOptions, ExecutionOptions, DiamondOptions, MMseqsOptions, PrepareOptions, \
     MemoryOptions, DownloadOptions, RatModes, RatOptions
 from .config.validation import get_file_names, make_prefix
-from .pipeline import build_plan, Status, run_download, run
+from .pipeline import build_plan, run_download, run
+from .progress import ProgressTracker
 from .utils.errors import CatError, show_error
 from .utils.logging import init_logging
 
 app = typer.Typer()
 
-console = Console(stderr=True)
-
 @app.callback()
 def main():
     """Ah oh"""
 
-class StaticBarColumn(BarColumn):
-    def render(self, task):
-        bar = super().render(task)
-        bar.pulse = False
-        # Rich also pulses when the rendered bar has an unknown total.
-        if bar.total is None:
-            bar.total = 1
-            bar.completed = 0
-        return bar
 
-
-class ProcessingSpeedColumn(ProgressColumn):
-    def render(self, task) -> Text:
-        unit = task.fields.get("unit")
-        if not unit or not task.started:
-            return Text()
-        return Text(f"{task.speed or 0:,.1f} {unit}/s", style="cyan")
-
-
-def make_progress(stages, unit=None):
-    progress = Progress(
-        TextColumn("[bold]{task.description:<20}"),
-        StaticBarColumn(bar_width=28),
-        TextColumn("{task.fields[status]}"),
-        TimeElapsedColumn(),
-        ProcessingSpeedColumn(),
-        console=console,
-        refresh_per_second=1
-    )
-
-    tasks = {
-        stage: progress.add_task(
-            stage,
-            total=1,
-            start=False,
-            status="[dim]waiting[/dim]",
-            unit=unit if stage == "Classify" else None, # a bit ductaped for now, but for the idea
-        )
-        for stage in stages
-    }
-
-    return progress, tasks
-
-
-def update_progress(progress, tasks, step, status, completed=0, total=None):
-    styles = {
-        Status.WAITING: "dim",
-        Status.RUNNING: "yellow",
-        Status.COMPLETE: "green",
-        Status.SUPPLIED: "cyan",
-        Status.FAILED: "bold red",
-        Status.SKIPPED: "dim",
-        Status.CANCELLED: "red",
-    }
-
-    style = styles[status]
-    task_id = tasks[step]
-
-    # Source https://docs.python.org/3.10/whatsnew/3.10.html#pep-634-structural-pattern-matching
-    match status:
-        case Status.RUNNING:
-            progress.start_task(task_id)
-            progress.update(task_id, status=f"[{style}]{status}[/{style}]")
-            if total is not None:
-                progress.update(task_id, total=total, completed=completed)
-        case Status.COMPLETE:
-            task = next(task for task in progress.tasks if task.id == task_id)
-            progress.stop_task(task_id)
-            progress.update(task_id, status=f"[{style}]{status}[/{style}]",
-                            refresh=True, completed=task.total)
-        case Status.SUPPLIED:
-            progress.update(task_id, status=f"[{style}]{status}[/{style}]")
-        case Status.SKIPPED:
-            progress.update(task_id, status=f"[{style}]{status}[/{style}]")
-        case Status.CANCELLED | Status.FAILED:
-            progress.update(task_id, status=f"[{style}]{status}[/{style}]")
-            progress.stop_task(task_id)
-        case _: # catch all
-            progress.update(task_id,status=status,refresh=True)
-
-
-def argument_print(arguments, tool, log):
+def argument_print(arguments, tool, log, console):
     content = [Text(f"CAT_pack v{about.__version__}\n", style='underline'),
                Text("Running command", style="bold"),
                Text(f"$ {shlex.join(sys.argv)}", style="cyan")]
@@ -156,77 +68,13 @@ def download(
         debug=execution.debug,
         no_log=no_log,
     )
+    console = Console(stderr=True)
     log = init_logging(args.debug, quiet=args.quiet, console=console)
-    argument_print(args, "download", log)
-    progress, tasks = make_progress([step.name for step in build_plan(args)])
-    progress.disable = args.quiet
-    report = partial(update_progress, progress, tasks)
-    file_progress = Progress(
-        TextColumn("  {task.description}", markup=False, style="bold cyan"),
-        StaticBarColumn(), TaskProgressColumn(), DownloadColumn(),
-        TransferSpeedColumn(), TimeRemainingColumn(),
-        TextColumn("{task.fields[status]}"),
-        console=console, disable=args.quiet, refresh_per_second=1,
-        speed_estimate_period=60,
-    )
-    file_task = None
-    file_tasks = {}
-    last_file_update = 0.0
-    subtasks = {"Downloading": file_progress}
-
-    def render_progress():
-        rows = []
-        for task in progress.tasks:
-            rows.append(progress.make_tasks_table([task]))
-            if task.description in subtasks:
-                rows.append(subtasks[task.description])
-        return Group(*rows)
-
-    def download_queue(paths):
-        for path in paths:
-            file_tasks[path] = file_progress.add_task(
-                path.name, total=None, start=False, status="[dim]Waiting[/dim]"
-            )
-
-    def report_download(path, completed, total):
-        nonlocal file_task, last_file_update
-        task_id = file_tasks[path]
-        if task_id != file_task:
-            if file_task is not None:
-                file_progress.stop_task(file_task)
-                file_progress.update(file_task, status="[green]Completed[/green]")
-            file_task = task_id
-            last_file_update = 0.0
-            file_progress.start_task(file_task)
-            file_progress.update(file_task, status="[yellow]Downloading[/yellow]")
-        now = file_progress.get_time()
-        # Keep Rich's bounded speed history from filling with tiny block updates.
-        if completed > 0 and (total is None or completed < total) and now - last_file_update < 0.5:
-            return
-        file_progress.update(file_task, completed=completed, total=total)
-        last_file_update = now
-
-
+    argument_print(args, "download", log, console)
+    tracker = ProgressTracker(build_plan(args), quiet=args.quiet, console=console)
     try:
-        display = nullcontext() if args.quiet else Live(get_renderable=render_progress, console=console)
-        with display:
-            try:
-                files = run_download(args, report, report_download, download_queue)
-                file_status = "[green]Completed[/green]"
-            except KeyboardInterrupt:
-                file_status = "[red]Cancelled[/red]"
-                raise
-            except Exception:
-                file_status = "[bold red]Failed[/bold red]"
-                raise
-            finally:
-
-                if file_task is not None:
-                    file_progress.stop_task(file_task)
-                    task = file_progress.tasks[file_task]
-                    file_progress.update(file_task, status=(
-                        "[green]Completed[/green]" if task.finished else file_status
-                    ))
+        with tracker.display():
+            files = run_download(args, tracker.update, tracker.report_download, tracker.queue)
     except KeyboardInterrupt:
         console.print("\nDownload cancelled :(")
         raise typer.Exit(code=130)
@@ -309,14 +157,13 @@ def prepare(
         debug=execution.debug,
     )
     args = make_prefix(args)
+    console = Console(stderr=True)
     log = init_logging(args.debug, quiet=args.quiet, console=console)
-    argument_print(args, "prepare", log)
-    progress, tasks = make_progress([step.name for step in build_plan(args)])
-    progress.disable = execution.quiet
-    report = partial(update_progress, progress, tasks)
+    argument_print(args, "prepare", log, console)
+    tracker = ProgressTracker(build_plan(args), quiet=args.quiet, console=console)
     try:
-        with progress:
-            run(args, report)
+        with tracker.display():
+            run(args, tracker.update)
     except KeyboardInterrupt:
         console.print("\nRun cancelled :(")
         raise typer.Exit(code=130)
@@ -561,6 +408,7 @@ def bat(
 
 
 def run_annotation_cli(arguments: CatOptions | BatOptions):
+    console = Console(stderr=True)
     log = init_logging(arguments.debug, quiet=arguments.quiet,
                        console=console)
     log.info("Loaded all arguments")
@@ -600,15 +448,10 @@ def run_annotation_cli(arguments: CatOptions | BatOptions):
     if not arguments.quiet:
         console.print(f"Preparing for {tool} run\n\n")
     log.info(f"Preparing for {tool} run")
-    progress, tasks = make_progress(
-        [step.name for step in build_plan(arguments)],
-        unit="bins" if is_bat else "contigs",
-    )
-    progress.disable = arguments.quiet
-    report = partial(update_progress, progress, tasks)
+    tracker = ProgressTracker(build_plan(arguments), quiet=arguments.quiet, console=console)
     try:
-        with progress:
-            outputs = run(arguments, report)
+        with tracker.display():
+            outputs = run(arguments, tracker.update)
     except KeyboardInterrupt:
         console.print("\nRun cancelled :(")
         raise typer.Exit(code=130)
@@ -766,17 +609,16 @@ def rat(contigs_fasta: Annotated[
         verbose=execution.verbose,
         debug=execution.debug,
     )
+    console = Console(stderr=True)
     log = init_logging(arguments.debug, quiet=arguments.quiet,
                        console=console)
     log.info("Loaded all arguments")
 
-    argument_print(arguments, "RAT", log)
-    progress, tasks = make_progress([step.name for step in build_plan(arguments)])
-    progress.disable = arguments.quiet
-    report = partial(update_progress, progress, tasks)
+    argument_print(arguments, "RAT", log, console)
+    tracker = ProgressTracker(build_plan(arguments), quiet=arguments.quiet, console=console)
     try:
-        with progress:
-            outputs = run(arguments, report)
+        with tracker.display():
+            outputs = run(arguments, tracker.update)
     except KeyboardInterrupt:
         console.print("\nRun cancelled :(")
         raise typer.Exit(code=130)

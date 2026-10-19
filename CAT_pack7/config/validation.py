@@ -500,8 +500,16 @@ def make_cat_options(args: RatOptions) -> CatOptions:
     )
 
 def make_bat_options(args: RatOptions) -> BatOptions:
-    shared = {field.name: getattr(args, field.name) for field in fields(AnnotationOptions)}
-    shared.update(output_prefix=Path(f"{args.output_prefix}.BAT"), log_file=args.log_path)
+    shared = {
+        field.name: getattr(args, field.name)
+        for field in fields(AnnotationOptions)
+    }
+
+    shared.update(
+        output_prefix=Path(f"{args.output_prefix}.BAT"),
+        log_file=args.log_path
+    )
+
     return BatOptions(bins=args.bin_fasta_or_folder, bin_suffix=args.bin_suffix,
                       no_stars=args.no_stars, **shared)
 

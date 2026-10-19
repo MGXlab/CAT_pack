@@ -4,7 +4,7 @@ import logging
 import sys
 from dataclasses import dataclass
 from decimal import Decimal
-from enum import IntEnum, auto
+from enum import IntEnum
 from pathlib import Path
 from time import perf_counter
 from typing import Any, Iterable, Mapping, Sequence
@@ -20,8 +20,9 @@ from .utils.errors import InputError
 log = logging.getLogger("CAT_pack")
 
 class ORF(IntEnum):
-    NO_HIT = auto()
-    NO_TAXID = auto()
+    # Missing values must stay outside valid, nonnegative array positions.
+    NO_HIT = -1
+    NO_TAXID = -2
 
 class Taxonomy:
     def __init__(
