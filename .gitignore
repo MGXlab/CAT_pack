@@ -1,0 +1,11 @@
+/benchmarks/*
+/CAT_pack.egg-info/*
+/chloe's trash/*
+/devdocs/*
+*txt
+*log
+*.lock
+/tmp
+out.*
+/diamond-linux64.tar.gz
+/diamond

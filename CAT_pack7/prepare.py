@@ -87,18 +87,18 @@ def import_prot_accession2taxid(
 
 
 def make_fastaid2LCAtaxid_file(
-    fastaid2LCAtaxid_file: Path, fasta_file: Path, prot_accession2taxid_file: Path,
-    taxid2parent: dict[str, str], report: Report
+    settings: PrepareSettings, report: Report,
 ) -> None:
-    fastaid2prot_accessions, prot_accessions_whitelist = import_fasta_headers(fasta_file, report)
+    taxid2parent = tax.read_nodes(settings.files.nodes)
+    fastaid2prot_accessions, prot_accessions_whitelist = import_fasta_headers(settings.db_fasta, report)
     prot_accession2taxid = import_prot_accession2taxid(
-        prot_accession2taxid_file, prot_accessions_whitelist, report,
+        settings.acc2tax, prot_accessions_whitelist, report,
     )
     log.info("Finding LCA of all protein accession numbers in fasta headers.")
     no_taxid = 0
     corrected = 0
     total = 0
-    with fastaid2LCAtaxid_file.open("w", encoding="utf-8", newline="\n") as outf1:
+    with settings.files.fastaid2LCAtaxid.open("w", encoding="utf-8", newline="\n") as outf1:
         for fastaid, prot_accessions in fastaid2prot_accessions.items():
             list_of_lineages: list[list[str]] = []
             for prot_accession in prot_accessions:
@@ -117,7 +117,7 @@ def make_fastaid2LCAtaxid_file(
 
             LCAtaxid = tax.find_LCA(list_of_lineages)
             if LCAtaxid is None:
-                raise InputError(f"Disconnected taxonomic lineages in FASTA header {fastaid}.", path=fasta_file)
+                raise InputError(f"Disconnected taxonomic lineages in FASTA header {fastaid}.", path=settings.db_fasta)
             outf1.write(f"{fastaid}\t{LCAtaxid}\n")
             if fastaid not in prot_accession2taxid or LCAtaxid != prot_accession2taxid[fastaid]:
                 corrected += 1
@@ -155,8 +155,11 @@ def find_offspring(fastaid2LCAtaxid_file: Path, taxid2parent: dict[str, str], re
 
 
 def write_taxids_with_multiple_offspring_file(
-    taxids_with_multiple_offspring_file: Path, taxid2offspring: dict[str, set[str]],
+    settings: PrepareSettings, report: Report,
 ) -> None:
+    taxid2parent = tax.read_nodes(settings.files.nodes)
+    taxid2offspring = find_offspring(settings.files.fastaid2LCAtaxid, taxid2parent, report)
+    taxids_with_multiple_offspring_file = settings.files.taxids_with_multiple_offspring
     log.info(f"Writing {taxids_with_multiple_offspring_file}.")
     with taxids_with_multiple_offspring_file.open("w", encoding="utf-8", newline="\n") as outf1:
         for taxid in taxid2offspring:
@@ -164,13 +167,13 @@ def write_taxids_with_multiple_offspring_file(
                 outf1.write(f"{taxid}\n")
 
 
-def make_diamond_database(settings: PrepareSettings) -> None:
+def make_diamond_database(settings: PrepareSettings, report: Report) -> None:
     log.info(f"Constructing DIAMOND database {settings.files.diamond_database} "
              f"from {settings.db_fasta} using {settings.threads} cores.")
     run_tool(settings.diamond.get_command(), "DIAMOND")
 
 
-def make_mmseqs2_database(settings: PrepareSettings) -> None:
+def make_mmseqs2_database(settings: PrepareSettings, report: Report) -> None:
     log.info(f"Constructing MMseqs2 database {settings.files.mmseqs2_database} "
              f"from {settings.db_fasta} using {settings.threads} cores.")
     run_tool(settings.mmseqs.get_command(), "MMseqs2")
