@@ -170,6 +170,7 @@ class RatSettings(ExecutionSettings):
     log_file: Path
     bwa: Path
     samtools: Path
+    mapping_quality: int
     sort_memory_mib: int | None = None
     cat: CatSettings | None = None
     bat: BatSettings | None = None

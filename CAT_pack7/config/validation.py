@@ -530,13 +530,15 @@ def validate_rat(args: RatOptions) -> RatSettings:
     if "m" in args.mode.value and args.bin2classification is None:
         bat_settings = validate_cat(make_bat_options(args))
 
+    mapping_quality: int = args.mapping_quality
+
     return RatSettings(
         files=files, log_file=args.log_path,
         bwa=Path(bwa), samtools=Path(samtools),
         sort_memory_mib=args.sort_memory_mib,
         threads=execution.threads, quiet=execution.quiet,
         verbose=execution.verbose, debug=execution.debug,
-        memory=execution.memory, cat=cat_settings, bat=bat_settings
+        memory=execution.memory, cat=cat_settings, bat=bat_settings, mapping_quality=mapping_quality,
     )
 
 def get_validated_settings(args: CatOptions | BatOptions | RatOptions | PrepareOptions) -> CatSettings | BatSettings | RatSettings | PrepareSettings:

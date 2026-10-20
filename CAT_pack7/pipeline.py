@@ -21,6 +21,7 @@ from .prepare import (
     make_fastaid2LCAtaxid_file, make_mmseqs2_database,
     write_taxids_with_multiple_offspring_file,
 )
+from .reads import process_bam_file
 from .tools.aligner import run_aligner
 from .tools.bwa_mem import run_bwa_mem
 from .tools.pyrodigal import run_protein_prediction
@@ -97,7 +98,7 @@ def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | Dow
                                args.contigs2classification is not None) if "c" in mode else []),
             *(annotation_steps(make_bat_options(args), "bat", "Bins",
                                args.bin2classification is not None) if "m" in mode else []),
-            Step("Process mappings"),
+            Step("Process mappings", runner=process_bam_file),
             *([Step("Extract unclassified sequences")] if needs_sequences else []),
             *([Step("Align unclassified sequences",supplied=args.alignment_unmapped is not None)] if needs_alignment else []),
             *([Step("Classify unclassified sequences",supplied=args.unmapped2classification is not None)] if "r" in mode else []),
