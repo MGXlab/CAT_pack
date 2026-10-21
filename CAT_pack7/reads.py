@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 
-import argparse
 import datetime
 import decimal
-import multiprocessing
 import os
 import subprocess
 import sys
@@ -20,12 +18,10 @@ from CAT_pack7.utils.logging import Report
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(
-            prog='CAT_pack reads',
-            description='Run Read Annotation Tool (RAT).',
+    parser = (
             # @Tina: Should the explanation on how to use RAT be in the description? Right now the 'Run Read Annotation Tool' is at a little weird position. Also if you forget one argument (say -c) you'll not only get the help message but also the entire usage which is a little overkill.
             # @Tina: I do like this explanation of complete and partial workflows... Maybe we should add it to the other CAT pack as well?
-            usage='CAT_pack reads -m [mode] -c [contigs] -t [database] [options] [-h / --help]\n\n'
+            """usage='CAT_pack reads -m [mode] -c [contigs] -t [database] [options] [-h / --help]\n\n'
             'Complete RAT workflow (perform read mapping, run CAT, BAT, and RAT): '
             'Supply contigs, reads, database folder, taxonomy folder, and bin folder.\n\n'
             'Partial workflows:\n'
@@ -36,99 +32,9 @@ def parse_arguments():
             'taxonomy folder instead.\n'
             'If you prefer not to use bin classification, do not supply the path '
             'to a bin folder.',
-            add_help=False)
-    
-    required = parser.add_argument_group('Required arguments')
-    shared.add_argument(required, 'contigs_fasta', True)
-    shared.add_argument(required, 'taxonomy_folder', True)
-    shared.add_argument(required, 'mode', True)
-    
-    optional = parser.add_argument_group('Optional arguments')
-    shared.add_argument(optional, 'out_prefix', False, default='./out')
-    shared.add_argument(optional, 'read_file1', False)
-    shared.add_argument(optional, 'read_file2', False)
-    shared.add_argument(optional, 'bam_file1', False)
-    shared.add_argument(optional, 'bam_file2', False)
-    shared.add_argument(optional, 'alignment_unmapped', False)
-    shared.add_argument(optional, 'bin_fasta_or_folder', False, default=False)
-    shared.add_argument(optional, 'bin_suffix', False, default=".fna")
-    shared.add_argument(optional, 'contig2classification', False)
-    shared.add_argument(optional, 'bin2classification', False)
-    shared.add_argument(optional, 'read2classification', False)
-    shared.add_argument(optional, 'unmapped2classification', False)
-
-    shared.add_argument(optional, 'mapping_quality', False, default=2)
-    shared.add_argument(optional, 'path_to_bwa', False, default='bwa')
-    shared.add_argument(optional, 'path_to_samtools', False, default='samtools')
-
-    shared.add_argument(optional, 'nproc', False,
-            default=multiprocessing.cpu_count())
-    shared.add_argument(optional, 'tmpdir', False)
-    shared.add_argument(optional, 'force', False)
-    shared.add_argument(optional, 'quiet', False)
-    shared.add_argument(optional, 'verbose', False)
-    shared.add_argument(optional, 'no_log', False)
-    shared.add_argument(optional, 'help', False)
-    
-    CAT_args = parser.add_argument_group('CAT/BAT-specific arguments')
-    shared.add_argument(CAT_args, 'database_folder', False)
-    shared.add_argument(optional, "proteins_fasta", False)
-    shared.add_argument(optional, "alignment_file", False)
-    shared.add_argument(CAT_args, 'r', False, default=decimal.Decimal(10))
-    shared.add_argument(CAT_args, 'f', False, default=decimal.Decimal(0.5))
-    shared.add_argument(CAT_args, 'no_stars', False)
-    shared.add_argument(CAT_args, 'IkwId', False)
-    
-    dmnd_args = parser.add_argument_group('DIAMOND specific optional arguments')
-    shared.add_all_diamond_arguments(dmnd_args)
-                          
-    (args, extra_args) = parser.parse_known_args()
-    extra_args = [arg for (i, arg) in enumerate(extra_args) if
-        (i, arg) != (0, 'reads')]
-    if len(extra_args) > 0:
-        sys.exit('error: too many arguments supplied:\n{0}'.format(
-            '\n'.join(extra_args)))
-
-    # Add extra arguments.
-    shared.expand_arguments(args, rat=True)
-    
-    if not args.read_file1:
-        sys.exit('error: you have to supply read files!')
-    
-    #check if the mode is correct
-    for c in [m for m in args.mode]:
-        if c not in ['m', 'c', 'r']:
-            sys.exit('Unknown letter "{}" in the mode argument. Allowed letters ' 
-                     'are "m" for MAGs, "c" for contigs and "r" for reads. '
-                     'Exiting.'.format(c))
-    
-    if 'm' in args.mode:
-        if not args.bin_folder:
-            sys.exit('error: "m" was supplied to mode but no bin_folder. If '
-                     'you want to include MAGs in your profile, please submit '
-                     'a bin folder (and suffix if necessary)')
-        if args.bin_folder and not args.bin2classification and not args.database_folder:
-            sys.exit('error: please provide either a bin2classification file or '
-                     'the path to the CAT_pack database_folder for bin classification!')
-        if args.bin2classification and not args.bin_folder:
-            sys.exit('error: bin2classification file but no bin_folder supplied. '
-                     'RAT requires -b/--bin_folder to include bins in annotation!')
-    
-    if 'c' in args.mode:
-        if not args.contigs_fasta:
-            sys.exit('error: no contigs_fasta supplied.')
+            add_help=False""")
     
 
-        if not args.contig2classification and not args.database_folder:
-            sys.exit('error: please provide either a contig2classification file '
-                     'or the path to the CAT_pack database_folder!')
-            
-    if 'r' in args.mode and not 'c' in args.mode and not 'm' in args.mode:
-        sys.exit('error: we do not recommend annotating all reads directly '
-                 'with diamond. Please include c or m in the mode argument.')
-    
-    
-    return args
 
 
 
@@ -1085,12 +991,14 @@ def process_CAT_table(CAT_output_table,
 
 @dataclass
 class MappingResult:
-    read_dict: dict[str, dict[str, list[str]]] = field(default=dict)
-    unmapped_reads: dict[str, set[str]] = field(default=lambda: {'fw': set(), 'rev': set()})
+    read_dict: dict[str, dict[str, list[str]]] = field(default_factory=dict)
+    unmapped_reads: dict[str, set[str]] = field(default_factory=lambda: {'fw': set(), 'rev': set()})
     sum_of_reads: int = 0
     paired: bool =False
+    contig_dict: dict[str, int] = field(default_factory=dict)
+    max_primary: int = 1
 
-def process_bam_file(settings: RatSettings, report: Report):
+def process_bam_file(settings: RatSettings, report: Report) -> MappingResult:
     """
     # function that processes the bam file(s) by picking out the primary alignments
     # and storing the contigs that the forward and reverse reads map to. If only
@@ -1109,11 +1017,20 @@ def process_bam_file(settings: RatSettings, report: Report):
                 cmd, stdout=subprocess.PIPE, stderr=output, text=True) as proc:
 
             for mapping in proc.stdout:
-                mapping=mapping.decode("utf-8").rstrip().split('\t')
+                mapping=mapping.rstrip().split('\t')
                 read_id, flag, contig, score=mapping[0], int(mapping[1]), mapping[2], int(mapping[4])
         
                 if flag & 0x1:
                     map_result.paired=True
+
+                map_result.read_dict.setdefault(read_id, {
+                    "contig": [],
+                    "bin": [],
+                    "taxon_bin": [],
+                    "taxon_contig": [],
+                    "taxon_contig_dm": [],
+                    "taxon_read_dm": [],
+                })
 
                 map_result.read_dict.setdefault(read_id, {"contig": [], "bin": []})
 
@@ -1126,6 +1043,10 @@ def process_bam_file(settings: RatSettings, report: Report):
             if proc.wait() != 0:
                 raise ExternalToolError("samtools", f"view exited with a non 0 status: {proc.returncode}")
 
+    contig2bin = invert_bin_dict(settings.files.bin2contigs)
+
+    make_contig_dict(map_result, settings, contig2bin)
+
 
     if map_result.paired or len(settings.files.bam_files)>1:
         map_result.sum_of_reads=2*len(map_result.read_dict)
@@ -1134,55 +1055,73 @@ def process_bam_file(settings: RatSettings, report: Report):
 
     return map_result
 
+# @Bastiaan and @Tina are inplace operations too complex? Return values can also be used.
+def make_contig_dict(map_result: MappingResult, settings: RatSettings, contig2bin: dict[str, str]) -> None:
+    max_primary = 2 if len(settings.files.bam_files) > 1 or map_result.paired else 1
+    contig_dict = {"*": 0}
+
+    for read in map_result.read_dict.values():
+        contigs = read["contig"]
+        contig_dict["*"] += max_primary - len(contigs)
+
+        for contig in contigs:
+            contig_dict[contig] = contig_dict.get(contig, 0) + 1
+
+            if contig2bin:
+                read["bin"].append(contig2bin.get(contig, "unbinned"))
+
+    map_result.contig_dict = contig_dict
+    map_result.max_primary = max_primary
 
 
-def make_contig_dict(read_dict, 
-                     bam_files, 
-                     paired, 
-                     contig2bin):
-    """
-    takes the read dictionary that stores which read maps where and returns
-    a dictionary that stores how many reads bind to each contig. It also adds
-    bin annotation to the read dict
-    """
-    contig_dict={}
-    contig_dict['*']=0
-    
-    # check how long the list of contigs per read is allowed to be to calculate
-    # unmapped reads and check that everything is working correctly
-    if len(bam_files)>1 or paired:
-        max_primary=2
-    else:
-        max_primary=1
-    
-    for read in read_dict:
-        # if a read (pair) has multiple primary alignments, exit
-        if len(read_dict[read]['contig'])>max_primary:
-            message = (
-                    'Something is wrong with the alignment. Too many mappings '
-                    'detected. Please check your alignment file or map your reads '
-                    'using RAT.')
-            shared.give_user_feedback(message)
-            sys.exit(1)
-        
-        # otherwise, determine the number of unmapped reads and add it to unmapped
-        # build a dictionary of contigs and how many reads map to them
-        # Add bin info to read dictionary
-        else:
-            contig_dict['*']+=max_primary-len(read_dict[read]['contig'])
-            for contig in read_dict[read]['contig']:
-                if not contig in contig_dict:
-                    contig_dict[contig]=0
-                    
-                contig_dict[contig]+=1
-                if contig2bin:
-                    if contig in contig2bin:
-                        read_dict[read]['bin'].append(contig2bin[contig])
-                    else:
-                        read_dict[read]['bin'].append('unbinned')
-                    
-    return contig_dict, read_dict, max_primary
-
+#
+# def make_contig_dict(read_dict,
+#                      bam_files,
+#                      paired,
+#                      contig2bin):
+#     """
+#     takes the read dictionary that stores which read maps where and returns
+#     a dictionary that stores how many reads bind to each contig. It also adds
+#     bin annotation to the read dict
+#     """
+#     contig_dict={}
+#     contig_dict['*']=0
+#
+#     # check how long the list of contigs per read is allowed to be to calculate
+#     # unmapped reads and check that everything is working correctly
+#     if len(bam_files)>1 or paired:
+#         max_primary=2
+#     else:
+#         max_primary=1
+#
+#     for read in read_dict:
+#         # if a read (pair) has multiple primary alignments, exit
+#         if len(read_dict[read]['contig'])>max_primary:
+#             message = (
+#                     'Something is wrong with the alignment. Too many mappings '
+#                     'detected. Please check your alignment file or map your reads '
+#                     'using RAT.')
+#             shared.give_user_feedback(message)
+#             sys.exit(1)
+#
+#         # otherwise, determine the number of unmapped reads and add it to unmapped
+#         # build a dictionary of contigs and how many reads map to them
+#         # Add bin info to read dictionary
+#         else:
+#             contig_dict['*']+=max_primary-len(read_dict[read]['contig'])
+#             for contig in read_dict[read]['contig']:
+#                 if not contig in contig_dict:
+#                     contig_dict[contig]=0
+#
+#                 contig_dict[contig]+=1
+#                 if contig2bin:
+#                     if contig in contig2bin:
+#                         read_dict[read]['bin'].append(contig2bin[contig])
+#                     else:
+#                         read_dict[read]['bin'].append('unbinned')
+#
+#     return contig_dict, read_dict, max_primary
+#
 
 
 
