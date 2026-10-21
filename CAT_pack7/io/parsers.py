@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from itertools import chain, islice
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, Literal, TextIO
 
 import numpy as np
 
@@ -30,6 +30,7 @@ class FastaRecord:
     sequence: str
 
 
+
 class FastaParser:
     """Read FASTA records and collect their contig or ORF identifiers."""
 
@@ -41,6 +42,7 @@ class FastaParser:
         # https://github.com/idptools/sparrow/blob/03aa232abcbe191d96daf55ee28e1f7881979a68/sparrow/sequence_analysis/plaac/plaac.py#L318-L350
         record_name = None
         sequence_lines: list[str] = []
+        seen: set[str] = set()
         opener = gzip.open if self.path.suffix == ".gz" else bz2.open if self.path.suffix == ".bz2" else open
         with opener(self.path, "rt", encoding="utf-8") as source:
             for line in source:
@@ -49,6 +51,9 @@ class FastaParser:
                     continue
                 if line.startswith(">"):
                     next_name = self._parse_header(line)
+                    if next_name in seen:
+                        raise InputError(f"Found a duplicate FASTA header: {next_name}.", path=self.path)
+                    seen.add(next_name)
                     if record_name is not None:
                         yield FastaRecord(record_name, "".join(sequence_lines))
                     record_name = next_name
@@ -102,6 +107,36 @@ class FastaParser:
                 contig2ORFs[contig] = []
             contig2ORFs[contig].append(orf_name)
         return contig2ORFs
+
+@dataclass(frozen=True, slots=True)
+class FastqRecord:
+    name: str
+    sequence: str
+    quality: str
+
+
+class FastqParser:
+    def __init__(self, path: Path) -> None:
+        self.path = path
+
+    def __iter__(self) -> Iterator[FastqRecord]:
+        seen: set[str] = set()
+        with optionally_compressed_handle(self.path, "r") as file:
+            for header in file:
+                if not header.startswith("@"):
+                    raise InputError(f"FASTQ header must start with a '@'. Got {header}",
+                                     path=self.path, hint="Check the fastq file")
+                name = header[1:].rstrip().split(" ", 1)[0]
+                if name in seen:
+                    raise InputError(f"Duplicate FASTQ header: {name}.", path=self.path,
+                                     hint="Remove any duplicate FASTQ headers from the supplied file")
+                seen.add(name)
+
+                sequence = next(file).rstrip()
+                next(file)  # Skip the + line.
+                quality = next(file).rstrip()
+
+                yield FastqRecord(name, sequence, quality)
 
 
 @dataclass(frozen=True, slots=True)
@@ -467,7 +502,10 @@ def is_gz(file_path):
     return file_path.endswith(".gz") or file_path.endswith(".z")
 
 
-def optionally_compressed_handle(file_path, mode):
+def optionally_compressed_handle(
+    file_path: str | Path,
+    mode: Literal["r", "rb", "rt", "w", "wb", "wt", "a", "ab", "at"],
+) -> TextIO:
     """Return an appropriate file handle to operate on.
 
     Arguments:
