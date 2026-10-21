@@ -1,121 +1,53 @@
 #!/usr/bin/env python3
 import shlex
 import sys
-from contextlib import nullcontext
 from decimal import Decimal
-from functools import partial
 from pathlib import Path
 from typing import Annotated
 
 import typer
 from rich.console import Console, Group
-from rich.live import Live
 from rich.panel import Panel
-from rich.progress import (
-    Progress, ProgressColumn, BarColumn, DownloadColumn, TaskProgressColumn,
-    TextColumn, TimeElapsedColumn, TimeRemainingColumn, TransferSpeedColumn,
-)
+from rich.pretty import Pretty
 from rich.table import Table
 from rich.text import Text
 from typer import Option
 
+from . import about
 from .cli_options import (
     DiamondPathOption, diamond_options, execution_options, mmseqs_options, memory_options, with_option_groups,
 )
 from .config.options import BatOptions, CatOptions, ExecutionOptions, DiamondOptions, MMseqsOptions, PrepareOptions, \
-    MemoryOptions, DownloadOptions
+    MemoryOptions, DownloadOptions, RatModes, RatOptions
 from .config.validation import get_file_names, make_prefix
-from .pipeline import run_annotation, build_plan, Status, run_prepare, run_download
+from .pipeline import build_plan, run_download, run
+from .progress import ProgressTracker
 from .utils.errors import CatError, show_error
 from .utils.logging import init_logging
 
 app = typer.Typer()
 
-console = Console(stderr=True)
-
 @app.callback()
 def main():
     """Ah oh"""
 
-class StaticBarColumn(BarColumn):
-    def render(self, task):
-        bar = super().render(task)
-        bar.pulse = False
-        # Rich also pulses when the rendered bar has an unknown total.
-        if bar.total is None:
-            bar.total = 1
-            bar.completed = 0
-        return bar
 
+def argument_print(arguments, tool, log, console):
+    content = [Text(f"CAT_pack v{about.__version__}\n", style='underline'),
+               Text("Running command", style="bold"),
+               Text(f"$ {shlex.join(sys.argv)}", style="cyan")]
 
-class ProcessingSpeedColumn(ProgressColumn):
-    def render(self, task) -> Text:
-        unit = task.fields.get("unit")
-        if not unit or not task.started:
-            return Text()
-        return Text(f"{task.speed or 0:,.1f} {unit}/s", style="cyan")
+    if arguments.debug:
+        content.extend([Pretty(arguments)])
+    log.info(f"Running command: $ {shlex.join(sys.argv)}")
+    log.debug(f"{arguments!r}")
 
+    if not arguments.quiet: console.print(Panel(Group(*content), title=tool))
 
-def make_progress(stages, unit=None):
-    progress = Progress(
-        TextColumn("[bold]{task.description:<20}"),
-        StaticBarColumn(bar_width=28),
-        TextColumn("{task.fields[status]}"),
-        TimeElapsedColumn(),
-        ProcessingSpeedColumn(),
-        console=console,
-        refresh_per_second=1
-    )
+    if not arguments.quiet:
+        console.print(f"Preparing for {tool} run\n\n")
+    log.info(f"Preparing for {tool} run")
 
-    tasks = {
-        stage: progress.add_task(
-            stage,
-            total=1,
-            start=False,
-            status="[dim]waiting[/dim]",
-            unit=unit if stage == "Classify" else None, # a bit ductaped for now, but for the idea
-        )
-        for stage in stages
-    }
-
-    return progress, tasks
-
-
-def update_progress(progress, tasks, step, status, completed=0, total=None):
-    styles = {
-        Status.WAITING: "dim",
-        Status.RUNNING: "yellow",
-        Status.COMPLETE: "green",
-        Status.SUPPLIED: "cyan",
-        Status.FAILED: "bold red",
-        Status.SKIPPED: "dim",
-        Status.CANCELLED: "red",
-    }
-
-    style = styles[status]
-    task_id = tasks[step]
-
-    # Source https://docs.python.org/3.10/whatsnew/3.10.html#pep-634-structural-pattern-matching
-    match status:
-        case Status.RUNNING:
-            progress.start_task(task_id)
-            progress.update(task_id, status=f"[{style}]{status}[/{style}]")
-            if total is not None:
-                progress.update(task_id, total=total, completed=completed)
-        case Status.COMPLETE:
-            task = next(task for task in progress.tasks if task.id == task_id)
-            progress.stop_task(task_id)
-            progress.update(task_id, status=f"[{style}]{status}[/{style}]",
-                            refresh=True, completed=task.total)
-        case Status.SUPPLIED:
-            progress.update(task_id, status=f"[{style}]{status}[/{style}]")
-        case Status.SKIPPED:
-            progress.update(task_id, status=f"[{style}]{status}[/{style}]")
-        case Status.CANCELLED | Status.FAILED:
-            progress.update(task_id, status=f"[{style}]{status}[/{style}]")
-            progress.stop_task(task_id)
-        case _: # catch all
-            progress.update(task_id,status=status,refresh=True)
 
 
 @app.command()
@@ -136,75 +68,13 @@ def download(
         debug=execution.debug,
         no_log=no_log,
     )
-    progress, tasks = make_progress([step.name for step in build_plan(args)])
-    progress.disable = args.quiet
-    report = partial(update_progress, progress, tasks)
-    file_progress = Progress(
-        TextColumn("  {task.description}", markup=False, style="bold cyan"),
-        StaticBarColumn(), TaskProgressColumn(), DownloadColumn(),
-        TransferSpeedColumn(), TimeRemainingColumn(),
-        TextColumn("{task.fields[status]}"),
-        console=console, disable=args.quiet, refresh_per_second=1,
-        speed_estimate_period=60,
-    )
-    file_task = None
-    file_tasks = {}
-    last_file_update = 0.0
-    subtasks = {"Downloading": file_progress}
-
-    def render_progress():
-        rows = []
-        for task in progress.tasks:
-            rows.append(progress.make_tasks_table([task]))
-            if task.description in subtasks:
-                rows.append(subtasks[task.description])
-        return Group(*rows)
-
-    def download_queue(paths):
-        for path in paths:
-            file_tasks[path] = file_progress.add_task(
-                path.name, total=None, start=False, status="[dim]Waiting[/dim]"
-            )
-
-    def report_download(path, completed, total):
-        nonlocal file_task, last_file_update
-        task_id = file_tasks[path]
-        if task_id != file_task:
-            if file_task is not None:
-                file_progress.stop_task(file_task)
-                file_progress.update(file_task, status="[green]Completed[/green]")
-            file_task = task_id
-            last_file_update = 0.0
-            file_progress.start_task(file_task)
-            file_progress.update(file_task, status="[yellow]Downloading[/yellow]")
-        now = file_progress.get_time()
-        # Keep Rich's bounded speed history from filling with tiny block updates.
-        if completed > 0 and (total is None or completed < total) and now - last_file_update < 0.5:
-            return
-        file_progress.update(file_task, completed=completed, total=total)
-        last_file_update = now
-
-
+    console = Console(stderr=True)
+    log = init_logging(args.debug, quiet=args.quiet, console=console)
+    argument_print(args, "download", log, console)
+    tracker = ProgressTracker(build_plan(args), quiet=args.quiet, console=console)
     try:
-        display = nullcontext() if args.quiet else Live(get_renderable=render_progress, console=console)
-        with display:
-            try:
-                files = run_download(args, report, report_download, download_queue)
-                file_status = "[green]Completed[/green]"
-            except KeyboardInterrupt:
-                file_status = "[red]Cancelled[/red]"
-                raise
-            except Exception:
-                file_status = "[bold red]Failed[/bold red]"
-                raise
-            finally:
-
-                if file_task is not None:
-                    file_progress.stop_task(file_task)
-                    task = file_progress.tasks[file_task]
-                    file_progress.update(file_task, status=(
-                        "[green]Completed[/green]" if task.finished else file_status
-                    ))
+        with tracker.display():
+            files = run_download(args, tracker.update, tracker.report_download, tracker.queue)
     except KeyboardInterrupt:
         console.print("\nDownload cancelled :(")
         raise typer.Exit(code=130)
@@ -287,12 +157,13 @@ def prepare(
         debug=execution.debug,
     )
     args = make_prefix(args)
-    progress, tasks = make_progress([step.name for step in build_plan(args)])
-    progress.disable = execution.quiet
-    report = partial(update_progress, progress, tasks)
+    console = Console(stderr=True)
+    log = init_logging(args.debug, quiet=args.quiet, console=console)
+    argument_print(args, "prepare", log, console)
+    tracker = ProgressTracker(build_plan(args), quiet=args.quiet, console=console)
     try:
-        with progress:
-            run_prepare(args, report)
+        with tracker.display():
+            run(args, tracker.update)
     except KeyboardInterrupt:
         console.print("\nRun cancelled :(")
         raise typer.Exit(code=130)
@@ -537,6 +408,7 @@ def bat(
 
 
 def run_annotation_cli(arguments: CatOptions | BatOptions):
+    console = Console(stderr=True)
     log = init_logging(arguments.debug, quiet=arguments.quiet,
                        console=console)
     log.info("Loaded all arguments")
@@ -576,15 +448,10 @@ def run_annotation_cli(arguments: CatOptions | BatOptions):
     if not arguments.quiet:
         console.print(f"Preparing for {tool} run\n\n")
     log.info(f"Preparing for {tool} run")
-    progress, tasks = make_progress(
-        [step.name for step in build_plan(arguments)],
-        unit="bins" if is_bat else "contigs",
-    )
-    progress.disable = arguments.quiet
-    report = partial(update_progress, progress, tasks)
+    tracker = ProgressTracker(build_plan(arguments), quiet=arguments.quiet, console=console)
     try:
-        with progress:
-            outputs = run_annotation(arguments, report)
+        with tracker.display():
+            outputs = run(arguments, tracker.update)
     except KeyboardInterrupt:
         console.print("\nRun cancelled :(")
         raise typer.Exit(code=130)
@@ -639,5 +506,134 @@ def run_annotation_cli(arguments: CatOptions | BatOptions):
             title=f"{tool} completed",
             border_style="green",
         ))
+
+@app.command("reads", hidden=True, deprecated=True)
+@app.command(options_metavar="-m [mode] -c [contigs] -t [database] [options]",
+             epilog="""Classification modes:
+    - 'mcr': integrate annotations from MAGs, contigs, and reads.
+    - 'cr': integrate annotations from contigs and reads.
+    - 'mr': integrate annotations from MAGs and reads.""")
+@with_option_groups(
+    execution=execution_options, diamond=diamond_options, mmseqs=mmseqs_options,
+    memory=memory_options,
+)
+def rat(contigs_fasta: Annotated[
+            Path, Option("--contigs_fasta", "-c" ,
+                   help="Contigs fasta file", metavar="<FILE[.gz|.bz2]>")
+        ],
+        database: Annotated[Path, Option("--database", "-d",
+                         help="Directory that contains database and taxonomy files", metavar="<DIR>")],
+        mode: Annotated[RatModes,
+                        Option("--mode", "-m", help="Classification mode")],
+        output_prefix: Annotated[
+            Path,
+            Option("--output-prefix", "--out_prefix", "-o", metavar="<prefix>", help="Prefix for output files.")
+        ] = RatOptions.output_prefix,
+        read_file: Annotated[list[Path], Option("--read_file", "--read-file", "-r",
+                                    help="""Path to (paired-end) read file. Use --read_file path/to/read_file_1 --read_file path/to/read_file_2 to supply two files for paired-end reads""", metavar="<FILE[.gz|.bz2]>")] = RatOptions.read_file,
+        bam_file: Annotated[list[Path],
+        Option("--bam_file", "--bam-file", help="Path to sorted BAM or SAM mapping file. Repeat for separate mate files.", metavar="<FILE>")] = RatOptions.bam_file,
+        alignment_unmapped: Annotated[Path,
+            Option("--alignment_unmapped",
+                   help="Path to alignment file of reads and contigs "
+                        "that could not be classified by CAT/BAT.", metavar="<FILE[.gz|.bz2]>")] = RatOptions.alignment_unmapped,
+        bin_fasta_or_folder: Annotated[
+            Path, Option("--bin_fasta", "-b", "--bin-folder", help="Bin fasta file or directory containing bins.", metavar="<FILE[.gz|.bz2]|DIR>")] = RatOptions.bin_fasta_or_folder,
+        bin_suffix: Annotated[
+            str, Option("--bin_suffix", "-s", help="Suffix of bins in bin directory")] = RatOptions.bin_suffix,
+        contigs2classification: Annotated[
+            Path, Option("--c2c", help="Path to contig2classification file.", metavar="<FILE[.gz|.bz2]>")] = RatOptions.contigs2classification,
+        bin2classification: Annotated[
+            Path, Option("--b2c", help="Path to bin2classification file.", metavar="<FILE[.gz|.bz2]>")] = RatOptions.bin2classification,
+        read2classification: Annotated[
+            bool, Option("--read2classification", help="Write a classification row for each read/mate.")] = RatOptions.read2classification,
+        unmapped2classification: Annotated[
+            Path, Option("--u2c", help="Path to unmapped2classification file.", metavar="<FILE[.gz|.bz2]>")] = RatOptions.unmapped2classification,
+        mapping_quality: Annotated[
+            int, Option("--mapping_quality", min=0, max=255, help="Minimum mapping quality phred score")] = RatOptions.mapping_quality,
+        proteins: Annotated[Path | None, Option("--proteins_fasta", "-p", help="Reuse predicted contig proteins for CAT/BAT.")] = RatOptions.proteins,
+        alignment: Annotated[Path | None, Option("--alignment_table", "-a", help="Reuse CAT/BAT protein alignments; also supply --proteins_fasta.")] = RatOptions.alignment,
+        range_: Annotated[float, Option("--range", min=0, max=100)] = float(RatOptions.range_),
+        fraction: Annotated[float, Option("--fraction", "-f", min=0, max=0.99)] = float(RatOptions.fraction),
+        top: Annotated[int, Option("--top", min=0, max=100)] = RatOptions.top,
+        tmpdir: Annotated[Path | None, Option("--tmpdir")] = RatOptions.tmpdir,
+        compress: Annotated[bool, Option("--compress", help="Compress generated CAT/BAT protein alignments.")] = RatOptions.compress,
+        no_stars: Annotated[bool, Option("--no-stars", "--no_stars")] = RatOptions.no_stars,
+        log_file: Annotated[Path | None, Option("--log-file")] = RatOptions.log_file,
+        aligner: Annotated[str, Option("--aligner", help="Protein aligner; direct nucleotide searches require DIAMOND.")] = RatOptions.aligner,
+        # TODO: Look into the use of bwa mem 2 as well
+        path_to_bwa: Annotated[
+            Path, Option("--path_to_bwa", help="Path to bwa binaries. Supply if RAT cannot find bwa.", metavar="<EXC>")] = RatOptions.path_to_bwa,
+        path_to_samtools: Annotated[
+            Path, Option("--path_to_samtools", help="Path to Samtools binaries. Supply if RAT cannot find Samtools.", metavar="<EXC>")] = RatOptions.path_to_samtools,
+        sort_memory_mib: Annotated[int | None, Option("--sort-memory-mib", min=1, help="SAMtools sort memory per thread in MiB")] = RatOptions.sort_memory_mib,
+        *, execution: ExecutionOptions,
+        diamond: DiamondOptions,
+        mmseqs: MMseqsOptions,
+        memory: MemoryOptions):
+    """Read Annotation Tool"""
+
+    arguments = RatOptions(
+        contigs_fasta=contigs_fasta,
+        database=database,
+        mode=mode,
+        output_prefix=output_prefix,
+        read_file=tuple(read_file) if read_file else None,
+        bam_file=tuple(bam_file) if bam_file else None,
+        alignment_unmapped=alignment_unmapped,
+        bin_fasta_or_folder=bin_fasta_or_folder,
+        bin_suffix=bin_suffix,
+        contigs2classification=contigs2classification,
+        bin2classification=bin2classification,
+        read2classification=read2classification,
+        unmapped2classification=unmapped2classification,
+        mapping_quality=mapping_quality,
+        proteins=proteins,
+        alignment=alignment,
+        range_=Decimal(str(range_)),
+        fraction=Decimal(str(fraction)),
+        top=top,
+        tmpdir=tmpdir,
+        compress=compress,
+        no_stars=no_stars,
+        log_file=log_file,
+        aligner=aligner,
+        path_to_bwa=path_to_bwa,
+        path_to_samtools=path_to_samtools,
+        sort_memory_mib=sort_memory_mib,
+        diamond=diamond,
+        mmseqs=mmseqs,
+        memory=memory,
+        threads=execution.threads,
+        quiet=execution.quiet,
+        verbose=execution.verbose,
+        debug=execution.debug,
+    )
+    console = Console(stderr=True)
+    log = init_logging(arguments.debug, quiet=arguments.quiet,
+                       console=console)
+    log.info("Loaded all arguments")
+
+    argument_print(arguments, "RAT", log, console)
+    tracker = ProgressTracker(build_plan(arguments), quiet=arguments.quiet, console=console)
+    try:
+        with tracker.display():
+            outputs = run(arguments, tracker.update)
+    except KeyboardInterrupt:
+        console.print("\nRun cancelled :(")
+        raise typer.Exit(code=130)
+
+    except CatError as error:
+        show_error(error, console)
+        raise typer.Exit(code=1)
+
+    except Exception:
+        log.exception("Unexpected error", exc_info=False)
+        if arguments.debug:
+            console.print_exception(show_locals=True)  # TODO: before release back to False
+        raise typer.Exit(code=1)
+
+    if not arguments.quiet:
+        console.print(Panel(Text("Completed"),title="RAT completed", border_style="green"))
 
 

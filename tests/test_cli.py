@@ -1,11 +1,14 @@
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from rich.text import Text
 from typer.testing import CliRunner
 
 from CAT_pack7.cli import app
+from CAT_pack7.progress import ProgressTracker
+from CAT_pack7.utils.logging import Status
 from CAT_pack7.config.options import DiamondOptions, MMseqsOptions
 
 ANNOTATION_COMMANDS = (("cat", "-c"), ("bat", "-b"), ("bins", "-b"))
@@ -139,6 +142,29 @@ class CliTests(unittest.TestCase):
 
         self.assertEqual(result.exit_code, 2, result.output)
         self.assertIn("Missing option", result.output)
+
+    def test_download_keeps_file_callbacks_with_step_tracker(self):
+        def download(args, report, report_file, queue):
+            self.assertIsInstance(report.__self__, ProgressTracker)
+            path = Path("example.faa.gz")
+            queue([path])
+            report("Downloading", Status.RUNNING)
+            report_file(path, 5, 10)
+            report_file(path, 10, 10)
+            report("Downloading", Status.COMPLETE, 1, 1)
+            return SimpleNamespace(db_fasta=path, names=path, nodes=path, acc2tax=path)
+
+        for quiet in (False, True):
+            with self.subTest(quiet=quiet), patch("CAT_pack7.cli.run_download", side_effect=download):
+                args = ["download", "--db", "nr", "--out-dir", "example-db"]
+                if quiet:
+                    args.append("--quiet")
+                result = self.runner.invoke(app, args)
+                self.assertEqual(result.exit_code, 0, result.output)
+                if quiet:
+                    self.assertEqual(result.output, "")
+                else:
+                    self.assertIn("Download completed", result.output)
 
 
 if __name__ == "__main__":

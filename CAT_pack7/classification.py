@@ -9,7 +9,7 @@ import numpy as np
 
 from . import tax
 from .io.parsers import AlignmentInput
-from .results import NO_HIT, Classification, ClassificationStatus
+from .results import Classification, ClassificationStatus
 
 log = logging.getLogger("CAT_pack")
 
@@ -54,7 +54,7 @@ class ClassificationEngine:
             return np.bincount(ORF2contig_or_bin[ORF_mask], minlength=n_entities)
 
         n_ORFs_with_hits = count_per_entity(ORF_has_hits)
-        n_ORFs_with_taxid = count_per_entity(LCA_per_ORF != tax.NO_TAXID)
+        n_ORFs_with_taxid = count_per_entity(LCA_per_ORF != tax.ORF.NO_TAXID)
         n_assignments = np.diff(assignment_starts)
 
         # DEVNOTE: For in the devdocs. np.select picks the first matching condition
@@ -87,8 +87,8 @@ class ClassificationEngine:
         n_ORFs = len(ORF_names)
 
         ORF2alignment_index = np.fromiter(
-            (alignment.orf_index.get(ORF, NO_HIT) for ORF in ORF_names), dtype=np.int64, count=n_ORFs)
-        ORF_has_hits = ORF2alignment_index != NO_HIT
+            (alignment.orf_index.get(ORF, tax.ORF.NO_HIT) for ORF in ORF_names), dtype=np.int64, count=n_ORFs)
+        ORF_has_hits = ORF2alignment_index != tax.ORF.NO_HIT
 
         alignment_indices = ORF2alignment_index[ORF_has_hits]
         hits_start = alignment.orf_offsets[alignment_indices]
@@ -125,7 +125,7 @@ class ClassificationEngine:
                 alignment.orf_offsets, hit_taxids
             )
 
-        LCA_per_ORF = np.full(n_ORFs, tax.NO_TAXID, dtype=np.int32)
+        LCA_per_ORF = np.full(n_ORFs, tax.ORF.NO_TAXID, dtype=np.int32)
         LCA_per_ORF[ORF_has_hits] = alignment_ORF_LCAs[alignment_indices]
 
         n_hits_per_ORF = np.zeros(n_ORFs, dtype=np.int64)

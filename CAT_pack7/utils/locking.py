@@ -11,16 +11,24 @@ from .errors import InputError
 def lock_outputs(resources: Iterable[Path]) -> Iterator[None]:
     with ExitStack() as stack:
         for path in dict.fromkeys(path.resolve() for path in resources):
-            lock_path = path.with_name(f".{path.name}.from.cat.lock")
-            lock_file = stack.enter_context(lock_path.open("a+b"))
+            #lock_path = path.with_name(f".{path.name}.from.cat.lock")
+            lock_file = stack.enter_context(path.open("a+b"))
             try:
                 lock_file.seek(0)
                 if os.name == "nt": # <- For future reference: THis is for windows
                     import msvcrt
                     msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+
+                    def _unlock_win(f=lock_file):
+                        f.seek(0)
+                        msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+                    stack.callback(_unlock_win)
+
+
                 else:
                     import fcntl
                     fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    stack.callback(fcntl.flock, lock_file.fileno(), fcntl.LOCK_UN)
             except OSError as error:
                 if error.errno in {errno.EACCES, errno.EAGAIN, errno.EDEADLK}:
                     raise InputError(

@@ -4,6 +4,7 @@ import logging
 import sys
 from dataclasses import dataclass
 from decimal import Decimal
+from enum import IntEnum
 from pathlib import Path
 from time import perf_counter
 from typing import Any, Iterable, Mapping, Sequence
@@ -12,13 +13,16 @@ import numpy as np
 from numpy import dtype, ndarray
 from numpy.typing import ArrayLike, NDArray
 
+from CAT_pack7.utils.typing import Taxid
 from .io.reference_mapping import read_fastaid2LCAtaxid
-from .typing import Taxid
 from .utils.errors import InputError
 
 log = logging.getLogger("CAT_pack")
 
-NO_TAXID: int = -1
+class ORF(IntEnum):
+    # Missing values must stay outside valid, nonnegative array positions.
+    NO_HIT = -1
+    NO_TAXID = -2
 
 class Taxonomy:
     def __init__(
@@ -30,7 +34,7 @@ class Taxonomy:
         self.taxid_index: dict[str, int] = taxid_index
         self.taxids: list[str] = taxids
         self.no_rank: int = 1
-        self.no_taxid: int = NO_TAXID
+        self.no_taxid: int = ORF.NO_TAXID
         self.prepare_LCA()
 
     @classmethod
@@ -236,7 +240,7 @@ def sum_bitscores(
     orf_type: NDArray[np.int64], lca_per_orf: NDArray[np.int32],
     top_bitscores: NDArray[np.int64], n: int,
 ) -> NDArray[np.int64]:
-    taxid_mask = lca_per_orf != NO_TAXID
+    taxid_mask = lca_per_orf != ORF.NO_TAXID
     total_bitscore = np.zeros(n, dtype=np.int64)
     np.add.at(total_bitscore, orf_type[taxid_mask], top_bitscores[taxid_mask])
     return total_bitscore
@@ -247,7 +251,7 @@ def sum_taxid_bitscores(
 ) -> tuple[NDArray[np.int64], NDArray[np.int64], NDArray[np.int64]]:
     log.info("Starting support expansion.")
     stage_started: float = perf_counter()
-    orf_pos = np.flatnonzero(lca_per_orf != NO_TAXID)
+    orf_pos = np.flatnonzero(lca_per_orf != ORF.NO_TAXID)
     known_orfs = len(orf_pos)
 
     orf_ids = orf_type[orf_pos]
@@ -407,26 +411,28 @@ def find_weighted_LCA(
     return result
 
 
-def read_nodes(path: Path) -> dict[str, str]:
+def read_nodes(path: Path, ranks: bool = False) -> dict[str, str]:
+    """Read taxid2parent, or taxid2rank depending on the ranks argument"""
     log.info(f"Loading file {path}.")
-    parents: dict[str, str] = {}
+    column = 4 if ranks else 2
+    nodes: dict[str, str] = {}
     with path.open(encoding="utf-8") as source:
         for line_number, line in enumerate(source, start=1):
-            fields = line.rstrip("\r\n").split("\t", 3)
-            if len(fields) < 3 or fields[1] != "|" or not fields[0] or not fields[2]:
+            fields = line.rstrip("\r\n").split("\t", column + 1)
+            if len(fields) <= column or fields[1] != "|" or not fields[0] or not fields[column]:
                 raise InputError(
                     f"Malformed taxonomy node at line {line_number}.",
                     path=path,
-                    hint="Use an NCBI nodes.dmp file with tab-separated taxid and parent fields.",
+                    hint="Use an NCBI nodes.dmp file with tab-separated taxid, parent, rank fields.",
                 )
-            taxid, parent = fields[0], fields[2]
-            if taxid in parents:
+            taxid, value = fields[0], fields[column]
+            if taxid in nodes:
                 raise InputError(
                     f"Duplicate taxonomy taxid {taxid} at line {line_number}.",
                     path=path,
                 )
-            parents[taxid] = parent
-    return parents
+            nodes[taxid] = value
+    return nodes
 
 
 def import_fastaid2LCAtaxid(fastaid2LCAtaxid_file: Path, all_hits: set[str], *, workers: int=1) -> dict[str, str]:

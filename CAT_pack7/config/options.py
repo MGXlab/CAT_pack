@@ -6,6 +6,7 @@ And can easily build or extend classes.
 """
 from dataclasses import dataclass, field
 from decimal import Decimal
+from enum import Enum
 from pathlib import Path
 from typing import Literal
 
@@ -65,6 +66,8 @@ class AnnotationOptions(ExecutionOptions):
         return self.log_file if self.log_file is not None else Path(f"{self.output_prefix}.log")
 
 
+
+
 @dataclass(frozen=True, kw_only=True)
 class CatOptions(AnnotationOptions):
     contigs: Path
@@ -78,6 +81,34 @@ class BatOptions(AnnotationOptions):
     fraction: Decimal = Decimal("0.3")
     output_prefix: Path = Path("out.BAT")
     no_stars: bool = False
+
+class RatModes(str, Enum):
+    MCR = "mcr"
+    CR = "cr"
+    MR = "mr"
+    MC = "mc"
+    C = "c"
+    M = "m"
+
+@dataclass(frozen=True, kw_only=True)
+class RatOptions(AnnotationOptions):
+    contigs_fasta: Path
+    mode: RatModes
+    output_prefix: Path = Path("out.RAT")
+    read_file: tuple[Path, ...] | None = None
+    bam_file: tuple[Path, ...] | None = None
+    alignment_unmapped: Path | None = None
+    bin_fasta_or_folder: Path | None = None
+    bin_suffix: str = ".fna"
+    contigs2classification: Path | None = None
+    bin2classification: Path | None = None
+    read2classification: bool = False
+    unmapped2classification: Path | None = None
+    mapping_quality: int = 2
+    no_stars: bool = False
+    path_to_bwa: Path = 'bwa'
+    path_to_samtools: Path = 'samtools'
+    sort_memory_mib: int | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -98,3 +129,5 @@ class DownloadOptions(ExecutionOptions):
     out_dir: Path
     cleanup: bool = False
     no_log: bool = False
+
+

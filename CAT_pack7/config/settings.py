@@ -73,7 +73,7 @@ class DiamondSettings(DiamondParameters):
     blast_flavour: str = "blastp"
     matrix: str = "BLOSUM62"
     evalue: str = "0.001"
-    cat_only = True
+    cat_only: bool = True
 
     def get_command(self):
         command = [
@@ -143,6 +143,40 @@ class BatSettings(ExecutionSettings, ClassificationSettings):
     no_stars: bool
 
 
+@dataclass(frozen=True)
+class RatFiles:
+    contigs_fasta: Path
+    nodes: Path
+    read_files: tuple[Path, ...]
+    bam_files: tuple[Path, ...]
+    bin_paths: tuple[Path, ...]
+    bin2contigs: dict[str, list[str]]
+    contigs2classification: Path | None
+    bin2classification: Path | None
+    unmapped2classification: Path | None
+    unclassified_fasta: Path | None
+    alignment_unmapped: Path | None
+    contig_abundance: Path
+    complete_abundance: Path
+    bin_abundance: Path | None
+    read_classification: Path | None
+    mapping_sam: Path | None = None
+    mapping_bam: Path | None = None
+    outputs: tuple[Path, ...] = ()
+
+
+@dataclass(frozen=True)
+class RatSettings(ExecutionSettings):
+    files: RatFiles
+    log_file: Path
+    bwa: Path
+    samtools: Path
+    mapping_quality: int
+    sort_memory_mib: int | None = None
+    cat: CatSettings | None = None
+    bat: BatSettings | None = None
+
+
 # Database preparation settings and outputs.
 @dataclass(frozen=True)
 class DiamondPrepareSettings:
@@ -161,7 +195,7 @@ class DiamondPrepareSettings:
         ]
         if not self.verbose:
             command.append("--quiet")
-        return command
+        return [str(arg) for arg in command if arg != ""]
 
 
 @dataclass(frozen=True)

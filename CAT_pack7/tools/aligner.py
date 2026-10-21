@@ -47,7 +47,7 @@ def run_mmseqs2(mmseqs: MMseqsSettings, report):
     """)
 
 
-def run_aligner(arguments: DiamondSettings | MMseqsSettings, report):
+def run_aligner(arguments: DiamondSettings | MMseqsSettings, report, *, _=None):
     if type(arguments) == DiamondSettings:
         log.info(f"Aligning {arguments.query} to {arguments.alignment} with DIAMOND")
         run_diamond(arguments, report)

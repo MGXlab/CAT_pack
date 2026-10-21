@@ -6,8 +6,6 @@ import numpy as np
 from .io.parsers import AlignmentInput
 from .tax import Taxonomy, WeightedLCA
 
-NO_HIT = -1
-
 
 @dataclass(frozen=True, slots=True)
 class Lineage:

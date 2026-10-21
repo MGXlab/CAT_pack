@@ -1,18 +1,18 @@
 import logging
 import shutil
 import sys
-from dataclasses import replace
+from dataclasses import replace, fields
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
 from .options import AlignerName, BatOptions, CatOptions, ExecutionOptions, DiamondOptions, PrepareOptions, \
-    MemoryOptions, DownloadOptions
+    MemoryOptions, DownloadOptions, RatOptions, AnnotationOptions
 from .settings import (
     BatFiles, BatSettings, CatFiles, CatSettings, ClassificationSettings, DatabaseFiles, DiamondParameters,
     DiamondPrepareSettings, DiamondSettings, ExecutionSettings, MMseqsPrepareSettings,
     PrepareOutputs, PrepareSettings, TaxonomyFiles, MemorySettings,
-    DownloadFile, DownloadOutputs, DownloadSettings, NRUrls, GTDBUrls, GTDBDownloadOutputs,
+    DownloadFile, DownloadOutputs, DownloadSettings, NRUrls, GTDBUrls, GTDBDownloadOutputs, RatFiles, RatSettings,
 )
 from ..io.parsers import BinParser
 from ..utils.check import (
@@ -31,7 +31,7 @@ DIAMOND_MODES = {
 
 
 def validate_execution(options: ExecutionOptions) -> ExecutionSettings:
-    memory = validate_memory(options.memory) if isinstance(options, (CatOptions, BatOptions)) else MemorySettings()
+    memory = validate_memory(options.memory) if isinstance(options, (CatOptions, BatOptions, RatOptions)) else MemorySettings()
     if memory.available_memory_bytes is not None:
         log.info(f"[red]Memory mode[/red]: custom ({memory.available_memory_bytes / GIB:g} GiB)")
     elif memory.low_memory:
@@ -382,7 +382,169 @@ def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
         raise TypeError(f"Hmmm, that type of options I don't know yet")
 
 
-def get_validated_settings(args: CatOptions | BatOptions | PrepareOptions) -> CatSettings | BatSettings | PrepareSettings:
+def validate_rat_files(args: RatOptions) -> RatFiles:
+    checks = ValErrorCollector()
+    prefix = str(args.output_prefix)
+    output_files = []
+    checks.check(check_fasta_file, args.contigs_fasta, "Contigs FASTA")
+    nodes = checks.check(check_file_not_empty, args.database / "nodes.dmp", "Taxonomy nodes file")
+    checks.check(check_output_prefix, args.output_prefix)
+    checks.check(check_output_prefix, args.log_path)
+    checks.check(check_integer, args.threads, "Threads", 1, sys.maxsize)
+    checks.check(check_integer, args.mapping_quality, "Mapping quality", 0, 255)
+    if args.sort_memory_mib is not None:
+        checks.check(check_integer, args.sort_memory_mib, "Sort memory (MiB)", 1, sys.maxsize)
+    checks.check(validate_classification, args.range_, args.fraction)
+    checks.check(validate_memory, args.memory)
+
+
+    # Check the optional arguments and argument combinations
+    read_files = []
+    if args.read_file is not None:
+        if len(args.read_file) > 2:
+            checks.add(InputError("Too many read files", hint="supply one or two read files."))
+        for read_file in args.read_file:
+            read_files.append(checks.check(check_file_not_empty, read_file, "Read file"))
+
+    mapping_sam = None
+    mapping_bam = None
+    bam_files = ()
+    if args.bam_file is not None:
+        if len(args.bam_file) > 2:
+            checks.add(InputError("Too many bam files", hint="supply one or two bam files. One is preferred"))
+        for bam_file in args.bam_file:
+            checks.check(check_file_not_empty, bam_file, "Bam file")
+        bam_files = args.bam_file
+    elif args.read_file:
+        mapping_sam = Path(f"{prefix}.{args.contigs_fasta.name}.{args.read_file[0].name}.bwamem")
+        mapping_bam = Path(f"{mapping_sam}.bam")
+        bam_files = (Path(f"{mapping_sam}.sorted"),)
+        output_files += [mapping_sam, mapping_bam, *bam_files]
+
+    if not args.read_file and not args.bam_file:
+        checks.add(InputError("No read files or bam files supplied.", hint="supply read files (--read_file) or bam files (--bam_file)."))
+
+    if args.contigs2classification is not None:
+        c2c = checks.check(check_file_not_empty, args.contigs2classification, "Contigs classification")
+    else:
+        c2c = Path(f"{prefix}.CAT.contig2classification.txt")
+    if args.bin2classification is not None:
+        checks.check(check_file_not_empty, args.bin2classification, "Bin classification")
+    if args.unmapped2classification is not None:
+        checks.check(check_file_not_empty, args.unmapped2classification, "Unmapped classification")
+    if args.proteins is not None:
+        checks.check(check_fasta_file, args.proteins, "Protein FASTA")
+    if args.alignment is not None:
+        checks.check(check_file_not_empty, args.alignment, "Alignment table")
+    if args.alignment_unmapped is not None:
+        checks.check(check_file, args.alignment_unmapped, "Direct alignment")
+
+    bins = None
+    if "m" in args.mode.value:
+        if args.bin_fasta_or_folder is None:
+            checks.add(InputError("No bins supplied", hint="Add the require bins (--bin_fasta or --bin-folder)."))
+        else:
+            parser = BinParser(args.bin_fasta_or_folder, args.bin_suffix)
+            paths = checks.check(parser.find_bin_paths)
+            if paths is not None:
+                for path in paths:
+                    checks.check(check_fasta_file, path, "Bin FASTA")
+                bins = checks.check(parser.parse, paths)
+    direct = "r" in args.mode.value
+    files = RatFiles(
+        contigs_fasta=args.contigs_fasta,
+        nodes=nodes,
+        read_files=tuple(read_files),
+        bam_files=bam_files,
+        mapping_sam=mapping_sam,
+        mapping_bam=mapping_bam,
+        bin_paths=bins.bin_paths if bins else (),
+        bin2contigs=bins.bin2contigs if bins else {},
+        contigs2classification=c2c if "c" in args.mode.value else None,
+        bin2classification=(args.bin2classification or Path(f"{prefix}.BAT.bin2classification.txt")) if "m" in args.mode.value else None,
+        unmapped2classification=(args.unmapped2classification or Path(f"{prefix}.RAT.unmapped2classification.txt")) if direct else None,
+        unclassified_fasta=Path(f"{prefix}.RAT.unclassified.fna") if direct else None,
+        alignment_unmapped=(args.alignment_unmapped or Path(f"{prefix}.RAT.unclassified.alignment.diamond")) if direct else None,
+        contig_abundance=Path(f"{prefix}.RAT.contig.abundance.txt"),
+        complete_abundance=Path(f"{prefix}.RAT.complete.abundance.txt"),
+        bin_abundance=Path(f"{prefix}.RAT.bin.reads.txt") if bins else None,
+        read_classification=Path(f"{prefix}.RAT.read2classification.txt") if args.read2classification else None,
+    )
+    output_files += [files.contig_abundance, files.complete_abundance]
+    if files.bin_abundance is not None: output_files.append(files.bin_abundance)
+    if files.read_classification is not None: output_files.append(files.read_classification)
+    if "r" in args.mode.value and not args.unmapped2classification:
+        output_files.append(files.unmapped2classification)
+        if not args.alignment_unmapped:
+            output_files.append(files.unclassified_fasta)
+            output_files.append(files.alignment_unmapped)
+
+    checks.finish()
+    return replace(files, outputs=tuple(output_files))
+
+
+
+def make_cat_options(args: RatOptions) -> CatOptions:
+    shared = {
+        field.name: getattr(args, field.name)
+        for field in fields(AnnotationOptions)
+    }
+
+    shared.update(
+        output_prefix=Path(f"{args.output_prefix}.CAT"),
+        log_file=args.log_path,
+    )
+
+    return CatOptions(
+        contigs=args.contigs_fasta,
+        **shared,
+    )
+
+def make_bat_options(args: RatOptions) -> BatOptions:
+    shared = {
+        field.name: getattr(args, field.name)
+        for field in fields(AnnotationOptions)
+    }
+
+    shared.update(
+        output_prefix=Path(f"{args.output_prefix}.BAT"),
+        log_file=args.log_path
+    )
+
+    return BatOptions(bins=args.bin_fasta_or_folder, bin_suffix=args.bin_suffix,
+                      no_stars=args.no_stars, **shared)
+
+
+def validate_rat(args: RatOptions) -> RatSettings:
+    files = validate_rat_files(args)
+    execution = validate_execution(args)
+    bwa = shutil.which(str(args.path_to_bwa))
+    samtools = shutil.which(str(args.path_to_samtools))
+    if bwa is None:
+        raise InputError("BWA executable not found.")
+    if samtools is None:
+        raise InputError("SAMtools executable not found.")
+    cat_settings = None
+    if "c" in args.mode.value and args.contigs2classification is None:
+        cat_settings = validate_cat(make_cat_options(args))
+    bat_settings = None
+    if "m" in args.mode.value and args.bin2classification is None:
+        bat_settings = validate_cat(make_bat_options(args))
+
+    mapping_quality: int = args.mapping_quality
+
+    return RatSettings(
+        files=files, log_file=args.log_path,
+        bwa=Path(bwa), samtools=Path(samtools),
+        sort_memory_mib=args.sort_memory_mib,
+        threads=execution.threads, quiet=execution.quiet,
+        verbose=execution.verbose, debug=execution.debug,
+        memory=execution.memory, cat=cat_settings, bat=bat_settings, mapping_quality=mapping_quality,
+    )
+
+def get_validated_settings(args: CatOptions | BatOptions | RatOptions | PrepareOptions) -> CatSettings | BatSettings | RatSettings | PrepareSettings:
+    if isinstance(args, RatOptions):
+        return validate_rat(args)
     if isinstance(args, (CatOptions, BatOptions)):
         log.debug(f"Starting validation on CatOptions or BatOptions")
         return validate_cat(args)
