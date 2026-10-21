@@ -411,26 +411,28 @@ def find_weighted_LCA(
     return result
 
 
-def read_nodes(path: Path) -> dict[str, str]:
+def read_nodes(path: Path, ranks: bool = False) -> dict[str, str]:
+    """Read taxid2parent, or taxid2rank depending on the ranks argument"""
     log.info(f"Loading file {path}.")
-    parents: dict[str, str] = {}
+    column = 4 if ranks else 2
+    nodes: dict[str, str] = {}
     with path.open(encoding="utf-8") as source:
         for line_number, line in enumerate(source, start=1):
-            fields = line.rstrip("\r\n").split("\t", 3)
-            if len(fields) < 3 or fields[1] != "|" or not fields[0] or not fields[2]:
+            fields = line.rstrip("\r\n").split("\t", column + 1)
+            if len(fields) <= column or fields[1] != "|" or not fields[0] or not fields[column]:
                 raise InputError(
                     f"Malformed taxonomy node at line {line_number}.",
                     path=path,
-                    hint="Use an NCBI nodes.dmp file with tab-separated taxid and parent fields.",
+                    hint="Use an NCBI nodes.dmp file with tab-separated taxid, parent, rank fields.",
                 )
-            taxid, parent = fields[0], fields[2]
-            if taxid in parents:
+            taxid, value = fields[0], fields[column]
+            if taxid in nodes:
                 raise InputError(
                     f"Duplicate taxonomy taxid {taxid} at line {line_number}.",
                     path=path,
                 )
-            parents[taxid] = parent
-    return parents
+            nodes[taxid] = value
+    return nodes
 
 
 def import_fastaid2LCAtaxid(fastaid2LCAtaxid_file: Path, all_hits: set[str], *, workers: int=1) -> dict[str, str]:

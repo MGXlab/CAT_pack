@@ -146,6 +146,7 @@ class BatSettings(ExecutionSettings, ClassificationSettings):
 @dataclass(frozen=True)
 class RatFiles:
     contigs_fasta: Path
+    nodes: Path
     read_files: tuple[Path, ...]
     bam_files: tuple[Path, ...]
     bin_paths: tuple[Path, ...]

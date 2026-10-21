@@ -387,7 +387,7 @@ def validate_rat_files(args: RatOptions) -> RatFiles:
     prefix = str(args.output_prefix)
     output_files = []
     checks.check(check_fasta_file, args.contigs_fasta, "Contigs FASTA")
-    checks.check(check_file_not_empty, args.database / "nodes.dmp", "Taxonomy nodes file")
+    nodes = checks.check(check_file_not_empty, args.database / "nodes.dmp", "Taxonomy nodes file")
     checks.check(check_output_prefix, args.output_prefix)
     checks.check(check_output_prefix, args.log_path)
     checks.check(check_integer, args.threads, "Threads", 1, sys.maxsize)
@@ -453,6 +453,7 @@ def validate_rat_files(args: RatOptions) -> RatFiles:
     direct = "r" in args.mode.value
     files = RatFiles(
         contigs_fasta=args.contigs_fasta,
+        nodes=nodes,
         read_files=tuple(read_files),
         bam_files=bam_files,
         mapping_sam=mapping_sam,
