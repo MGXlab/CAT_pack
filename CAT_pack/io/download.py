@@ -2,7 +2,6 @@
 
 import gzip
 import hashlib
-import io
 import logging
 import pathlib
 import re
@@ -15,11 +14,13 @@ from functools import singledispatch
 from itertools import chain
 from typing import Callable
 
-from CAT_pack7.config.settings import DownloadOutputs, DownloadSettings, GTDBDownloadOutputs
-from CAT_pack7.io.parsers import optionally_compressed_handle
-from CAT_pack7.utils import check
-from CAT_pack7.utils.errors import CheckSumError
-from CAT_pack7.utils.logging import Report, Status
+from CAT_pack.config.settings import DownloadOutputs, DownloadSettings, GTDBDownloadOutputs
+from CAT_pack.io.parsers import optionally_compressed_handle
+from CAT_pack.utils import check
+from CAT_pack.utils.errors import CheckSumError
+from CAT_pack.utils.logging import Report, Status
+
+import io
 
 log = logging.getLogger("CAT_pack")
 DownloadReport = Callable[[pathlib.Path, int, int | None], None]

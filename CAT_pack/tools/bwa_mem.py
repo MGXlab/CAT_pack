@@ -3,9 +3,9 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from CAT_pack7.config.settings import RatSettings
-from CAT_pack7.tools.tool_runner import run_tool, tool_output
-from CAT_pack7.utils.errors import ExternalToolError
+from CAT_pack.config.settings import RatSettings
+from CAT_pack.tools.tool_runner import run_tool, tool_output
+from CAT_pack.utils.errors import ExternalToolError
 
 
 def check_index(contigs_fasta: Path) -> bool:

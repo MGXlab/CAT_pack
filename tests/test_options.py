@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from CAT_pack7.config.options import BatOptions
+from CAT_pack.config.options import BatOptions
 
 
 class LogPathTests(unittest.TestCase):

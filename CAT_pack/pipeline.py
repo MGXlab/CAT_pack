@@ -5,10 +5,11 @@ from decimal import Decimal
 from tarfile import TarError
 from typing import Any, Callable
 
-from CAT_pack7.io.download import (
+from CAT_pack.io.download import (
     DownloadQueueReport, DownloadReport, multi_download,
     check_files, process_files, cleanup_downloads,
 )
+
 from .classification import ClassificationEngine
 from .config.options import BatOptions, CatOptions, PrepareOptions, DownloadOptions, RatOptions
 from .config.settings import BatFiles, BatSettings, CatFiles, CatSettings, DownloadOutputs
