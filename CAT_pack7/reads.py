@@ -7,6 +7,7 @@ from pathlib import Path
 
 from CAT_pack7 import tax
 from CAT_pack7.config.settings import RatSettings
+from CAT_pack7.io.parsers import FastaParser, FastqParser
 from CAT_pack7.tools.tool_runner import tool_output
 from CAT_pack7.utils.errors import ExternalToolError
 from CAT_pack7.utils.logging import Report
@@ -189,83 +190,56 @@ def make_contig_dict(map_result: MappingResult, settings: RatSettings, contig2bi
 #
 #
 #
-# def make_unclassified_seq_fasta(seq_fasta, unclassified_seq_ids,
-#                                 unclassified_seq_fasta, f_format, f_mode,
-#                                 suffix=''):
-#
-#
-#     fasta_dict={}
-#     if f_format == 'fasta':
-#         with shared.optionally_compressed_handle(seq_fasta, 'r') as f1:
-#             for line in f1:
-#                 if line.startswith('>'):
-#                     header = line.rstrip().split(' ')[0].lstrip('>')
-#                     if header in fasta_dict:
-#                         sys.exit('Duplicate fasta headers in the file!') # This should be prettified.
-#                     fasta_dict.setdefault(header, '')
-#                 else:
-#                     fasta_dict[header] += line.rstrip()
-#
-#
-#     elif f_format=='fastq':
-#         with shared.optionally_compressed_handle(seq_fasta, 'r') as f1:
-#             for n, line in enumerate(f1):
-#                 if n % 4 == 0:
-#                     if not line.startswith('@'):
-#                         sys.exit('Unknown seuqence identifier symbol in line {n}!') # This should be prettified.
-#                     header = line.rstrip().split(' ')[0].lstrip('@')
-#
-#                     if header in fasta_dict:
-#                         sys.exit('Duplicate fasta headers in the file!')
-#
-#                     fasta_dict.setdefault(header, '')
-#                 elif n % 4 == 1:
-#                     fasta_dict[header] += line.rstrip()
-#     else:
-#         sys.exit('Unknown read file format!')
-#
-#     with open(unclassified_seq_fasta, f_mode) as outf:
-#         # print(unclassified_seq_ids)
-#         suffices=['/1', '/2', '_1', '_2']
-#         for seq in unclassified_seq_ids:
-#             if seq in fasta_dict:
-#                 seq_id=seq
-#             else:
-#                 for s in suffices:
-#                     if seq+s in fasta_dict:
-#                         seq_id=seq+s
-#         # print(seq)
-#             outf.write('>{0}{1}\n{2}\n'.format(seq_id, suffix,
-#                                                fasta_dict[seq]))
-#
-#
-#
-# def get_unclassified_contigs(contig2bin, c2c, b2c):
-#     """
-#     If the contig is in a bin that is unclassified, or if the contig is not in
-#     a bin AND unclassified: put it in a set.
-#     """
-#     unclassified_contigs=list()
-#     for c in c2c:
-#         classified=False
-#         if c in contig2bin:
-#             if b2c[contig2bin[c]]:
-#                 mag_lineage=b2c[contig2bin[c]][0]
-#                 if len(mag_lineage)>2 or (len(mag_lineage)==2 and
-#                                           mag_lineage[1]!='131567'):
-#                     classified=True
-#         if not classified:
-#             if c2c[c]:
-#                 lineage=c2c[c][0]
-#                 if len(lineage)>2 or (len(lineage)==2 and
-#                                           lineage[1]!='131567'):
-#                     classified=True
-#         if not classified:
-#             unclassified_contigs.append(c)
-#     return unclassified_contigs
-#
-#
-#
+
+
+def make_unclassified_seq_fasta(settings: RatSettings, map_result: MappingResult,
+                                unclassified_contigs: list[str]) -> None:
+    unclassified_seq_ids = set(unclassified_contigs)
+
+    with settings.files.unclassified_fasta.open("w") as outf:
+        for record in FastaParser(settings.files.contigs_fasta):
+            if record.name in unclassified_seq_ids:
+                outf.write(f">{record.name}\n{record.sequence}\n")
+
+        for index, seq_fasta in enumerate(settings.files.read_files, start=1):
+            direction = "fw" if index == 1 else "rev"
+            unmapped_reads = map_result.unmapped_reads[direction]
+
+            for record in FastqParser(seq_fasta):
+                seq_id = record.name
+
+                if seq_id not in unmapped_reads and seq_id.endswith(("/1", "/2", "_1", "_2")):
+                    seq_id = seq_id[:-2]
+
+                if seq_id in unmapped_reads:
+                    outf.write(f">{seq_id}_{index}\n{record.sequence}\n")
+
+
+def get_unclassified_contigs(contig2bin, c2c, b2c):
+    """
+    If the contig is in a bin that is unclassified, or if the contig is not in
+    a bin AND unclassified: put it in a set.
+    """
+    unclassified_contigs=list()
+    for c in c2c:
+        classified=False
+        if c in contig2bin:
+            if b2c[contig2bin[c]]:
+                mag_lineage=b2c[contig2bin[c]][0]
+                if len(mag_lineage)>2 or (len(mag_lineage)==2 and
+                                          mag_lineage[1]!='131567'):
+                    classified=True
+        if not classified:
+            if c2c[c]:
+                lineage=c2c[c][0]
+                if len(lineage)>2 or (len(lineage)==2 and
+                                          lineage[1]!='131567'):
+                    classified=True
+        if not classified:
+            unclassified_contigs.append(c)
+    return unclassified_contigs
+
+
 # def get_contig_lengths(contig_file):
 #     """
 #     gets the lengths of all contigs from the contig file. Works for all types
