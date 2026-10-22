@@ -126,7 +126,7 @@ class FastqParser:
                 if not header.startswith("@"):
                     raise InputError(f"FASTQ header must start with a '@'. Got {header}",
                                      path=self.path, hint="Check the fastq file")
-                name = header[1:].rstrip().split(" ", 1)[0]
+                name = header[1:].rstrip().split(maxsplit=1)[0]
                 if name in seen:
                     raise InputError(f"Duplicate FASTQ header: {name}.", path=self.path,
                                      hint="Remove any duplicate FASTQ headers from the supplied file")
