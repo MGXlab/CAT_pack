@@ -6,13 +6,13 @@ from dataclasses import field, dataclass
 from pathlib import Path
 from typing import Iterator
 
-from CAT_pack7 import tax
-from CAT_pack7.config.settings import RatSettings
-from CAT_pack7.io.parsers import FastaParser, FastqParser
-from CAT_pack7.tools.tool_runner import tool_output
-from CAT_pack7.utils.errors import ExternalToolError
-from CAT_pack7.utils.logging import Report
-from CAT_pack7.tools.aligner import run_aligner
+from CAT_pack import tax
+from CAT_pack.config.settings import RatSettings
+from CAT_pack.io.parsers import FastaParser, FastqParser
+from CAT_pack.tools.aligner import run_aligner
+from CAT_pack.tools.tool_runner import tool_output
+from CAT_pack.utils.errors import ExternalToolError
+from CAT_pack.utils.logging import Report
 
 
 def process_CAT_table(settings: RatSettings, output_table: Path)-> dict[str, list[tuple[str,...]]]:

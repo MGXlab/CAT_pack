@@ -8,10 +8,10 @@ import logging
 import os
 import subprocess
 from contextlib import contextmanager
-from io import BufferedWriter
 from threading import Thread
 from typing import Generator
 
+from _io import BufferedWriter
 from ..utils.errors import ExternalToolError
 
 log = logging.getLogger("CAT_pack")

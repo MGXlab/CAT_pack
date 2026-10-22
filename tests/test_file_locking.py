@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from textwrap import dedent
 
-from CAT_pack7.utils.locking import lock_outputs
+from CAT_pack.utils.locking import lock_outputs
 
 
 class OutputLockingTests(unittest.TestCase):

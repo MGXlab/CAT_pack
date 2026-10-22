@@ -1,9 +1,9 @@
 import logging
 import multiprocessing
-from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from _io import StringIO
 from ..config.settings import BatFiles
 from ..io.parsers import FastaParser
 from ..utils.errors import InputError

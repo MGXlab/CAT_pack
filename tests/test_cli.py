@@ -6,10 +6,10 @@ from unittest.mock import patch
 from rich.text import Text
 from typer.testing import CliRunner
 
-from CAT_pack7.cli import app
-from CAT_pack7.progress import ProgressTracker
-from CAT_pack7.utils.logging import Status
-from CAT_pack7.config.options import DiamondOptions, MMseqsOptions
+from CAT_pack.cli import app
+from CAT_pack.config.options import DiamondOptions, MMseqsOptions
+from CAT_pack.progress import ProgressTracker
+from CAT_pack.utils.logging import Status
 
 ANNOTATION_COMMANDS = (("cat", "-c"), ("bat", "-b"), ("bins", "-b"))
 

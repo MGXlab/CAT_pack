@@ -3,10 +3,10 @@ from decimal import Decimal
 
 import numpy as np
 
-from CAT_pack7.classification import ClassificationEngine
-from CAT_pack7.io.parsers import AlignmentInput
-from CAT_pack7.results import ClassificationStatus
-from CAT_pack7.tax import ORF, Taxonomy
+from CAT_pack.classification import ClassificationEngine
+from CAT_pack.io.parsers import AlignmentInput
+from CAT_pack.results import ClassificationStatus
+from CAT_pack.tax import ORF, Taxonomy
 
 
 class BasicClassificationTests(unittest.TestCase):
