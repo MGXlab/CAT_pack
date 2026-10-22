@@ -36,7 +36,7 @@ class CliTests(unittest.TestCase):
 
     def test_annotation_commands_forward_execution_flags(self):
         for command, input_flag in ANNOTATION_COMMANDS:
-            with self.subTest(command=command), patch("CAT_pack7.cli.run_annotation_cli") as run_annotation:
+            with self.subTest(command=command), patch("CAT_pack.cli.run_annotation_cli") as run_annotation:
                 arguments = [
                     command, input_flag, "input.fna",
                     "-d", "database",
@@ -56,7 +56,7 @@ class CliTests(unittest.TestCase):
 
     def test_annotation_commands_forward_diamond_options(self):
         for command, input_flag in ANNOTATION_COMMANDS:
-            with self.subTest(command=command), patch("CAT_pack7.cli.run_annotation_cli") as run_annotation:
+            with self.subTest(command=command), patch("CAT_pack.cli.run_annotation_cli") as run_annotation:
                 arguments = [
                     command, input_flag, "input.fna",
                     "-d", "database",
@@ -80,7 +80,7 @@ class CliTests(unittest.TestCase):
 
     def test_annotation_commands_forward_mmseqs_options(self):
         for command, input_flag in ANNOTATION_COMMANDS:
-            with self.subTest(command=command), patch("CAT_pack7.cli.run_annotation_cli") as run_annotation:
+            with self.subTest(command=command), patch("CAT_pack.cli.run_annotation_cli") as run_annotation:
                 arguments = [
                     command, input_flag, "input.fna",
                     "-d", "database",
@@ -102,7 +102,7 @@ class CliTests(unittest.TestCase):
 
     def test_annotation_commands_use_default_aligner_options(self):
         for command, input_flag in ANNOTATION_COMMANDS:
-            with self.subTest(command=command), patch("CAT_pack7.cli.run_annotation_cli") as run_annotation:
+            with self.subTest(command=command), patch("CAT_pack.cli.run_annotation_cli") as run_annotation:
                 arguments = [command, input_flag, "input.fna", "-d", "database"]
 
                 result = self.runner.invoke(app, arguments)
@@ -116,7 +116,7 @@ class CliTests(unittest.TestCase):
     def test_zero_index_chunks_is_rejected_before_annotation(self):
         arguments = ["cat", "-c", "input.fna", "-d", "database", "--index-chunks", "0"]
 
-        with patch("CAT_pack7.cli.run_annotation_cli") as run_annotation:
+        with patch("CAT_pack.cli.run_annotation_cli") as run_annotation:
             result = self.runner.invoke(app, arguments)
 
         self.assertEqual(result.exit_code, 2, result.output)
@@ -125,7 +125,7 @@ class CliTests(unittest.TestCase):
     def test_mmseqs_sensitivity_above_the_limit_is_rejected(self):
         arguments = ["cat", "-c", "input.fna", "-d", "database", "--sensitivity", "8"]
 
-        with patch("CAT_pack7.cli.run_annotation_cli") as run_annotation:
+        with patch("CAT_pack.cli.run_annotation_cli") as run_annotation:
             result = self.runner.invoke(app, arguments)
 
         self.assertEqual(result.exit_code, 2, result.output)
@@ -155,7 +155,7 @@ class CliTests(unittest.TestCase):
             return SimpleNamespace(db_fasta=path, names=path, nodes=path, acc2tax=path)
 
         for quiet in (False, True):
-            with self.subTest(quiet=quiet), patch("CAT_pack7.cli.run_download", side_effect=download):
+            with self.subTest(quiet=quiet), patch("CAT_pack.cli.run_download", side_effect=download):
                 args = ["download", "--db", "nr", "--out-dir", "example-db"]
                 if quiet:
                     args.append("--quiet")
