@@ -4,6 +4,7 @@ import subprocess
 import sys
 from dataclasses import field, dataclass
 from pathlib import Path
+from typing import Iterator
 
 from CAT_pack7 import tax
 from CAT_pack7.config.settings import RatSettings
@@ -11,6 +12,7 @@ from CAT_pack7.io.parsers import FastaParser, FastqParser
 from CAT_pack7.tools.tool_runner import tool_output
 from CAT_pack7.utils.errors import ExternalToolError
 from CAT_pack7.utils.logging import Report
+from CAT_pack7.tools.aligner import run_aligner
 
 
 def process_CAT_table(settings: RatSettings, output_table: Path)-> dict[str, list[tuple[str,...]]]:
@@ -63,6 +65,13 @@ class MappingResult:
     paired: bool =False
     contig_dict: dict[str, int] = field(default_factory=dict)
     max_primary: int = 1
+
+    def iter_unmapped_read_ids(self) -> Iterator[str]:
+        for read in self.unmapped_reads["fw"]:
+            yield f"{read}_1"
+
+        for read in self.unmapped_reads["rev"]:
+            yield f"{read}_2"
 
 def process_bam_file(settings: RatSettings, report: Report) -> MappingResult:
     """
@@ -136,60 +145,6 @@ def make_contig_dict(map_result: MappingResult, settings: RatSettings, contig2bi
 
     map_result.contig_dict = contig_dict
     map_result.max_primary = max_primary
-
-
-#
-# def make_contig_dict(read_dict,
-#                      bam_files,
-#                      paired,
-#                      contig2bin):
-#     """
-#     takes the read dictionary that stores which read maps where and returns
-#     a dictionary that stores how many reads bind to each contig. It also adds
-#     bin annotation to the read dict
-#     """
-#     contig_dict={}
-#     contig_dict['*']=0
-#
-#     # check how long the list of contigs per read is allowed to be to calculate
-#     # unmapped reads and check that everything is working correctly
-#     if len(bam_files)>1 or paired:
-#         max_primary=2
-#     else:
-#         max_primary=1
-#
-#     for read in read_dict:
-#         # if a read (pair) has multiple primary alignments, exit
-#         if len(read_dict[read]['contig'])>max_primary:
-#             message = (
-#                     'Something is wrong with the alignment. Too many mappings '
-#                     'detected. Please check your alignment file or map your reads '
-#                     'using RAT.')
-#             shared.give_user_feedback(message)
-#             sys.exit(1)
-#
-#         # otherwise, determine the number of unmapped reads and add it to unmapped
-#         # build a dictionary of contigs and how many reads map to them
-#         # Add bin info to read dictionary
-#         else:
-#             contig_dict['*']+=max_primary-len(read_dict[read]['contig'])
-#             for contig in read_dict[read]['contig']:
-#                 if not contig in contig_dict:
-#                     contig_dict[contig]=0
-#
-#                 contig_dict[contig]+=1
-#                 if contig2bin:
-#                     if contig in contig2bin:
-#                         read_dict[read]['bin'].append(contig2bin[contig])
-#                     else:
-#                         read_dict[read]['bin'].append('unbinned')
-#
-#     return contig_dict, read_dict, max_primary
-#
-#
-#
-#
-#
 
 
 def make_unclassified_seq_fasta(settings: RatSettings, map_result: MappingResult,
@@ -320,6 +275,48 @@ def invert_bin_dict(bin_dict):
         for contig in bin_dict[b]:
             contig2bin[contig]=b
     return contig2bin
+
+@dataclass
+class RatResult:
+    mapping: MappingResult
+    c2c: dict[str, list[tuple[str, ...]]]
+    b2c: dict[str, list[tuple[str, ...]]]
+    unclassified_contigs: list[str]
+    all_unclassified: list[str]
+
+
+def load_classifications(settings: RatSettings, report: Report, map_result: MappingResult) -> RatResult:
+    files = settings.files
+    b2c = {}
+
+    report()
+    if files.contigs2classification is not None:
+        c2c = process_CAT_table(settings, files.contigs2classification)
+    else:
+        c2c = {name: [] for name in FastaParser(files.contigs_fasta).iter_headers()}
+
+    if files.bin2classification is not None:
+        b2c = process_CAT_table(settings, files.bin2classification)
+
+    unclassified_contigs = get_unclassified_contigs(
+        invert_bin_dict(files.bin2contigs), c2c, b2c,
+    )
+
+    all_unclassified = unclassified_contigs.copy()
+    all_unclassified.extend(map_result.iter_unmapped_read_ids())
+
+    return RatResult(map_result, c2c, b2c, unclassified_contigs, all_unclassified)
+
+
+def extract_unclassified_sequences(settings: RatSettings, report: Report, result: RatResult) -> None:
+    make_unclassified_seq_fasta(
+        settings, result.mapping, result.unclassified_contigs,
+    )
+
+
+def run_rat_alignment(settings: RatSettings, report: Report) -> None:
+    run_aligner(settings.aligner, report)
+
 
 
 if __name__ == '__main__':

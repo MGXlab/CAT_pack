@@ -175,6 +175,7 @@ class RatSettings(ExecutionSettings):
     sort_memory_mib: int | None = None
     cat: CatSettings | None = None
     bat: BatSettings | None = None
+    aligner: DiamondSettings | None = None
 
 
 # Database preparation settings and outputs.
