@@ -20,8 +20,8 @@ class OutputLockingTests(unittest.TestCase):
             import sys
             from pathlib import Path
 
-            from CAT_pack7.utils.locking import lock_outputs
-            from CAT_pack7.utils.errors import InputError
+            from CAT_pack.utils.locking import lock_outputs
+            from CAT_pack.utils.errors import InputError
 
             try:
                 with lock_outputs([Path(sys.argv[1])]):
