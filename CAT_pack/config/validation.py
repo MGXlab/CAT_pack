@@ -516,22 +516,49 @@ def make_bat_options(args: RatOptions) -> BatOptions:
 
 
 def validate_rat(args: RatOptions) -> RatSettings:
-    files = validate_rat_files(args)
-    execution = validate_execution(args)
-    bwa = shutil.which(str(args.path_to_bwa))
-    samtools = shutil.which(str(args.path_to_samtools))
+    checks = ValErrorCollector()
+    files = checks.check(validate_rat_files, args)
+    execution = checks.check(validate_execution, args)
+    classification = checks.check(validate_classification, args.range_, args.fraction)
+    bwa = checks.check(shutil.which, str(args.path_to_bwa))
+    samtools = checks.check(shutil.which, str(args.path_to_samtools))
+
     if bwa is None:
-        raise InputError("BWA executable not found.")
+        checks.add(ExternalToolError("BWA executable not found."))
     if samtools is None:
-        raise InputError("SAMtools executable not found.")
+        checks.add(ExternalToolError("SAMtools executable not found."))
+
     cat_settings = None
     if "c" in args.mode.value and args.contigs2classification is None:
-        cat_settings = validate_cat(make_cat_options(args))
+        cat_settings = checks.check(validate_cat, make_cat_options(args))
+
     bat_settings = None
     if "m" in args.mode.value and args.bin2classification is None:
-        bat_settings = validate_cat(make_bat_options(args))
+        bat_settings = checks.check(validate_cat, make_bat_options(args))
 
-    mapping_quality: int = args.mapping_quality
+    aligner = None
+    if "r" in args.mode.value and args.alignment_unmapped is None and args.unmapped2classification is None:
+        diamond = checks.check(validate_diamond, args.diamond)
+        database = checks.check(
+            check_db_file, args.database, ".dmnd", "DIAMOND database",
+        )
+        top = checks.check(check_integer, args.top, "Top", 0, 100)
+
+        if top <= classification.range_:
+            checks.add(InputError("Top must be higher than range."))
+
+        aligner = DiamondSettings(
+            diamond=diamond.diamond, mode=diamond.mode,
+            no_self_hits=diamond.no_self_hits, block_size=diamond.block_size,
+            index_chunks=diamond.index_chunks, query=files.unclassified_fasta,
+            database=database, alignment=files.alignment_unmapped,
+            tmpdir=(args.tmpdir or args.output_prefix.parent)
+                   / f"{args.output_prefix.name}.RAT.tmp",
+            threads=execution.threads, top=top, compression=args.compress,
+            verbose=execution.verbose, blast_flavour="blastx", tiny_out=True,
+        )
+    checks.finish()
+
 
     return RatSettings(
         files=files, log_file=args.log_path,
@@ -539,7 +566,7 @@ def validate_rat(args: RatOptions) -> RatSettings:
         sort_memory_mib=args.sort_memory_mib,
         threads=execution.threads, quiet=execution.quiet,
         verbose=execution.verbose, debug=execution.debug,
-        memory=execution.memory, cat=cat_settings, bat=bat_settings, mapping_quality=mapping_quality,
+        memory=execution.memory, cat=cat_settings, bat=bat_settings, mapping_quality=args.mapping_quality, aligner=aligner
     )
 
 def get_validated_settings(args: CatOptions | BatOptions | RatOptions | PrepareOptions) -> CatSettings | BatSettings | RatSettings | PrepareSettings:

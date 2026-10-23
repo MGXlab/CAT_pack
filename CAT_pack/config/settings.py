@@ -73,7 +73,7 @@ class DiamondSettings(DiamondParameters):
     blast_flavour: str = "blastp"
     matrix: str = "BLOSUM62"
     evalue: str = "0.001"
-    cat_only: bool = True
+    tiny_out: bool = True
 
     def get_command(self):
         command = [
@@ -93,7 +93,7 @@ class DiamondSettings(DiamondParameters):
             "--quiet" if not self.verbose else "",
             "--no-self-hits" if self.no_self_hits else "",
         ]
-        if self.cat_only:
+        if self.tiny_out:
             command.extend(["--outfmt", "6", "qseqid", "sseqid", "bitscore"])
         return [str(arg) for arg in command if arg != ""]
 
