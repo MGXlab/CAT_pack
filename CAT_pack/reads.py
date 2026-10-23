@@ -204,7 +204,8 @@ def get_unclassified_contigs(contig2bin, c2c, b2c):
 #     contig_length_dict={}
 #     sum_of_nucleotides=0
 #
-#     # split the fasta file into contigs and prevent empty strings
+#     # split the fast
+#     a file into contigs and prevent empty strings
 #     # @Tina: opening a file like this will load the entire file into memory. I would open it line by line myself. This may get super slow depending on how you implement it, it can also be very fast.
 #     with open(contig_file, 'r') as inp:
 #         # @Tina: what does the [1:] do here? Also shouldn't the strip() remove the trailing newline? or do you mean rstrip()?
@@ -289,21 +290,24 @@ def load_classifications(settings: RatSettings, report: Report, map_result: Mapp
     files = settings.files
     b2c = {}
 
-    report()
     if files.contigs2classification is not None:
         c2c = process_CAT_table(settings, files.contigs2classification)
     else:
         c2c = {name: [] for name in FastaParser(files.contigs_fasta).iter_headers()}
+    report.progress_next()
 
     if files.bin2classification is not None:
         b2c = process_CAT_table(settings, files.bin2classification)
+    report.progress_next()
 
     unclassified_contigs = get_unclassified_contigs(
         invert_bin_dict(files.bin2contigs), c2c, b2c,
     )
+    report.progress_next()
 
     all_unclassified = unclassified_contigs.copy()
     all_unclassified.extend(map_result.iter_unmapped_read_ids())
+    report.progress_next()
 
     return RatResult(map_result, c2c, b2c, unclassified_contigs, all_unclassified)
 
