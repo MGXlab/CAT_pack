@@ -163,7 +163,7 @@ def prepare(
     tracker = ProgressTracker(build_plan(args), quiet=args.quiet, console=console)
     try:
         with tracker.display():
-            run(args, tracker.update)
+            run(args, tracker)
     except KeyboardInterrupt:
         console.print("\nRun cancelled :(")
         raise typer.Exit(code=130)
@@ -451,7 +451,7 @@ def run_annotation_cli(arguments: CatOptions | BatOptions):
     tracker = ProgressTracker(build_plan(arguments), quiet=arguments.quiet, console=console)
     try:
         with tracker.display():
-            outputs = run(arguments, tracker.update)
+            outputs = run(arguments, tracker)
     except KeyboardInterrupt:
         console.print("\nRun cancelled :(")
         raise typer.Exit(code=130)
@@ -618,7 +618,7 @@ def rat(contigs_fasta: Annotated[
     tracker = ProgressTracker(build_plan(arguments), quiet=arguments.quiet, console=console)
     try:
         with tracker.display():
-            outputs = run(arguments, tracker.update)
+            outputs = run(arguments, tracker)
     except KeyboardInterrupt:
         console.print("\nRun cancelled :(")
         raise typer.Exit(code=130)

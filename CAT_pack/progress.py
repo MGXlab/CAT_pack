@@ -44,6 +44,7 @@ class ProgressTracker:
     tasks: dict[str, Task] = field(default_factory=dict, init=False)
     active: Task | None = field(default=None, init=False)
     last_update: float = field(default=0.0, init=False)
+    current_step: Task = field(init=False, repr=False)
 
     def __post_init__(self)-> None:
         self.progress = GroupedProgress(
@@ -58,7 +59,7 @@ class ProgressTracker:
         for step in self.steps:
             if step.parent and step.parent not in self.tasks:
                 self.add(Step(step.parent))
-            self.add(step, visible=step.parent is None)
+            self.add(step, total=step.total, visible=step.parent is None)
 
         for name, task in self.tasks.items():
             if subprocesses := self.subprocesses(name):
@@ -80,6 +81,8 @@ class ProgressTracker:
 
     def update(self, name: str, status: Status, completed=0, total=None):
         task = self.tasks[name]
+        if status is Status.RUNNING:
+            self.current_step = task
         changed = status is not task.fields["state"]
         done = (Status.COMPLETE, Status.SUPPLIED, Status.SKIPPED)
         count = completed if total is not None else None
@@ -140,3 +143,15 @@ class ProgressTracker:
                 raise
             finally:
                 self.finish(status)
+
+    def __call__(self, step, status, completed, total) -> None:
+        self.update(step, status, completed, total)
+
+    def progress_next(self) -> None:
+        task = self.current_step
+        self.update(
+            task.fields["step"].name,
+            Status.RUNNING,
+            int(task.completed) + 1,
+            task.total,
+        )

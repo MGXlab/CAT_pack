@@ -33,6 +33,7 @@ class Report(Protocol):
     def __call__(self, step: str, status: Status, completed: int,
                  total: int | None) -> None: ...
 
+    def progress_next(self) -> None: ...
 
 def add_handler(
     logger: logging.Logger, log_file: Path, debug: bool = False,

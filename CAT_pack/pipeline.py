@@ -9,7 +9,6 @@ from CAT_pack.io.download import (
     DownloadQueueReport, DownloadReport, multi_download,
     check_files, process_files, cleanup_downloads,
 )
-
 from .classification import ClassificationEngine
 from .config.options import BatOptions, CatOptions, PrepareOptions, DownloadOptions, RatOptions
 from .config.settings import BatFiles, BatSettings, CatFiles, CatSettings, DownloadOutputs
@@ -22,7 +21,7 @@ from .prepare import (
     make_fastaid2LCAtaxid_file, make_mmseqs2_database,
     write_taxids_with_multiple_offspring_file,
 )
-from .reads import process_bam_file, load_classifications, extract_unclassified_sequences
+from .reads import process_bam_file, load_classifications, extract_unclassified_sequences, run_rat_alignment
 from .tools.aligner import run_aligner
 from .tools.bwa_mem import run_bwa_mem
 from .tools.pyrodigal import run_protein_prediction
@@ -45,6 +44,7 @@ class Step:
     parent: str | None = None
     display_name: str | None = None
     unit: str | None = None
+    total: int | None = 1
 
     def __str__(self) -> str:
         return self.name
@@ -100,13 +100,13 @@ def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | Dow
             *(annotation_steps(make_bat_options(args), "bat", "Bins",
                                args.bin2classification is not None) if "m" in mode else []),
             (proc_maps := Step("Process mappings", runner=process_bam_file)),
-            (classif := Step("Load classifications",
+            (classif := Step("Load classifications", total=4,
                              runner=lambda settings, report:
             load_classifications(settings, report, proc_maps.result))),
             *([Step("Extract unclassified sequences",
                     runner=lambda settings, report: extract_unclassified_sequences(
             settings, report, classif.result))] if needs_sequences else []),
-            *([Step("Align unclassified sequences",supplied=args.alignment_unmapped is not None)] if needs_alignment else []),
+            *([Step("Align unclassified sequences",supplied=args.alignment_unmapped is not None, runner=run_rat_alignment)] if needs_alignment else []),
             *([Step("Classify unclassified sequences",supplied=args.unmapped2classification is not None)] if "r" in mode else []),
             Step("Calculate abundances"),
             *([Step("Assign read classifications")] if args.read2classification else []),

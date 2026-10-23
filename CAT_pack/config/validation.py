@@ -524,9 +524,9 @@ def validate_rat(args: RatOptions) -> RatSettings:
     samtools = checks.check(shutil.which, str(args.path_to_samtools))
 
     if bwa is None:
-        checks.add(ExternalToolError("BWA executable not found."))
+        checks.add(ExternalToolError("BWA","executable not found."))
     if samtools is None:
-        checks.add(ExternalToolError("SAMtools executable not found."))
+        checks.add(ExternalToolError("SAMtools","executable not found."))
 
     cat_settings = None
     if "c" in args.mode.value and args.contigs2classification is None:
@@ -547,6 +547,8 @@ def validate_rat(args: RatOptions) -> RatSettings:
         if top <= classification.range_:
             checks.add(InputError("Top must be higher than range."))
 
+        #checks.finish before the aligner arguments are loaded t
+        checks.finish()
         aligner = DiamondSettings(
             diamond=diamond.diamond, mode=diamond.mode,
             no_self_hits=diamond.no_self_hits, block_size=diamond.block_size,
@@ -557,7 +559,8 @@ def validate_rat(args: RatOptions) -> RatSettings:
             threads=execution.threads, top=top, compression=args.compress,
             verbose=execution.verbose, blast_flavour="blastx", tiny_out=True,
         )
-    checks.finish()
+    else:
+        checks.finish()
 
 
     return RatSettings(
