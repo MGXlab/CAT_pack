@@ -15,6 +15,7 @@ from typing import Iterator, Literal, TextIO
 
 import numpy as np
 
+from CAT_pack.utils.typing import EntityType
 from .reference_mapping import read_fastaid2LCAtaxid
 from .. import tax
 from ..config.settings import BatFiles, CatFiles, ParserSettings
@@ -428,7 +429,7 @@ class AlignmentParser:
 
 @dataclass(frozen=True, slots=True)
 class ClassificationInputs:
-    entity_type: str
+    entity_type: EntityType
     entity2ORFs: dict[str, list[str]]
     contig_names: set[str]
     contig2ORFs: dict[str, list[str]]
@@ -451,13 +452,13 @@ class ClassificationParser:
     def parse(self) -> ClassificationInputs:
         contig2ORFs = FastaParser(self.files.proteins_fasta).parse_ORFs()
         if isinstance(self.files, BatFiles):
-            entity_type = "bin"
+            entity_type = EntityType.BIN
             contig_names = set()
             for contigs in self.files.bin2contigs.values():
                 contig_names.update(contigs)
             entity2ORFs = self._group_bin_ORFs(self.files.bin2contigs, contig2ORFs)
         else:
-            entity_type = "contig"
+            entity_type = EntityType.CONTIG
             contig_names = FastaParser(self.files.contigs).parse_contig_names()
             entity2ORFs = {}
             for contig in contig_names:

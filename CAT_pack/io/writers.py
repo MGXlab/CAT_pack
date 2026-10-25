@@ -2,17 +2,18 @@
 from decimal import Decimal
 from typing import TextIO
 
-from .parsers import format_bitscore
-from ..results import Classification, ClassificationStatus, Lineage
-from ..tax import Taxonomy, ORF
+from CAT_pack.io.parsers import format_bitscore
+from CAT_pack.results import Classification, ClassificationStatus, Lineage
+from CAT_pack.tax import Taxonomy, ORF
+from CAT_pack.utils.typing import EntityType
 
 
 class ClassificationWriter:
     """Write headers on creation, then write the array results."""
 
     def __init__(
-        self, classification_out: TextIO, orf_out: TextIO, *,
-        entity_type: str, fraction: Decimal, range_: Decimal,
+        self, classification_out: TextIO, orf_out: TextIO | None = None, *,
+        entity_type: EntityType, fraction: Decimal, range_: Decimal,
         branches: set[str], no_stars: bool = False,
     ) -> None:
         self.classification_out = classification_out
@@ -32,10 +33,11 @@ class ClassificationWriter:
             f"# {self.entity_type}\tclassification\treason\tlineage\t"
             f"lineage scores (f: {float(self.fraction)})\n"
         )
-        bin_column = "bin\t" if self.is_bin else ""
-        self.orf_out.write(
-            f"# ORF\t{bin_column}number of hits (r: {self.range_})\tlineage\ttop bit-score\n"
-        )
+        if self.orf_out:
+            bin_column = "bin\t" if self.is_bin else ""
+            self.orf_out.write(
+                f"# ORF\t{bin_column}number of hits (r: {self.range_})\tlineage\ttop bit-score\n"
+            )
 
     def write(self, result: Classification, entity: int) -> None:
         entity_id = result.entities[entity]
@@ -49,12 +51,15 @@ class ClassificationWriter:
                 f"{entity_id}\tno taxid assigned\t{status.reason}\n"
             )
             return
+        if self.entity_type == EntityType.SEQUENCE:
+            reason = f"based on {result.orf_n_hits}"
+        else:
+            reason = (
+                f"based on {result.n_orfs_with_taxid[entity]}/"
+                f"{orfs.stop - orfs.start} ORFs"
+            )
 
         assignments = result.get_assignments(entity)
-        reason = (
-            f"based on {result.n_orfs_with_taxid[entity]}/"
-            f"{orfs.stop - orfs.start} ORFs"
-        )
         weighted = result.weighted
         total = Decimal(int(weighted.total[entity]))
         score_strings: dict[int, str] = {}

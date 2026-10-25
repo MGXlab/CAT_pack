@@ -544,8 +544,9 @@ def validate_rat(args: RatOptions) -> RatSettings:
         )
         top = checks.check(check_integer, args.top, "Top", 0, 100)
 
-        if top <= classification.range_:
-            checks.add(InputError("Top must be higher than range."))
+        if classification is not None and top is not None:
+            if top <= classification.range_:
+                checks.add(InputError("Top must be higher than range."))
 
         #checks.finish before the aligner arguments are loaded t
         checks.finish()
@@ -569,7 +570,10 @@ def validate_rat(args: RatOptions) -> RatSettings:
         sort_memory_mib=args.sort_memory_mib,
         threads=execution.threads, quiet=execution.quiet,
         verbose=execution.verbose, debug=execution.debug,
-        memory=execution.memory, cat=cat_settings, bat=bat_settings, mapping_quality=args.mapping_quality, aligner=aligner
+        memory=execution.memory, cat=cat_settings, bat=bat_settings,
+        mapping_quality=args.mapping_quality, aligner=aligner,
+        range_=classification.range_, fraction=classification.fraction,
+        no_stars=classification.no_stars
     )
 
 def get_validated_settings(args: CatOptions | BatOptions | RatOptions | PrepareOptions) -> CatSettings | BatSettings | RatSettings | PrepareSettings:

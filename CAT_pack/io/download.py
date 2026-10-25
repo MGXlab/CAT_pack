@@ -14,13 +14,12 @@ from functools import singledispatch
 from itertools import chain
 from typing import Callable
 
+import io
 from CAT_pack.config.settings import DownloadOutputs, DownloadSettings, GTDBDownloadOutputs
 from CAT_pack.io.parsers import optionally_compressed_handle
 from CAT_pack.utils import check
 from CAT_pack.utils.errors import CheckSumError
 from CAT_pack.utils.logging import Report, Status
-
-import io
 
 log = logging.getLogger("CAT_pack")
 DownloadReport = Callable[[pathlib.Path, int, int | None], None]
