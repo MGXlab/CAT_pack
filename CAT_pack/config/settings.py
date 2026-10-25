@@ -36,6 +36,7 @@ class ExecutionSettings:
 class ClassificationSettings:
     range_: Decimal
     fraction: Decimal
+    no_stars: bool
 
 
 @dataclass(frozen=True)
@@ -128,11 +129,12 @@ class BatFiles(AnnotationFiles):
     bin_paths: tuple[Path, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class CatSettings(ExecutionSettings, ClassificationSettings):
     files: CatFiles
     aligner: DiamondSettings | None
     log_file: Path
+    no_stars: bool | None = False
 
 
 @dataclass(frozen=True)
@@ -140,7 +142,6 @@ class BatSettings(ExecutionSettings, ClassificationSettings):
     files: BatFiles
     aligner: DiamondSettings | None
     log_file: Path
-    no_stars: bool
 
 
 @dataclass(frozen=True)
@@ -162,16 +163,19 @@ class RatFiles:
     read_classification: Path | None
     mapping_sam: Path | None = None
     mapping_bam: Path | None = None
+    fastaid2LCA: Path | None = None
+    branches: Path | None = None
     outputs: tuple[Path, ...] = ()
 
 
-@dataclass(frozen=True)
-class RatSettings(ExecutionSettings):
+@dataclass(frozen=True, kw_only=True)
+class RatSettings(ExecutionSettings, ClassificationSettings):
     files: RatFiles
     log_file: Path
     bwa: Path
     samtools: Path
     mapping_quality: int
+    no_stars: bool = False
     sort_memory_mib: int | None = None
     cat: CatSettings | None = None
     bat: BatSettings | None = None

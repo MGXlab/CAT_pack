@@ -10,10 +10,10 @@ from time import perf_counter
 from typing import Any, Iterable, Mapping, Sequence
 
 import numpy as np
-from CAT_pack.utils.typing import Taxid
 from numpy import dtype, ndarray
 from numpy.typing import ArrayLike, NDArray
 
+from CAT_pack.utils.typing import Taxid
 from .io.reference_mapping import read_fastaid2LCAtaxid
 from .utils.errors import InputError
 
