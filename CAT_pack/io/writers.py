@@ -42,8 +42,9 @@ class ClassificationWriter:
     def write(self, result: Classification, entity: int) -> None:
         entity_id = result.entities[entity]
         orfs = result.get_orfs(entity)
-        for orf in range(orfs.start, orfs.stop):
-            self.write_orf(result, orf, entity)
+        if self.orf_out is not None:
+            for orf in range(orfs.start, orfs.stop):
+                self.write_orf(result, orf, entity)
 
         status = result.get_status(entity)
         if status != ClassificationStatus.ASSIGNED:
