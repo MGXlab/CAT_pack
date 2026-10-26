@@ -9,6 +9,7 @@ from CAT_pack.io.download import (
     DownloadQueueReport, DownloadReport, multi_download,
     check_files, process_files, cleanup_downloads,
 )
+from CAT_pack.utils.typing import EntityType
 from .classification import ClassificationEngine
 from .config.options import BatOptions, CatOptions, PrepareOptions, DownloadOptions, RatOptions
 from .config.settings import BatFiles, BatSettings, CatFiles, CatSettings, DownloadOutputs
@@ -21,7 +22,8 @@ from .prepare import (
     make_fastaid2LCAtaxid_file, make_mmseqs2_database,
     write_taxids_with_multiple_offspring_file,
 )
-from .reads import process_bam_file, load_classifications, extract_unclassified_sequences, run_rat_alignment
+from .reads import process_bam_file, load_classifications, extract_unclassified_sequences, run_rat_alignment, \
+    write_unmapped2classification, calculate_abundances, classify_reads, write_reports
 from .tools.aligner import run_aligner
 from .tools.bwa_mem import run_bwa_mem
 from .tools.pyrodigal import run_protein_prediction
@@ -107,10 +109,32 @@ def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | Dow
                     runner=lambda settings, report: extract_unclassified_sequences(
             settings, report, classif.result))] if needs_sequences else []),
             *([Step("Align unclassified sequences",supplied=args.alignment_unmapped is not None, runner=run_rat_alignment)] if needs_alignment else []),
-            *([Step("Classify unclassified sequences",supplied=args.unmapped2classification is not None)] if "r" in mode else []),
-            Step("Calculate abundances"),
-            *([Step("Assign read classifications")] if args.read2classification else []),
-            Step("Write reports"),
+            *([Step("Classify unclassified sequences",supplied=args.unmapped2classification is not None,  total=4,
+                runner=lambda settings, report: write_unmapped2classification(settings, report, classif.result)
+                    )] if "r" in mode else []),
+            Step(
+                "Calculate abundances",
+                total=4,
+                runner=lambda settings, report:
+                calculate_abundances(
+                    settings, report, classif.result,
+                ),
+            ),
+            *([Step(
+                "Assign read classifications",
+                runner=lambda settings, report:
+                classify_reads(
+                    settings, report, classif.result,
+                ),
+            )] if args.read2classification else []),
+            Step(
+                "Write reports",
+                total=3,
+                runner=lambda settings, report:
+                write_reports(
+                    settings, report, classif.result,
+                ),
+            ),
         ]
     if isinstance(args, DownloadOptions):
         return [
@@ -123,7 +147,7 @@ def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | Dow
     raise CatError("I haven't figured out how to build that specific plan")
 
 
-def run_classification(settings: CatSettings | BatSettings, report: Report) -> tuple[int, int, str, Decimal]:
+def run_classification(settings: CatSettings | BatSettings, report: Report) -> tuple[int, int, EntityType, Decimal]:
     """Load inputs, classify all entities, then write their reports."""
     files: CatFiles | BatFiles = settings.files
     log = logging.getLogger("CAT_pack")
@@ -161,7 +185,7 @@ def run_classification(settings: CatSettings | BatSettings, report: Report) -> t
             fraction=settings.fraction,
             range_=settings.range_,
             branches=inputs.branches,
-            no_stars=getattr(settings, "no_stars", False),
+            no_stars=settings.no_stars,
         )
         for entity in range(len(result)):
             writer.write(result, entity)
@@ -177,7 +201,7 @@ def run_classification(settings: CatSettings | BatSettings, report: Report) -> t
 def classification_summary(n_classified: int, total: int, entity_type: str, fraction: Decimal) -> None:
     log = logging.getLogger("CAT_pack")
     tool = "CAT"
-    if entity_type == "bin":
+    if entity_type == EntityType.BIN:
         tool = "BAT"
     percent = 0
     if total > 0:
@@ -324,7 +348,16 @@ def run(args: CatOptions | BatOptions | RatOptions | PrepareOptions, report: Rep
                 "Steps": completed_steps,
                 "Contig abundance": settings.files.contig_abundance,
                 "Complete abundance": settings.files.complete_abundance,
+                **(
+                    {"Bin abundance": settings.files.bin_abundance}
+                    if settings.files.bin_abundance is not None else {}
+                ),
+                **(
+                    {"Read classifications": settings.files.read_classification}
+                    if settings.files.read_classification is not None else {}
+                ),
                 "Log": settings.log_file,
+                "Results": completed_steps[-1].result,
             }
         return {
             "Results": completed_steps[-1].result,

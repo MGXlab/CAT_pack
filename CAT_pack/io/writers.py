@@ -52,7 +52,7 @@ class ClassificationWriter:
             )
             return
         if self.entity_type == EntityType.SEQUENCE:
-            reason = f"based on {result.orf_n_hits}"
+            reason = f"based on {result.orf_n_hits[orfs.start]} hits"
         else:
             reason = (
                 f"based on {result.n_orfs_with_taxid[entity]}/"

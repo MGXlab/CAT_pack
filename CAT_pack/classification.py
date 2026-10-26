@@ -7,6 +7,7 @@ from typing import Mapping, Sequence
 
 import numpy as np
 
+from CAT_pack.utils.typing import EntityType
 from . import tax
 from .io.parsers import AlignmentInput
 from .results import Classification, ClassificationStatus
@@ -29,7 +30,7 @@ class ClassificationEngine:
         self.threads = threads
 
     def classify(
-        self, entity_type: str, entity2ORFs: Mapping[str, Sequence[str]], alignment: AlignmentInput,
+        self, entity_type: EntityType, entity2ORFs: Mapping[str, Sequence[str]], alignment: AlignmentInput,
     ) -> Classification:
         log.info(f"Starting classification calculation: {len(entity2ORFs)} {entity_type}.")
         orf_entities_names = sorted(entity2ORFs)

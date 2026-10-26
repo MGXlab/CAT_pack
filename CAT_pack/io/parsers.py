@@ -44,8 +44,7 @@ class FastaParser:
         record_name = None
         sequence_lines: list[str] = []
         seen: set[str] = set()
-        opener = gzip.open if self.path.suffix == ".gz" else bz2.open if self.path.suffix == ".bz2" else open
-        with opener(self.path, "rt", encoding="utf-8") as source:
+        with optionally_compressed_handle(self.path, "rt") as source:
             for line in source:
                 line = line.strip()
                 if not line:
@@ -66,8 +65,7 @@ class FastaParser:
             yield FastaRecord(record_name, "".join(sequence_lines))
 
     def iter_headers(self) -> Iterator[str]:
-        opener = gzip.open if self.path.suffix == ".gz" else bz2.open if self.path.suffix == ".bz2" else open
-        with opener(self.path, "rt", encoding="utf-8") as source:
+        with optionally_compressed_handle(self.path, "rt") as source:
             for line in source:
                 line = line.lstrip()
                 if line.startswith(">"):
@@ -348,12 +346,7 @@ class AlignmentParser:
         # Import AFTER threads setting, so Polars initializes with the correct core count!
         import polars as pl
 
-        if self.path.suffix == ".gz":
-            source_file = gzip.open(self.path, "rt", encoding="utf-8")
-        elif self.path.suffix == ".bz2":
-            source_file = bz2.open(self.path, "rt", encoding="utf-8")
-        else:
-            source_file = open(self.path, "rt", encoding="utf-8", buffering=1024 * 1024)
+        source_file = optionally_compressed_handle(self.path, mode="rt")
         orf_names: list[str] = []
         orf_index: dict[str, int] = {}
         orf_offsets = array("q")
@@ -517,17 +510,13 @@ def optionally_compressed_handle(
         A file handle either gzip opened or plainly opened for
         reading/writing/appending in text mode.
     """
-    if mode == "r" or mode == "rb":
-        mode = "rt"
-    if mode == "w" or mode == "wb":
-        mode = "wt"
-    if mode == "a" or mode == "ab":
-        mode = "at"
-
-    if is_gz(file_path):
-        return gzip.open(file_path, mode=mode)
-    else:
-        return open(file_path, mode=mode)
+    path = Path(file_path)
+    opener = (
+        gzip.open if path.suffix == ".gz"
+        else bz2.open if path.suffix == ".bz2"
+        else open
+    )
+    return opener(path, mode[0] + "t", encoding="utf-8")
 
 
 def tar_extraction(file: pathlib.Path, output_dir: pathlib.Path, prefix: str = "", files_to_extract: list[str] = None):
