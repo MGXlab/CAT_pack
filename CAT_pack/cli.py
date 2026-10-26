@@ -634,6 +634,36 @@ def rat(contigs_fasta: Annotated[
         raise typer.Exit(code=1)
 
     if not arguments.quiet:
-        console.print(Panel(Text("Completed"),title="RAT completed", border_style="green"))
+        if not arguments.quiet:
+            rat_result = outputs["Results"]
+            total = rat_result.mapping.sum_of_reads
+            classified = sum(
+                read.n_reads
+                for read in rat_result.taxon_dict.values()
+                if read.classification
+            )
+            percent = classified / total * 100 if total else 0.0
+
+            results = Table(box=None, padding=(0, 2))
+            results.add_column("Result", style="green")
+            results.add_column("Location", overflow="fold")
+
+            for label, path in outputs.items():
+                results.add_row(Text(label), Text(str(path)))
+
+            console.print(Panel(
+                Group(
+                    Text(
+                        f"{classified:,} of {total:,} reads "
+                        f"({percent:.2f}%) have taxonomy assigned.",
+                        style="bold green",
+                    ),
+                    Text(),
+                    results,
+                ),
+                title="RAT completed",
+                border_style="green",
+            ))
+        #console.print(Panel(Text("Completed"),title="RAT completed", border_style="green"))
 
 

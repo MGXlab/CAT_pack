@@ -3,6 +3,7 @@ from enum import auto, IntEnum
 
 import numpy as np
 
+from CAT_pack.utils.typing import EntityType
 from .io.parsers import AlignmentInput
 from .tax import Taxonomy, WeightedLCA
 
@@ -46,7 +47,7 @@ class ClassificationStatus(IntEnum):
 class Classification:
     """Classification of all contigs or bins "entities"
     stored as 1d numpy arrays"""
-    entity_type: str
+    entity_type: EntityType
     entities: list[str]
     status: np.ndarray
     orf_offsets: np.ndarray

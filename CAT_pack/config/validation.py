@@ -376,7 +376,7 @@ def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
             files=files, aligner=aligner,
             memory=execution.memory,
             range_=classification.range_, fraction=classification.fraction,
-            log_file=args.log_path #TODO: Add no stars compatibility
+            log_file=args.log_path, no_stars=args.no_stars,
         )
     else:
         raise TypeError(f"Hmmm, that type of options I don't know yet")
@@ -451,6 +451,25 @@ def validate_rat_files(args: RatOptions) -> RatFiles:
                     checks.check(check_fasta_file, path, "Bin FASTA")
                 bins = checks.check(parser.parse, paths)
     direct = "r" in args.mode.value
+
+    fastaid2LCA = None
+    taxids_with_multiple_offspring = None
+    if direct and args.unmapped2classification is None:
+        fastaid2LCA = checks.check(
+            check_db_file,
+            args.database,
+            "fastaid2LCAtaxid",
+            "Protein taxonomy mapping",
+        )
+        taxids_with_multiple_offspring = checks.check(
+            check_db_file,
+            args.database,
+            "taxids_with_multiple_offspring",
+            "Branching taxids",
+        )
+
+
+
     files = RatFiles(
         contigs_fasta=args.contigs_fasta,
         nodes=nodes,
@@ -469,6 +488,8 @@ def validate_rat_files(args: RatOptions) -> RatFiles:
         complete_abundance=Path(f"{prefix}.RAT.complete.abundance.txt"),
         bin_abundance=Path(f"{prefix}.RAT.bin.reads.txt") if bins else None,
         read_classification=Path(f"{prefix}.RAT.read2classification.txt") if args.read2classification else None,
+        fastaid2LCA=fastaid2LCA,
+        taxids_with_multiple_offspring=taxids_with_multiple_offspring
     )
     output_files += [files.contig_abundance, files.complete_abundance]
     if files.bin_abundance is not None: output_files.append(files.bin_abundance)
@@ -512,7 +533,7 @@ def make_bat_options(args: RatOptions) -> BatOptions:
     )
 
     return BatOptions(bins=args.bin_fasta_or_folder, bin_suffix=args.bin_suffix,
-                      no_stars=args.no_stars, **shared)
+                      **shared)
 
 
 def validate_rat(args: RatOptions) -> RatSettings:

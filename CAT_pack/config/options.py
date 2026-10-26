@@ -60,6 +60,7 @@ class AnnotationOptions(ExecutionOptions):
     tmpdir: Path | None = None
     compress: bool = False
     memory: MemoryOptions = field(default_factory=MemoryOptions)
+    no_stars: bool = False
 
     @property
     def log_path(self) -> Path:
@@ -80,7 +81,6 @@ class BatOptions(AnnotationOptions):
     range_: Decimal = Decimal("5")
     fraction: Decimal = Decimal("0.3")
     output_prefix: Path = Path("out.BAT")
-    no_stars: bool = False
 
 class RatModes(str, Enum):
     MCR = "mcr"
@@ -105,7 +105,6 @@ class RatOptions(AnnotationOptions):
     read2classification: bool = False
     unmapped2classification: Path | None = None
     mapping_quality: int = 2
-    no_stars: bool = False
     path_to_bwa: Path = 'bwa'
     path_to_samtools: Path = 'samtools'
     sort_memory_mib: int | None = None
