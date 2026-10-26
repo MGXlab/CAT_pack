@@ -1,4 +1,4 @@
-""""IO (input/output) module of CAT pack
+"""IO (input/output) module of CAT pack
 
 This module consist of four files `download.py`. `parsers.py`, `reference_mapping.py`, `writers.py`
 
@@ -12,4 +12,11 @@ This file handles the parsing of numerous different file types and folders:
  - BinParser: Parsing of bins
  - AlignmentParser: DIOMOND aligment parser 
  - ClassificationParser: Load ORF groups, accepted alignment hits, and their taxonomy data
+
+reference_mapping.py`
+Parses and loads the fastaid2LCAtaxid file into memory in parallel
+
+writers.py
+Write the CAT/BAT/RAT classification report
+NOTE: This python script is destined to hold more writer functionality in the feature.
 """
