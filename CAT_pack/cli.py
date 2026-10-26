@@ -649,7 +649,8 @@ def rat(contigs_fasta: Annotated[
             results.add_column("Location", overflow="fold")
 
             for label, path in outputs.items():
-                results.add_row(Text(label), Text(str(path)))
+                if isinstance(path, Path):
+                    results.add_row(Text(label), Text(str(path)))
 
             console.print(Panel(
                 Group(
