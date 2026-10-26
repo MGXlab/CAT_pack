@@ -303,7 +303,7 @@ def write_unmapped2classification(settings: RatSettings, report: Report, result:
 
     taxonomy = tax.Taxonomy.import_nodes(files.nodes)
     fastaid2LCAtaxid = tax.import_fastaid2LCAtaxid(files.fastaid2LCA, set(alignment.hit_names), workers=settings.threads)
-    taxids_with_multiple_offspring = tax.import_taxids_with_multiple_offspring(files.import_taxids_with_multiple_offspring)
+    taxids_with_multiple_offspring = tax.import_taxids_with_multiple_offspring(files.taxids_with_multiple_offspring)
     report.progress_next()
 
     classifications = ClassificationEngine(
