@@ -4,18 +4,18 @@ import subprocess
 import sys
 from dataclasses import field, dataclass
 from pathlib import Path
-from typing import Iterator, Literal
+from typing import Iterator
 
 from CAT_pack import tax
-from CAT_pack.config.settings import RatSettings, ClassificationSettings
+from CAT_pack.classification import ClassificationEngine
+from CAT_pack.config.settings import RatSettings
 from CAT_pack.io.parsers import FastaParser, FastqParser
+from CAT_pack.io.parsers import optionally_compressed_handle, AlignmentParser
+from CAT_pack.io.writers import ClassificationWriter
 from CAT_pack.tools.aligner import run_aligner
 from CAT_pack.tools.tool_runner import tool_output
 from CAT_pack.utils.errors import ExternalToolError
 from CAT_pack.utils.logging import Report
-from CAT_pack.classification import ClassificationEngine
-from CAT_pack.io.parsers import optionally_compressed_handle, AlignmentParser
-from CAT_pack.io.writers import ClassificationWriter
 from CAT_pack.utils.typing import EntityType
 
 
@@ -218,44 +218,6 @@ def get_contig_lengths(contig_file: Path) -> tuple[dict[str, int], int]:
     """
     contig_lengths = {contig.name: len(contig.sequence) for contig in FastaParser(contig_file)}
     return contig_lengths, sum(contig_lengths.values())
-#
-#
-#
-#
-#
-# def process_bin_folder(path_to_folder, bin_suffix):
-#     """
-#     takes the path to a folder containing metagenomic bins and picks out all
-#     nucleotide fasta files. Returns a dictionary that contains the bin ids as
-#     keys and a set of all contig ids that belong in that bin as values.
-#     Important: Only contains the binned sequences. Every contig that is not
-#     in the output dictionary is unbinned.
-#     @Tina: Don't we have a function from the BAT workflow that does this?
-#     """
-#     bin_dict={}
-#     bins=os.listdir(path_to_folder)
-#
-#     for b in bins:
-#         # grabs all fasta files and gets the bin id
-#         if b.split('.')[-1]==bin_suffix.split('.')[-1] and not b.rsplit('.', 1)[0].endswith('unbinned'):
-#             bin_id=b.strip()
-#             bin_dict[bin_id]=set()
-#
-#             # open fasta file and split it into contigs
-#             contigs=open(path_to_folder+b).read().split('>')[1:]
-#
-#             # add all contig ids to set
-#
-#             for contig in contigs:
-#                 try:
-#                     bin_dict[bin_id].add(contig.split()[0])
-#                 except IndexError:
-#                     sys.exit(f'The bin {b} is empty or not formatted correctly'
-#                              ' (Look for a ">" sign at the end of the file). '
-#                              'Did something go wrong during binning?')
-#
-#     return bin_dict
-
 
 def invert_bin_dict(bin_dict):
     # WORKS
@@ -589,6 +551,5 @@ def write_reports(settings: RatSettings, report: Report, rat_result: RatResult) 
     report.progress_next()
     return rat_result
 
-    return
 if __name__ == '__main__':
     sys.exit('Run \'CAT_pack reads\' to run Read Annotation Tool (RAT).')
