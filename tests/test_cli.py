@@ -160,7 +160,9 @@ class CliTests(unittest.TestCase):
                 if quiet:
                     args.append("--quiet")
                 result = self.runner.invoke(app, args)
-                self.assertEqual(result.exit_code, 0, result.output)
+                self.assertEqual(
+                    result.exit_code, 0, f"{result.output}\n{result.exception!r}",
+                )
                 if quiet:
                     self.assertEqual(result.output, "")
                 else:
