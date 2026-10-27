@@ -3,9 +3,14 @@ requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "CAT-pack"
+name = "CAT_pack"
 version = "7.0.0.alpha"
 description = "CAT, BAT, RAT package"
+authors = [
+    {name = "F. A. Bastiaan von Meijenfeldt"},
+    {name = "Nikos Pappas"},
+    {name = "Ernestina Hauptfeld"}
+]
 requires-python = ">=3.10"
 dependencies = [
     "typer",
@@ -15,11 +20,18 @@ dependencies = [
     "polars==2.0.0",
     "psutil"
 ]
+readme = "README.md"
+license = "MIT"
 
 [project.scripts]
-cat_pack7 = "CAT_pack7.cli:app"
+cat_pack = "CAT_pack.cli:app"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["CAT_pack7", "CAT_pack7.*"]
+include = ["CAT_pack", "CAT_pack.*"]
 namespaces = true
+
+[project.urls]
+Repository = "https://github.com/MGXlab/CAT_pack.git"
+Issues = "https://github.com/MGXlab/CAT_pack/issues"
+Changelog = "https://github.com/MGXlab/CAT_pack/blob/master/CHANGELOG.md"

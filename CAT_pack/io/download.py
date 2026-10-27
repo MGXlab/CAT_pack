@@ -60,14 +60,14 @@ def multi_download(settings: DownloadSettings, report: Report,
         download_singleton(item.url, item.path, download_report)
         report("Downloading", Status.RUNNING, index, len(settings.files.downloads))
 
-
+# FIXME: move to check.py
 def check_nr_md5s(files: DownloadOutputs, report: Report) -> None:
     pairs = [item for item in files.downloads if item.checksum is not None]
     for index, item in enumerate(pairs, 1):
         check.check_md5_gz(item.path, item.checksum)
         report("Check files", Status.RUNNING, index, len(pairs))
 
-
+# FIXME: move to parsers.py
 def extract_nr_taxonomy(files: DownloadOutputs, report: Report) -> None:
     targets = (("names.dmp", files.names), ("nodes.dmp", files.nodes))
     with tarfile.open(files.taxonomy_archive, "r:gz") as archive:
@@ -96,12 +96,12 @@ def cleanup_nr_downloads(files: DownloadOutputs) -> None:
         log.info(f"Removing {target}")
         target.unlink()
 
-
+# FIXME: move to check.py
 @singledispatch
 def check_files(files: DownloadOutputs, report: Report) -> None:
     check_nr_md5s(files, report)
 
-
+# FIXME: move to parsers.py?
 @singledispatch
 def process_files(files: DownloadOutputs, report: Report) -> None:
     extract_nr_taxonomy(files, report)
@@ -138,7 +138,7 @@ def staged_outputs(paths: list[pathlib.Path]):
         for partial in partials:
             partial.unlink(missing_ok=True)
 
-
+# FIXME: move to parsers.py
 def load_gtdb_md5sums(md5sums_file: pathlib.Path) -> dict[str, str]:
     """Create a dictionary from the MD5SUMS file."""
     md5_dict = {}
@@ -151,7 +151,7 @@ def load_gtdb_md5sums(md5sums_file: pathlib.Path) -> dict[str, str]:
         md5_dict[fname] = fields[0].lower()
     return md5_dict
 
-
+# FIXME: move to check.py
 @check_files.register
 def check_gtdb_md5s(files: GTDBDownloadOutputs, report: Report) -> None:
     md5_dict = load_gtdb_md5sums(files.checksums)
@@ -205,7 +205,7 @@ def parent_child_pairs(lineage_string):
 
     return pairs
 
-
+# FIXME: move to writers.py
 def write_nodes_dmp(taxonomies_tsv, nodes_dmp):
     """Write the nodes.dmp from the taxonomy files."""
     seen_taxids = set()
@@ -248,7 +248,7 @@ def write_nodes_dmp(taxonomies_tsv, nodes_dmp):
 
     return
 
-
+# FIXME: move to writers.py
 def write_names_dmp(taxonomies_tsv, names_dmp):
     """Write the names.dmp from the taxonomy files."""
     seen_taxids = set()
@@ -284,7 +284,7 @@ def write_names_dmp(taxonomies_tsv, names_dmp):
 
     return
 
-
+# FIXME: move to parsers.py
 def genome_id_to_taxid(taxonomy_tsv):
     """Return a dictionary with GTDB taxid for each genome.
     """
@@ -299,7 +299,7 @@ def genome_id_to_taxid(taxonomy_tsv):
 
     return mapping
 
-
+# FIXME: move to writers.py
 def concatenate_trees(bac_tree_fp, ar_tree_fp, all_tree_fp):
     """Concatenate the newick trees under a common root in a new file."""
 
@@ -325,7 +325,8 @@ def concatenate_trees(bac_tree_fp, ar_tree_fp, all_tree_fp):
 
 fastaRecord = namedtuple("fastaRecord", ["id", "seq", "uid", "taxid"])
 
-
+# FIXME: move to parsers.py
+# FIXME: remove duplicate code...
 def fastaIterator_gz(fasta_in_gz, gid2taxid, *, handle=None):
     origin = pathlib.Path(fasta_in_gz).name.removesuffix(".gz").removesuffix("_protein.faa")
     taxid = gid2taxid[origin]
@@ -354,7 +355,7 @@ def fastaIterator_gz(fasta_in_gz, gid2taxid, *, handle=None):
             uid = (hashlib.md5(seq.encode()).digest(), len(seq))
             yield fastaRecord(f"{origin}~{name}", seq, uid, taxid)
 
-
+# FIXME: move to parsers.py
 def iter_gtdb_proteins(proteins_tar: pathlib.Path, gid2taxid: dict[str, str]):
     with tarfile.open(proteins_tar, "r|gz") as archive:
         for member in archive:
@@ -367,7 +368,7 @@ def iter_gtdb_proteins(proteins_tar: pathlib.Path, gid2taxid: dict[str, str]):
                 handle = stack.enter_context(io.TextIOWrapper(source, encoding="utf-8"))
                 yield from fastaIterator_gz(pathlib.Path(name), gid2taxid, handle=handle)
 
-
+# FIXME: move to writers.py and or parsers.py?
 def extract_duplicates(proteins_tar, gid2taxid, acc2taxid_fp):
     """Write the accession table and return duplicate sequence records."""
     seen_uids = {}
@@ -394,7 +395,7 @@ def extract_duplicates(proteins_tar, gid2taxid, acc2taxid_fp):
     log.info(f"Indexed {seq_counter:,} GTDB proteins in total.")
     return multiplets
 
-
+# FIXME: move to writers.py
 def write_singletons(proteins_tar, duplicates, gid2taxid, singletons_fp, *, append=False):
     with gzip.open(singletons_fp, "at" if append else "wt", encoding="utf-8") as outf1:
         for record in iter_gtdb_proteins(proteins_tar, gid2taxid):
