@@ -2,16 +2,13 @@
 
 from __future__ import absolute_import
 
-from enum import Enum
+from enum import StrEnum
 from typing import Hashable, TypeVar
 
 Taxid = TypeVar("Taxid", bound=Hashable)
 """Type of a taxonomic identifier in a lineage"""
 
-class EntityType(str, Enum):
+class EntityType(StrEnum):
     CONTIG = "contig"
     BIN = "bin"
     SEQUENCE = "sequence"
-
-    def __str__(self) -> str:
-        return self.value

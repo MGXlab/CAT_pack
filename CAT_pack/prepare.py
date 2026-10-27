@@ -4,6 +4,7 @@ import shutil
 from pathlib import Path
 from typing import TextIO
 
+from io.parsers import optionally_compressed_handle
 from . import tax
 from .config.settings import PrepareSettings
 from .tools.tool_runner import run_tool
@@ -13,10 +14,6 @@ from .utils.logging import Report, Status
 log = logging.getLogger("CAT_pack")
 
 
-def optionally_compressed_handle(file_path: Path) -> TextIO:
-    if file_path.suffix == ".gz":
-        return gzip.open(file_path, "rt", encoding="utf-8")
-    return file_path.open(encoding="utf-8")
 
 
 def find_lineage(taxid: str, taxid2parent: dict[str, str]) -> list[str]:
@@ -107,6 +104,8 @@ def make_fastaid2LCAtaxid_file(
                     lineage = find_lineage(taxid, taxid2parent)
                     list_of_lineages.append(lineage)
                 except KeyError:
+                    # This accounts for missing accession numbers in
+                    # prot.accession2taxid and missing nodes in nodes.dmp.
                     continue
             total += 1
             if total % 10000 == 0:
