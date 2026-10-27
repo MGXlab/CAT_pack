@@ -147,18 +147,19 @@ class Taxonomy:
 
     def find_LCA_for_ORF(
         self, orf_hit_offsets: NDArray[np.int64], hits: NDArray[np.int32],
-    ) -> NDArray[np.int32]:
+    ) -> tuple[NDArray[np.int32], NDArray[np.int32]]:
         batch_started = perf_counter()
         orf_count = len(orf_hit_offsets) - 1
 
         if orf_count == 0:
-            return np.empty(0, dtype=np.int32)
+            return np.empty(0, dtype=np.int32), np.empty(0, dtype=np.int32)
 
         orf_of_hit = np.repeat(np.arange(orf_count), np.diff(orf_hit_offsets))
 
         no_taxid_hit_mask = hits != self.no_taxid
         hits = hits[no_taxid_hit_mask]
         orf_of_hit = orf_of_hit[no_taxid_hit_mask]
+
 
         hits_per_orf = np.bincount(orf_of_hit, minlength=orf_count)
         max_hits = int(hits_per_orf.max())
@@ -208,7 +209,7 @@ class Taxonomy:
             elapsed, orf_count, known_hit_count, max_hits, reduction_rounds,
             extra={"classification_phase": "orf_lca_batch", "classification_seconds": elapsed},
         )
-        return lca_per_orf
+        return lca_per_orf, hits_per_orf #hits per orf == hits with taxid per orf
 
 
 @dataclass

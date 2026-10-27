@@ -55,6 +55,7 @@ class Classification:
     orf_row: np.ndarray
     orf_lca: np.ndarray
     orf_n_hits: np.ndarray
+    n_w_tax: np.ndarray
     orf_top_bitscore: np.ndarray
     n_orfs_with_taxid: np.ndarray
     assignment_offsets: np.ndarray
