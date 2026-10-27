@@ -41,7 +41,7 @@ class ClassificationEngine:
         n_ORFs = np.array([len(entity2ORFs[name]) for name in orf_entities_names], dtype=np.int64)
         ORF_starts = np.concatenate(([0], np.cumsum(n_ORFs)))
         ORF2contig_or_bin = np.repeat(np.arange(n_entities), n_ORFs)
-        ORF2alignment_index, ORF_has_hits, LCA_per_ORF, n_hits_per_ORF, top_bitscore_per_ORF = (self.per_ORF_stats(ORF_names, alignment))
+        ORF2alignment_index, ORF_has_hits, LCA_per_ORF, n_hits_per_ORF, n_w_tax, top_bitscore_per_ORF = (self.per_ORF_stats(ORF_names, alignment))
 
         # Combine the ORF lowest common ancestors per contig (or bin)
         # and weighted by their tob bit score(s)
@@ -76,6 +76,7 @@ class ClassificationEngine:
             orf_row=ORF2alignment_index,
             orf_lca=LCA_per_ORF,
             orf_n_hits=n_hits_per_ORF,
+            n_w_tax=n_w_tax,
             orf_top_bitscore=top_bitscore_per_ORF,
             n_orfs_with_taxid=n_ORFs_with_taxid,
             assignment_offsets=assignment_starts,
@@ -118,13 +119,13 @@ class ClassificationEngine:
                 for start, end in zip(hit_bounds[:-1], hit_bounds[1:])
             )
             with ThreadPoolExecutor(max_workers=workers) as pool:
-                alignment_ORF_LCAs = np.concatenate(list(pool.map(
-                    self.taxonomy.find_LCA_for_ORF,
-                    offset_batches, hit_batches)))
+                batches = list(pool.map(self.taxonomy.find_LCA_for_ORF,offset_batches, hit_batches))
+            alignment_ORF_LCAs = np.concatenate([batch[0] for batch in batches])
+            alignment_w_tax = np.concatenate([batch[1] for batch in batches])
         else:
-            alignment_ORF_LCAs = self.taxonomy.find_LCA_for_ORF(
-                alignment.orf_offsets, hit_taxids
-            )
+             alignment_ORF_LCAs, alignment_w_tax = self.taxonomy.find_LCA_for_ORF(
+                 alignment.orf_offsets, hit_taxids
+             )
 
         LCA_per_ORF = np.full(n_ORFs, tax.ORF.NO_TAXID, dtype=np.int32)
         LCA_per_ORF[ORF_has_hits] = alignment_ORF_LCAs[alignment_indices]
@@ -132,8 +133,12 @@ class ClassificationEngine:
         n_hits_per_ORF = np.zeros(n_ORFs, dtype=np.int64)
         n_hits_per_ORF[ORF_has_hits] = hits_end - hits_start
 
+        n_hits_w_tax_per_ORF = np.zeros(n_ORFs, dtype=np.int64)
+        n_hits_w_tax_per_ORF[ORF_has_hits] = alignment_w_tax[alignment_indices]
+
         top_bitscore_per_ORF = np.zeros(n_ORFs, dtype=np.int64)
         top_bitscore_per_ORF[ORF_has_hits] = alignment.bitscores[hits_start]
 
-        return ORF2alignment_index, ORF_has_hits, LCA_per_ORF, n_hits_per_ORF, top_bitscore_per_ORF
+        return (ORF2alignment_index, ORF_has_hits, LCA_per_ORF, n_hits_per_ORF,
+                n_hits_w_tax_per_ORF, top_bitscore_per_ORF)
 
