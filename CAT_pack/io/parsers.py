@@ -134,7 +134,7 @@ class FastqParser:
                 sequence = next(file).rstrip()
                 next(file)  # Skip the + line.
                 quality = next(file).rstrip()
-
+                if not quality: raise ValueError("Incomplete fastq record at end of file.")
                 yield FastqRecord(name, sequence, quality)
 
 

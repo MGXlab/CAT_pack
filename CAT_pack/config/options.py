@@ -82,7 +82,7 @@ class BatOptions(AnnotationOptions):
     fraction: Decimal = Decimal("0.3")
     output_prefix: Path = Path("out.BAT")
 
-class RatModes(str, Enum):
+class RatMode(str, Enum):
     MCR = "mcr"
     CR = "cr"
     MR = "mr"
@@ -93,7 +93,7 @@ class RatModes(str, Enum):
 @dataclass(frozen=True, kw_only=True)
 class RatOptions(AnnotationOptions):
     contigs_fasta: Path
-    mode: RatModes
+    mode: RatMode
     output_prefix: Path = Path("out.RAT")
     read_file: tuple[Path, ...] | None = None
     bam_file: tuple[Path, ...] | None = None
@@ -105,8 +105,8 @@ class RatOptions(AnnotationOptions):
     read2classification: bool = False
     unmapped2classification: Path | None = None
     mapping_quality: int = 2
-    path_to_bwa: Path = 'bwa'
-    path_to_samtools: Path = 'samtools'
+    path_to_bwa: Path |str = 'bwa'
+    path_to_samtools: Path | str = 'samtools'
     sort_memory_mib: int | None = None
 
 

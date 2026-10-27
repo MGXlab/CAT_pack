@@ -500,6 +500,8 @@ def validate_rat_files(args: RatOptions) -> RatFiles:
             output_files.append(files.unclassified_fasta)
             output_files.append(files.alignment_unmapped)
 
+    checks.check(check_outputs, output_files)
+
     checks.finish()
     return replace(files, outputs=tuple(output_files))
 
@@ -536,7 +538,7 @@ def make_bat_options(args: RatOptions) -> BatOptions:
                       **shared)
 
 
-def validate_rat(args: RatOptions) -> RatSettings:
+def validate_rat_args(args: RatOptions) -> RatSettings:
     checks = ValErrorCollector()
     files = checks.check(validate_rat_files, args)
     execution = checks.check(validate_execution, args)
@@ -544,7 +546,7 @@ def validate_rat(args: RatOptions) -> RatSettings:
     bwa = checks.check(shutil.which, str(args.path_to_bwa))
     samtools = checks.check(shutil.which, str(args.path_to_samtools))
 
-    if bwa is None:
+    if bwa is None and args.path_to_bwa != RatOptions.args.path_to_bwa:
         checks.add(ExternalToolError("BWA","executable not found."))
     if samtools is None:
         checks.add(ExternalToolError("SAMtools","executable not found."))
@@ -599,7 +601,7 @@ def validate_rat(args: RatOptions) -> RatSettings:
 
 def get_validated_settings(args: CatOptions | BatOptions | RatOptions | PrepareOptions) -> CatSettings | BatSettings | RatSettings | PrepareSettings:
     if isinstance(args, RatOptions):
-        return validate_rat(args)
+        return validate_rat_args(args)
     if isinstance(args, (CatOptions, BatOptions)):
         log.debug(f"Starting validation on CatOptions or BatOptions")
         return validate_cat(args)

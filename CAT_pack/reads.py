@@ -4,7 +4,7 @@ import subprocess
 import sys
 from dataclasses import field, dataclass
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, Any
 
 from CAT_pack import tax
 from CAT_pack.classification import ClassificationEngine
@@ -19,7 +19,7 @@ from CAT_pack.utils.logging import Report
 from CAT_pack.utils.typing import EntityType
 
 
-def process_CAT_table(settings: RatSettings, output_table: Path)-> dict[str, list[tuple[str,...]]]:
+def process_annotation_table(settings: RatSettings, output_table: Path)-> dict[str, list[tuple[str,...]]]:
     """
     takes CAT contig2classification or bin2classification table and taxonomy
     nodes file as input; returns a dictionary that contains the complete
@@ -174,7 +174,7 @@ def make_unclassified_seq_fasta(settings: RatSettings, map_result: MappingResult
                     outf.write(f">{seq_id}_{index}\n{record.sequence}\n")
 
 
-def get_unclassified_contigs(contig2bin, c2c, b2c):
+def get_unclassified_contigs(contig2bin, c2c, b2c) -> list[str]:
     """
     If the contig is in a bin that is unclassified, or if the contig is not in
     a bin AND unclassified: put it in a set.
@@ -261,16 +261,16 @@ class RatResult:
 
 def load_classifications(settings: RatSettings, report: Report, map_result: MappingResult) -> RatResult:
     files = settings.files
-    b2c = {}
+    b2c: dict[str, list[tuple[str,...]]] = {}
 
     if files.contigs2classification is not None:
-        c2c = process_CAT_table(settings, files.contigs2classification)
+        c2c = process_annotation_table(settings, files.contigs2classification)
     else:
         c2c = {name: [] for name in FastaParser(files.contigs_fasta).iter_headers()}
     report.progress_next()
 
     if files.bin2classification is not None:
-        b2c = process_CAT_table(settings, files.bin2classification)
+        b2c = process_annotation_table(settings, files.bin2classification)
     report.progress_next()
 
     contig2bin = invert_bin_dict(files.bin2contigs)
@@ -337,7 +337,7 @@ def calculate_abundances(
 ) -> None:
     files = settings.files
     if files.unmapped2classification is not None:
-        rat_result.u2c = process_CAT_table(
+        rat_result.u2c = process_annotation_table(
             settings, files.unmapped2classification,
         )
     report.progress_next()

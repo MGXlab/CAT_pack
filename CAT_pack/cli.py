@@ -19,7 +19,7 @@ from .cli_options import (
     DiamondPathOption, diamond_options, execution_options, mmseqs_options, memory_options, with_option_groups,
 )
 from .config.options import BatOptions, CatOptions, ExecutionOptions, DiamondOptions, MMseqsOptions, PrepareOptions, \
-    MemoryOptions, DownloadOptions, RatModes, RatOptions
+    MemoryOptions, DownloadOptions, RatMode, RatOptions
 from .config.validation import get_file_names, make_prefix
 from .pipeline import build_plan, run_download, run
 from .progress import ProgressTracker
@@ -568,7 +568,7 @@ def rat(contigs_fasta: Annotated[
         ],
         database: Annotated[Path, Option("--database", "-d",
                          help="Directory that contains database and taxonomy files", metavar="<DIR>")],
-        mode: Annotated[RatModes,
+        mode: Annotated[RatMode,
                         Option("--mode", "-m", help="Classification mode")],
         output_prefix: Annotated[
             Path,

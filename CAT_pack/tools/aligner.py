@@ -28,7 +28,7 @@ def run_mmseqs2(mmseqs: MMseqsSettings, report):
                 " The porting is in progress.\n")
 
     log.warning(
-    f"""
+    r"""
                _                        
            \`*-.                    
             )  _`-.                 
