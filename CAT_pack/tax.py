@@ -161,7 +161,8 @@ class Taxonomy:
         orf_of_hit = orf_of_hit[no_taxid_hit_mask]
 
 
-        hits_per_orf = np.bincount(orf_of_hit, minlength=orf_count)
+        n_hits_with_taxid = np.bincount(orf_of_hit, minlength=orf_count)
+        hits_per_orf = n_hits_with_taxid
         max_hits = int(hits_per_orf.max())
         known_hit_count = len(hits)
         log.info(
@@ -209,7 +210,7 @@ class Taxonomy:
             elapsed, orf_count, known_hit_count, max_hits, reduction_rounds,
             extra={"classification_phase": "orf_lca_batch", "classification_seconds": elapsed},
         )
-        return lca_per_orf, hits_per_orf #hits per orf == hits with taxid per orf
+        return lca_per_orf, n_hits_with_taxid
 
 
 @dataclass
