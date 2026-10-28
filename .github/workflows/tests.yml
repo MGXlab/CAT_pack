@@ -23,6 +23,8 @@ jobs:
             file: test_options.py
           - name: Classification
             file: test_basic_classification.py
+          - name: Hit counts
+            file: test_hit_counts.py
 
     steps:
       - name: Check out repository
