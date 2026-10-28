@@ -171,8 +171,8 @@ class RatFiles:
 class RatSettings(ExecutionSettings, ClassificationSettings):
     files: RatFiles
     log_file: Path
-    bwa: Path | None
-    samtools: Path
+    bwa: Path | str | None
+    samtools: Path | str
     mapping_quality: int
     sort_memory_mib: int | None = None
     cat: CatSettings | None = None
