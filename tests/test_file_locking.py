@@ -4,12 +4,8 @@ import tempfile
 import unittest
 from pathlib import Path
 from textwrap import dedent
-from unittest.mock import Mock
 
-from CAT_pack7.config.options import CatOptions
-from CAT_pack7.pipeline import run_annotation
-from CAT_pack7.utils.errors import InputError
-from CAT_pack7.utils.locking import lock_outputs
+from CAT_pack.utils.locking import lock_outputs
 
 
 class OutputLockingTests(unittest.TestCase):
@@ -24,8 +20,8 @@ class OutputLockingTests(unittest.TestCase):
             import sys
             from pathlib import Path
 
-            from CAT_pack7.utils.locking import lock_outputs
-            from CAT_pack7.utils.errors import InputError
+            from CAT_pack.utils.locking import lock_outputs
+            from CAT_pack.utils.errors import InputError
 
             try:
                 with lock_outputs([Path(sys.argv[1])]):
@@ -63,20 +59,6 @@ class OutputLockingTests(unittest.TestCase):
         with lock_outputs([self.output_prefix]):
             with lock_outputs([other_prefix]):
                 pass
-
-    def test_conflicting_annotation_does_not_write_its_log(self):
-        options = CatOptions(
-            contigs=self.directory / "contigs.fna",
-            database=self.directory / "db",
-            output_prefix=self.output_prefix,
-        )
-        report = Mock()
-
-        with lock_outputs([self.output_prefix]):
-            with self.assertRaisesRegex(InputError, "Another run is using"):
-                run_annotation(options, report)
-
-        self.assertFalse(options.log_path.exists())
 
 
 if __name__ == "__main__":

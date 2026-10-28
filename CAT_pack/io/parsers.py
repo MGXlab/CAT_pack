@@ -1,0 +1,536 @@
+"""input parsers"""
+import bz2
+import gzip
+import logging
+import os
+import pathlib
+import tarfile
+from array import array
+from contextlib import ExitStack, closing
+from dataclasses import dataclass
+from decimal import Decimal
+from itertools import chain, islice
+from pathlib import Path
+from typing import Iterator, Literal, TextIO
+
+import numpy as np
+
+from CAT_pack.utils.typing import EntityType
+from .reference_mapping import read_fastaid2LCAtaxid
+from .. import tax
+from ..config.settings import BatFiles, CatFiles, ParserSettings
+from ..utils.errors import InputError
+
+log = logging.getLogger("CAT_pack")
+parser_settings = ParserSettings()
+
+
+@dataclass(frozen=True, slots=True)
+class FastaRecord:
+    name: str
+    sequence: str
+
+
+
+class FastaParser:
+    """Read FASTA records and collect their contig or ORF identifiers."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+
+    def __iter__(self) -> Iterator[FastaRecord]:
+        # Fasta (yield) logic Adopted from:
+        # https://github.com/idptools/sparrow/blob/03aa232abcbe191d96daf55ee28e1f7881979a68/sparrow/sequence_analysis/plaac/plaac.py#L318-L350
+        record_name = None
+        sequence_lines: list[str] = []
+        seen: set[str] = set()
+        with optionally_compressed_handle(self.path, "rt") as source:
+            for line in source:
+                line = line.strip()
+                if not line:
+                    continue
+                if line.startswith(">"):
+                    next_name = self._parse_header(line)
+                    if next_name in seen:
+                        raise InputError(f"Found a duplicate FASTA header: {next_name}.", path=self.path)
+                    seen.add(next_name)
+                    if record_name is not None:
+                        yield FastaRecord(record_name, "".join(sequence_lines))
+                    record_name = next_name
+                    sequence_lines = []
+                else:
+                    sequence_lines.append(line)
+
+        if record_name is not None:
+            yield FastaRecord(record_name, "".join(sequence_lines))
+
+    def iter_headers(self) -> Iterator[str]:
+        with optionally_compressed_handle(self.path, "rt") as source:
+            for line in source:
+                line = line.lstrip()
+                if line.startswith(">"):
+                    yield self._parse_header(line.rstrip())
+
+    def _parse_header(self, header: str) -> str:
+        name = header[1:].split(" ", 1)[0]
+        if not name:
+            raise InputError(
+                "Fasta header is empty",
+                path=self.path,
+                hint="Please provide a non-empty name immediately after '>'.",
+            )
+        return name
+
+    def parse_contig_names(self) -> set[str]:
+        """Read unique contig identifiers. Checks also for duplicate contig names"""
+        log.info(f"Importing contig names from {self.path}.")
+        contig_names: set[str] = set()
+        for name in self.iter_headers():
+            if name in contig_names:
+                raise InputError(
+                    "your fasta file contains duplicate headers (the "
+                    "part before the first space in the >line). The "
+                    f"first duplicate encountered is {name}, but there "
+                    "might be more...", path=self.path,
+                )
+            contig_names.add(name)
+        return contig_names
+
+    def parse_ORFs(self) -> dict[str, list[str]]:
+        """Group ORF identifiers by their contig_name_# prefix."""
+        log.info(f"Parsing ORF file {self.path}.")
+        contig2ORFs: dict[str, list[str]] = {}
+        for orf_name in self.iter_headers():
+            contig = orf_name.rsplit("_", 1)[0]
+            if contig not in contig2ORFs:
+                contig2ORFs[contig] = []
+            contig2ORFs[contig].append(orf_name)
+        return contig2ORFs
+
+@dataclass(frozen=True, slots=True)
+class FastqRecord:
+    name: str
+    sequence: str
+    quality: str
+
+
+class FastqParser:
+    def __init__(self, path: Path) -> None:
+        self.path = path
+
+    def __iter__(self) -> Iterator[FastqRecord]:
+        seen: set[str] = set()
+        with optionally_compressed_handle(self.path, "r") as file:
+            for header in file:
+                if not header.startswith("@"):
+                    raise InputError(f"FASTQ header must start with a '@'. Got {header}",
+                                     path=self.path, hint="Check the fastq file")
+                name = header[1:].rstrip().split(maxsplit=1)[0]
+                if name in seen:
+                    raise InputError(f"Duplicate FASTQ header: {name}.", path=self.path,
+                                     hint="Remove any duplicate FASTQ headers from the supplied file")
+                seen.add(name)
+
+                sequence = next(file).rstrip()
+                next(file)  # Skip the + line.
+                quality = next(file).rstrip()
+                if not quality: raise ValueError("Incomplete fastq record at end of file.")
+                yield FastqRecord(name, sequence, quality)
+
+
+@dataclass(frozen=True, slots=True)
+class BinInput:
+    bin2contigs: dict[str, list[str]]
+    bin_paths: tuple[Path, ...]
+
+
+class BinParser:
+    """Read bin files and reject contig names that appear more than once."""
+
+    def __init__(self, path: Path, suffix: str) -> None:
+        self.path = path
+        self.suffix = suffix
+
+    def parse(self, paths=None) -> BinInput:
+        paths = self.find_bin_paths() if paths is None else paths
+        bin2contigs: dict[str, list[str]] = {}
+        contig2bin: dict[str, str] = {}
+
+        for path in paths:
+            contigs: list[str] = []
+            for contig_name in FastaParser(path).iter_headers():
+                if contig_name in contig2bin:
+                    previous_bin = contig2bin[contig_name]
+                    raise InputError(
+                        f"BAT has encountered {contig_name} twice, in {previous_bin} "
+                        f"and in {path.name}. Fasta headers (the part "
+                        "before the first space in the >line) should be unique "
+                        "across bins, please remove or rename duplicates.",
+                        path=path,
+                    )
+                contig2bin[contig_name] = path.name
+                contigs.append(contig_name)
+            bin2contigs[path.name] = contigs
+
+        if not contig2bin:
+            raise InputError("no contigs found in bin fasta files.", path=self.path)
+
+        if len(paths) == 1:
+            log.info("1 bin found!")
+        else:
+            log.info(f"{len(paths):,d} bins found!")
+        return BinInput(bin2contigs=bin2contigs, bin_paths=paths)
+
+    def find_bin_paths(self) -> tuple[Path, ...]:
+        if not self.path.is_dir():
+            return (self.path,)
+
+        log.info(f"Importing bins from {self.path}.")
+        paths = []
+        for path in sorted(self.path.iterdir()):
+            if not path.is_file():
+                continue
+            if path.name.startswith(".") or ".concatenated." in path.name:
+                continue
+            if path.name.endswith((self.suffix, f"{self.suffix}.gz", f"{self.suffix}.bz2")):
+                paths.append(path)
+
+        if not paths:
+            raise InputError(
+                f"no bins found with suffix {self.suffix} in bin folder. You can set the "
+                "suffix with the [-s / --bin_suffix] argument.",
+                path=self.path,
+            )
+        return tuple(paths)
+
+
+def parse_bitscore(text: str) -> int:
+    whole_number, _, decimal = text.strip().partition(".")
+    return int(whole_number) * parser_settings.bit_score_multiplier + int(decimal[:1] or "0")
+
+
+def format_bitscore(bitscore: int) -> str:
+    whole_number = bitscore // parser_settings.bit_score_multiplier
+    decimal = bitscore % parser_settings.bit_score_multiplier
+    if decimal == 0:
+        return str(whole_number)
+    return f"{whole_number}.{decimal}"
+
+@dataclass(frozen=True, slots=True)
+class AlignmentInput:
+    orf_names: list[str]
+    orf_index: dict[str, int]
+    orf_offsets: np.ndarray
+    hit_ids: np.ndarray
+    bitscores: np.ndarray
+    hit_names: list[str]
+
+    def hits_of(self, orf: int) -> slice:
+        return slice(self.orf_offsets[orf], self.orf_offsets[orf + 1])
+
+    def hit_names_of(self, orf: int) -> list[str]:
+        return [self.hit_names[hit] for hit in self.hit_ids[self.hits_of(orf)].tolist()]
+
+
+class _HitIndex:
+    def __init__(self):
+        import polars as pl
+
+        self.hit_name_dtype = pl.Categorical(pl.Categories.random())
+        # Keep the hit-name mapping across multiple batches
+        self.hit_name_keep = pl.Series([], dtype=self.hit_name_dtype)
+        self.hit_code2hit_id = np.full(1024, -1, dtype=np.int32)
+        self.new_hit_codes_by_batch = []
+        self.n_hit_names = 0
+
+    def index_hits(self, hit_names):
+        encoded_hit_names = hit_names.cast(self.hit_name_dtype)
+        hit_name_codes = encoded_hit_names.to_physical().to_numpy()
+
+        if not len(hit_name_codes):
+            return np.empty(0, dtype=np.int32)
+
+        unique_hit_name_codes = encoded_hit_names.unique(maintain_order=True).to_physical().to_numpy()
+        required_code_capacity = int(unique_hit_name_codes.max()) + 1
+
+        if required_code_capacity > len(self.hit_code2hit_id):
+            capacity = max(required_code_capacity, len(self.hit_code2hit_id) * 2)
+            expanded_hit_code2hit_id = np.full(capacity, -1, dtype=np.int32)
+            expanded_hit_code2hit_id[:len(self.hit_code2hit_id)] = self.hit_code2hit_id
+            self.hit_code2hit_id = expanded_hit_code2hit_id
+
+        new_hit_name_codes = unique_hit_name_codes[self.hit_code2hit_id[unique_hit_name_codes] < 0]
+        self.hit_code2hit_id[new_hit_name_codes] = np.arange(
+            self.n_hit_names, self.n_hit_names + len(new_hit_name_codes), dtype=np.int32,
+        )
+        self.new_hit_codes_by_batch.append(new_hit_name_codes)
+        self.n_hit_names += len(new_hit_name_codes)
+        return self.hit_code2hit_id[hit_name_codes]
+
+    def get_hit_names(self):
+        import polars as pl
+
+        if not self.n_hit_names:
+            return []
+        hit_name_codes = np.concatenate(self.new_hit_codes_by_batch)
+        return pl.Series(hit_name_codes, dtype=pl.UInt32).cat.to(self.hit_name_dtype).cast(pl.String).to_list()
+
+
+class AlignmentParser:
+    """Load DIAMOND hits within range_
+
+    DEVNOTE: The input is assumed to be grouped by ORF!
+    DEVNOTE 2: the Alignment file is not validated during loading.
+               Users responsibility to supply correct files or let cat_pack generate it
+
+    Bitscore comparison products are assumed to fit in int64.
+
+    """
+
+    _chunk_rows = 100_000
+
+    def __init__(self, path: Path, range_: Decimal, cat_only: bool | None = None, workers: int = 1) -> None:
+        self.path = path
+        self.cutoff_numerator, self.cutoff_denominator = ((Decimal(100) - range_)/Decimal(100)).as_integer_ratio()
+        self.cat_only = cat_only
+        self.workers = workers
+
+    def _read_in_batches(self, source, first_line, bitscore_index):
+        import polars as pl
+
+        column_names = [f"field_{i}" for i in range(bitscore_index + 1)]
+        schema = dict.fromkeys(column_names, pl.String)
+        selected_columns = [column_names[0], column_names[1], column_names[-1]]
+        # Parse one decimal place. After that it's stored in integers (decimal * 10)
+        bitscore_column = (
+            pl.col(selected_columns[-1]).cast(pl.Decimal(precision=38, scale=1))
+            .to_physical().cast(pl.Int64).alias("bitscore")
+        )
+        reader_options = dict(
+            has_header=False, separator="\t", quote_char=None, schema=schema,
+            empty_string_is_null=False, raise_if_empty=False,
+            missing_columns="insert", extra_columns="ignore",
+        )
+        log.info(f"Loading alignment with Polars using a total of {pl.thread_pool_size()} threads.")
+
+        if self.path.suffix == ".bz2":
+            alignment_lines = chain((first_line,), source)
+            for lines in iter(lambda: list(islice(alignment_lines, self._chunk_rows)), []):
+                alignment_batch = pl.read_csv("".join(lines).encode("utf-8"), **reader_options).with_columns(
+                    bitscore_column,
+                ).select([selected_columns[0], selected_columns[1], "bitscore"])
+                if alignment_batch.height:
+                    yield alignment_batch, selected_columns
+            return
+
+        alignment_scan = (
+            pl.scan_csv(self.path, glob=False, **reader_options)
+            .with_columns(bitscore_column)
+            .select([selected_columns[0], selected_columns[1], "bitscore"])
+        )
+        batches = alignment_scan.collect_batches(chunk_size=self._chunk_rows, maintain_order=True)
+        try:
+            for alignment_batch in batches:
+                if alignment_batch.height:
+                    yield alignment_batch, selected_columns
+        finally:
+            del batches
+
+    def parse(self) -> AlignmentInput:
+        log.info(f"Parsing alignment file {self.path}.")
+        # https://docs.pola.rs/api/python/stable/reference/api/polars.thread_pool_size.html
+        # DEVNOTE: During testing the sweetspot was 16 cores at 76 seconds and 8 cores around 77 seconds
+        #  10-12 cores need to be tested
+        os.environ.setdefault("POLARS_MAX_THREADS", str(min(self.workers, os.cpu_count() or 1)))
+
+        # Import AFTER threads setting, so Polars initializes with the correct core count!
+        import polars as pl
+
+        source_file = optionally_compressed_handle(self.path, mode="rt")
+        orf_names: list[str] = []
+        orf_index: dict[str, int] = {}
+        orf_offsets = array("q")
+        hit_ids = array("i")
+        bitscores = array("q")
+        hit_index = _HitIndex()
+        with source_file as source, ExitStack() as cleanup:
+            current_ORF = None
+            top_bitscore = 0
+            below_cutoff = False
+            first_line = next(source, None)
+            if self.cat_only is None:
+                n_fields = len(first_line.rstrip("\r\n").split("\t")) if first_line is not None else 12
+                if n_fields != 3 and n_fields < 12:
+                    raise InputError("Alignment must have three CAT columns or twelve BLAST6 columns.", path=self.path)
+                bitscore_index = 2 if n_fields == 3 else 11
+            else:
+                bitscore_index = 2 if self.cat_only else 11
+
+            batches = cleanup.enter_context(closing(self._read_in_batches(source, first_line, bitscore_index))) if first_line is not None else ()
+            for alignment_batch, selected_columns in batches:
+                batch_bitscores = alignment_batch["bitscore"].to_numpy()
+                ORF_groups = alignment_batch[selected_columns[0]].rle()
+                n_hits_per_ORF = ORF_groups.struct.field("len").to_numpy().astype(np.int64)
+                ORF_names = np.asarray(ORF_groups.struct.field("value").to_list(), dtype=object)
+                ORF_starts = np.concatenate(([0], np.cumsum(n_hits_per_ORF)[:-1]))
+                continues_ORF = ORF_names[0] == current_ORF
+                new_ORF_starts = ORF_starts[1:] if continues_ORF else ORF_starts
+                new_ORF_names = ORF_names[1:] if continues_ORF else ORF_names
+                first_ORF_index = len(orf_names)
+                orf_index.update(zip(new_ORF_names, range(first_ORF_index, first_ORF_index + len(new_ORF_names))))
+                orf_names.extend(new_ORF_names)
+
+                top_bitscores = batch_bitscores[ORF_starts]
+                if continues_ORF:
+                    top_bitscores[0] = top_bitscore
+                cutoff_numerator, cutoff_denominator = self.cutoff_numerator, self.cutoff_denominator
+                # Compare B * denominator with H * numerator
+                # DEVNOTE: Logic being here that
+                #  B >= Fraction * H  <-> B * denominator >= H * numerator
+                #  This keeps the comparison Integer only
+                hits_below_cutoff = (batch_bitscores * cutoff_denominator < np.repeat(top_bitscores * cutoff_numerator, n_hits_per_ORF))
+
+                row_indices = np.arange(len(batch_bitscores))
+                first_below_cutoff = np.minimum.reduceat(np.where(hits_below_cutoff, row_indices, len(batch_bitscores)), ORF_starts)
+
+                if continues_ORF and below_cutoff:
+                    first_below_cutoff[0] = -1
+
+                keep_hits = row_indices < np.repeat(first_below_cutoff, n_hits_per_ORF)
+                n_kept_before = np.concatenate(([0], np.cumsum(keep_hits)))
+                orf_offsets.frombytes((len(hit_ids) + n_kept_before[new_ORF_starts]).astype(np.int64).tobytes())
+
+                hit_names = alignment_batch[selected_columns[1]].filter(pl.Series(keep_hits))
+                batch_hit_ids = hit_index.index_hits(hit_names)
+                hit_ids.frombytes(batch_hit_ids.tobytes())
+                bitscores.frombytes(batch_bitscores[keep_hits].tobytes())
+
+                current_ORF = ORF_names[-1]
+                top_bitscore = int(top_bitscores[-1])
+                below_cutoff = first_below_cutoff[-1] < len(batch_bitscores)
+
+        orf_offsets.append(len(hit_ids))
+        return AlignmentInput(
+            orf_names=orf_names,
+            orf_index=orf_index,
+            orf_offsets=np.frombuffer(orf_offsets, dtype=np.int64),
+            hit_ids=np.frombuffer(hit_ids, dtype=np.int32),
+            bitscores=np.frombuffer(bitscores, dtype=np.int64),
+            hit_names=hit_index.get_hit_names(),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ClassificationInputs:
+    entity_type: EntityType
+    entity2ORFs: dict[str, list[str]]
+    contig_names: set[str]
+    contig2ORFs: dict[str, list[str]]
+    alignment: AlignmentInput
+    taxonomy: tax.Taxonomy
+    fastaid2taxid: np.ndarray  # tax.NO_TAXID for absent or unknown taxids
+    branches: set[str]
+
+
+class ClassificationParser:
+    """Load ORF groups, accepted alignment hits, and their taxonomy data."""
+
+    def __init__(self, files: CatFiles | BatFiles, range_: Decimal,
+                 cat_only: bool | None = None, workers: int = 1) -> None:
+        self.files = files
+        self.range_ = range_
+        self.cat_only = cat_only
+        self.workers = workers
+
+    def parse(self) -> ClassificationInputs:
+        contig2ORFs = FastaParser(self.files.proteins_fasta).parse_ORFs()
+        if isinstance(self.files, BatFiles):
+            entity_type = EntityType.BIN
+            contig_names = set()
+            for contigs in self.files.bin2contigs.values():
+                contig_names.update(contigs)
+            entity2ORFs = self._group_bin_ORFs(self.files.bin2contigs, contig2ORFs)
+        else:
+            entity_type = EntityType.CONTIG
+            contig_names = FastaParser(self.files.contigs).parse_contig_names()
+            entity2ORFs = {}
+            for contig in contig_names:
+                entity2ORFs[contig] = contig2ORFs.get(contig, [])
+
+        alignment = AlignmentParser(self.files.alignment, self.range_, self.cat_only, workers=self.workers).parse()
+        taxonomy = tax.Taxonomy.import_nodes(self.files.nodes)
+
+        fastaid2LCAtaxid = read_fastaid2LCAtaxid(self.files.fastaid2LCA, set(alignment.hit_names), workers=self.workers)
+        fastaid2taxid = taxonomy.taxid_of_hits(alignment.hit_names, fastaid2LCAtaxid)
+        branches = tax.import_taxids_with_multiple_offspring(self.files.branches)
+
+        return ClassificationInputs(
+            entity_type=entity_type,
+            entity2ORFs=entity2ORFs,
+            contig_names=contig_names,
+            contig2ORFs=contig2ORFs,
+            alignment=alignment,
+            taxonomy=taxonomy,
+            fastaid2taxid=fastaid2taxid,
+            branches=branches,
+        )
+
+    def _group_bin_ORFs(
+        self,
+        bin2contigs: dict[str, list[str]],
+        contig2ORFs: dict[str, list[str]],
+    ) -> dict[str, list[str]]:
+        bin2ORFs: dict[str, list[str]] = {}
+        for bin_name, contigs in bin2contigs.items():
+            orfs: list[str] = []
+            for contig in sorted(contigs):
+                orfs.extend(contig2ORFs.get(contig, []))
+            bin2ORFs[bin_name] = orfs
+        return bin2ORFs
+
+
+def is_gz(file_path):
+    """Check if given file_path is gzipped based on suffix."""
+    if isinstance(file_path, Path):
+        file_path = file_path.name
+    return file_path.endswith(".gz") or file_path.endswith(".z")
+
+
+def optionally_compressed_handle(
+    file_path: str | Path,
+    mode: Literal["r", "rb", "rt", "w", "wb", "wt", "a", "ab", "at"],
+) -> TextIO:
+    """Return an appropriate file handle to operate on.
+
+    Arguments:
+      file_path: str or PathLike: File path.
+      mode: str: The passed mode to open the file on.
+
+    Return:
+        A file handle either gzip opened or plainly opened for
+        reading/writing/appending in text mode.
+    """
+    path = Path(file_path)
+    opener = (
+        gzip.open if path.suffix == ".gz"
+        else bz2.open if path.suffix == ".bz2"
+        else open
+    )
+    return opener(path, mode[0] + "t", encoding="utf-8")
+
+
+def tar_extraction(file: pathlib.Path, output_dir: pathlib.Path, prefix: str = "", files_to_extract: list[str] = None):
+    files = {}
+    with tarfile.open(file, "r:gz") as tar:
+        for dmp in files_to_extract:
+            log.info("Extracting {0} from taxdump.tar.gz".format(dmp))
+
+            tar.extract(dmp, path=output_dir)
+
+            # Timestamp the extracted dmp file
+            outf1 = output_dir / pathlib.Path(dmp)
+            timestamped_fname = "{0}.{1}".format(prefix, dmp)
+            timestamped_outf1 = output_dir / pathlib.Path(timestamped_fname)
+            outf1.rename(timestamped_outf1)
+            files[dmp] = timestamped_fname
+    return files

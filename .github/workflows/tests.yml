@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.13"]
+        python-version: ["3.11", "3.13"]
         suite:
           - name: CLI
             file: test_cli.py
@@ -23,6 +23,8 @@ jobs:
             file: test_options.py
           - name: Classification
             file: test_basic_classification.py
+          - name: Hit counts
+            file: test_hit_counts.py
 
     steps:
       - name: Check out repository
@@ -33,8 +35,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install CLI dependencies
-        run: python -m pip install typer rich numpy psutil polars
+      - name: Install package
+        run: python -m pip install .
 
       - name: Run ${{ matrix.suite.name }} tests
         run: python -m unittest discover -s tests -p "${{ matrix.suite.file }}" -v

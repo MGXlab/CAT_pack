@@ -1,1087 +1,83 @@
 #!/usr/bin/env python3
 
-import os
 import subprocess
-import argparse
-import datetime
 import sys
-import decimal
-import multiprocessing
+from dataclasses import field, dataclass
+from pathlib import Path
+from typing import Iterator
 
-import about
-
-import check
-import shared
-import tax
-
-
-def parse_arguments():
-    parser = argparse.ArgumentParser(
-            prog='CAT_pack reads',
-            description='Run Read Annotation Tool (RAT).',
-            # @Tina: Should the explanation on how to use RAT be in the description? Right now the 'Run Read Annotation Tool' is at a little weird position. Also if you forget one argument (say -c) you'll not only get the help message but also the entire usage which is a little overkill.
-            # @Tina: I do like this explanation of complete and partial workflows... Maybe we should add it to the other CAT pack as well?
-            usage='CAT_pack reads -m [mode] -c [contigs] -t [database] [options] [-h / --help]\n\n'
-            'Complete RAT workflow (perform read mapping, run CAT, BAT, and RAT): '
-            'Supply contigs, reads, database folder, taxonomy folder, and bin folder.\n\n'
-            'Partial workflows:\n'
-            'If you have already mapped your reads, you can supply the sorted mapping '
-            'file and no read mapping will be performed.\n'
-            'If you have already run CAT and/or BAT, you can supply the output '
-            'files (contig2classification, bin2classification) and the path to the '
-            'taxonomy folder instead.\n'
-            'If you prefer not to use bin classification, do not supply the path '
-            'to a bin folder.',
-            add_help=False)
-    
-    required = parser.add_argument_group('Required arguments')
-    shared.add_argument(required, 'contigs_fasta', True)
-    shared.add_argument(required, 'taxonomy_folder', True)
-    shared.add_argument(required, 'mode', True)
-    
-    optional = parser.add_argument_group('Optional arguments')
-    shared.add_argument(optional, 'out_prefix', False, default='./out')
-    shared.add_argument(optional, 'read_file1', False)
-    shared.add_argument(optional, 'read_file2', False)
-    shared.add_argument(optional, 'bam_file1', False)
-    shared.add_argument(optional, 'bam_file2', False)
-    shared.add_argument(optional, 'alignment_unmapped', False)
-    shared.add_argument(optional, 'bin_fasta_or_folder', False, default=False)
-    shared.add_argument(optional, 'bin_suffix', False, default=".fna")
-    shared.add_argument(optional, 'contig2classification', False)
-    shared.add_argument(optional, 'bin2classification', False)
-    shared.add_argument(optional, 'read2classification', False)
-    shared.add_argument(optional, 'unmapped2classification', False)
-
-    shared.add_argument(optional, 'mapping_quality', False, default=2)
-    shared.add_argument(optional, 'path_to_bwa', False, default='bwa')
-    shared.add_argument(optional, 'path_to_samtools', False, default='samtools')
-
-    shared.add_argument(optional, 'nproc', False,
-            default=multiprocessing.cpu_count())
-    shared.add_argument(optional, 'tmpdir', False)
-    shared.add_argument(optional, 'force', False)
-    shared.add_argument(optional, 'quiet', False)
-    shared.add_argument(optional, 'verbose', False)
-    shared.add_argument(optional, 'no_log', False)
-    shared.add_argument(optional, 'help', False)
-    
-    CAT_args = parser.add_argument_group('CAT/BAT-specific arguments')
-    shared.add_argument(CAT_args, 'database_folder', False)
-    shared.add_argument(optional, "proteins_fasta", False)
-    shared.add_argument(optional, "alignment_file", False)
-    shared.add_argument(CAT_args, 'r', False, default=decimal.Decimal(10))
-    shared.add_argument(CAT_args, 'f', False, default=decimal.Decimal(0.5))
-    shared.add_argument(CAT_args, 'no_stars', False)
-    shared.add_argument(CAT_args, 'IkwId', False)
-    
-    dmnd_args = parser.add_argument_group('DIAMOND specific optional arguments')
-    shared.add_all_diamond_arguments(dmnd_args)
-                          
-    (args, extra_args) = parser.parse_known_args()
-    extra_args = [arg for (i, arg) in enumerate(extra_args) if
-        (i, arg) != (0, 'reads')]
-    if len(extra_args) > 0:
-        sys.exit('error: too many arguments supplied:\n{0}'.format(
-            '\n'.join(extra_args)))
-
-    # Add extra arguments.
-    shared.expand_arguments(args, rat=True)
-    
-    if not args.read_file1:
-        sys.exit('error: you have to supply read files!')
-    
-    #check if the mode is correct
-    for c in [m for m in args.mode]:
-        if c not in ['m', 'c', 'r']:
-            sys.exit('Unknown letter "{}" in the mode argument. Allowed letters ' 
-                     'are "m" for MAGs, "c" for contigs and "r" for reads. '
-                     'Exiting.'.format(c))
-    
-    if 'm' in args.mode:
-        if not args.bin_folder:
-            sys.exit('error: "m" was supplied to mode but no bin_folder. If '
-                     'you want to include MAGs in your profile, please submit '
-                     'a bin folder (and suffix if necessary)')
-        if args.bin_folder and not args.bin2classification and not args.database_folder:
-            sys.exit('error: please provide either a bin2classification file or '
-                     'the path to the CAT_pack database_folder for bin classification!')
-        if args.bin2classification and not args.bin_folder:
-            sys.exit('error: bin2classification file but no bin_folder supplied. '
-                     'RAT requires -b/--bin_folder to include bins in annotation!')
-    
-    if 'c' in args.mode:
-        if not args.contigs_fasta:
-            sys.exit('error: no contigs_fasta supplied.')
-    
-
-        if not args.contig2classification and not args.database_folder:
-            sys.exit('error: please provide either a contig2classification file '
-                     'or the path to the CAT_pack database_folder!')
-            
-    if 'r' in args.mode and not 'c' in args.mode and not 'm' in args.mode:
-        sys.exit('error: we do not recommend annotating all reads directly '
-                 'with diamond. Please include c or m in the mode argument.')
-    
-    
-    return args
+from CAT_pack import tax
+from CAT_pack.classification import ClassificationEngine
+from CAT_pack.config.settings import RatSettings
+from CAT_pack.io.parsers import FastaParser, FastqParser
+from CAT_pack.io.parsers import optionally_compressed_handle, AlignmentParser
+from CAT_pack.io.writers import ClassificationWriter
+from CAT_pack.tools.aligner import run_aligner
+from CAT_pack.tools.tool_runner import tool_output
+from CAT_pack.utils.errors import ExternalToolError
+from CAT_pack.utils.logging import Report
+from CAT_pack.utils.typing import EntityType
 
 
-
-
-
-def run():
-    args = parse_arguments()
-    path_to_CAT=sys.argv[0]
-    
-    message = '# CAT_pack v{0}.\n'.format(about.__version__)
-    shared.give_user_feedback(message, args.log_file, args.quiet,
-        show_time=False)
-    message = '# Running command: {0}\n\n'.format(' '.join(sys.argv[1:]))
-    shared.give_user_feedback(message, args.log_file, args.quiet,
-        show_time=False)
-    
-    # Checks
-    
-    
-    
-    errors = []
-    
-    errors.append(
-            check.check_input_file(args.contigs_fasta, args.log_file, args.quiet))
-    
-    if args.read_file1:
-        errors.append(
-            check.check_input_file(args.read_file1, args.log_file, args.quiet))
-    if args.read_file2:
-        errors.append(
-            check.check_input_file(args.read_file2, args.log_file, args.quiet))
-    if args.bam_file1:
-        errors.append(
-            check.check_input_file(args.bam_file1, args.log_file, args.quiet))
-    if args.contig2classification:
-        errors.append(
-            check.check_input_file(args.contig2classification, args.log_file, args.quiet))
-    if args.bin2classification:
-        errors.append(
-            check.check_input_file(args.bin2classification, args.log_file, args.quiet))
-    
-    
-    
-    if not args.force:
-        if args.read_file1:
-            outf_bwamem='{0}.{1}.bwamem'.format(args.out_prefix+'.'+
-                                        os.path.split(args.contigs_fasta)[-1], 
-                                        os.path.split(args.read_file1)[-1])
-            
-            errors.append(
-                    check.check_output_file(
-                        outf_bwamem, args.log_file, args.quiet))
-            errors.append(
-                    check.check_output_file(
-                        outf_bwamem + '.bam', args.log_file, args.quiet))
-            errors.append(
-                    check.check_output_file(
-                        outf_bwamem + '.sorted', args.log_file, args.quiet))
-        if not args.contig2classification:
-            outf_cat_protein_faa='{0}.CAT.predicted_proteins.faa'.format(args.out_prefix)
-            outf_cat_c2c='{0}.CAT.contig2classification.txt'.format(args.out_prefix)
-            outf_cat_alignment='{0}.CAT.alignment.diamond'.format(args.out_prefix)
-            errors.append(
-                    check.check_output_file(
-                        outf_cat_protein_faa, args.log_file, args.quiet))
-            errors.append(
-                    check.check_output_file(
-                        outf_cat_c2c, args.log_file, args.quiet))
-            errors.append(
-                    check.check_output_file(
-                        outf_cat_alignment, args.log_file, args.quiet))
-            
-        if 'm' in args.mode:    
-            if args.bin_folder and not args.bin2classification:
-                outf_bat_protein_faa='{0}.BAT.{1}.predicted_proteins.faa'.format(args.out_prefix,
-                                                                             'concatenated')
-                outf_bat_b2c='{0}.BAT.bin2classification.txt'.format(args.out_prefix)
-                outf_bat_alignment='{0}.BAT.{1}.alignment.diamond'.format(args.out_prefix,
-                                                                             'concatenated')
-                errors.append(
-                        check.check_output_file(
-                            outf_bat_protein_faa, args.log_file, args.quiet))
-                errors.append(
-                        check.check_output_file(
-                            outf_bat_b2c, args.log_file, args.quiet))
-                errors.append(
-                        check.check_output_file(
-                            outf_bat_alignment, args.log_file, args.quiet))
-
-        
-    errors.append(
-            check.check_samtools_binaries(
-                args.path_to_samtools, args.log_file, args.quiet))
-    if not args.bam_file1:
-        errors.append(
-            check.check_bwa_binaries(
-                args.path_to_bwa, args.log_file, args.quiet))
-    if not args.contig2classification or (args.bin_folder and not 
-                                          args.bin2classification):
-        errors.append(
-            check.check_diamond_binaries(
-                args.path_to_diamond, args.log_file, args.quiet))
-    
-    if True in errors:
-        sys.exit(1)
-    
-    if args.read_file1:
-        reads_files=[args.read_file1]
-        if args.read_file2:
-            reads_files.append(args.read_file2)
-        else:
-            message = (
-                'WARNING: only one read file supplied! Currently RAT does not '
-                'support interlaced read files. If you are working with '
-                'paired-end reads, please provide a reverse read-file!' )
-            shared.give_user_feedback(message, args.log_file, args.quiet, 
-                                      show_time=False)
-    
-    # First: run bwa mem, samtools view and samtools sort if there is no bam file
-    bam_files=[]
-    if not args.bam_file1:
-        message = (
-                '\n'
-                'RAT is running. Mapping reads against assembly with bwa mem.\n')
-        shared.give_user_feedback(message, args.log_file, args.quiet,
-                show_time=False)
-            
-        
-
-        shared.run_bwa_mem(args.path_to_bwa, args.path_to_samtools,
-                              args.contigs_fasta, reads_files, args.out_prefix,
-                              args.nproc, args.log_file)
-
-            
-            
-        bam_files.append('{0}.{1}.bwamem.sorted'.format(args.out_prefix+'.'
-                        ''+os.path.split(args.contigs_fasta)[-1], 
-                        os.path.split(args.read_file1)[-1]))
-    else:
-        bam_files.append(args.bam_file1)
-        if args.bam_file2:
-            bam_files.append(args.bam_file2)
-            message = (
-                'WARNING: you provided two bam files. Consider mapping forward '
-                'and reverse reads together or repeating the mapping step with '
-                'RAT!')
-            shared.give_user_feedback(message, args.log_file, args.quiet, 
-                                      show_time=False)
-
-    
-    # Run CAT or process CAT output file
-    if 'c' in args.mode:
-        if args.contig2classification:
-            message = (
-                    'contig2classification file supplied. Processing contig '
-                    'classifications.')
-            shared.give_user_feedback(message, args.log_file, args.quiet,
-                    show_time=True)
-            c2c=process_CAT_table(args.contig2classification, args.nodes_dmp, 
-                                  args.log_file, args.quiet)
-        else:
-            message = (
-                    'No contig2classification file supplied. Running CAT on '
-                    'contigs.')
-            shared.give_user_feedback(message, args.log_file, args.quiet,
-                    show_time=True)
-            
-            print(path_to_CAT)
-            
-            shared.run_CAT(args, args.contigs_fasta, args.database_folder, 
-                           args.taxonomy_folder, args.log_file, args.quiet, 
-                           args.nproc, args.f, args.r, args.out_prefix,
-                           path_to_CAT)
-            c2c=process_CAT_table('{0}.CAT.contig2classification.txt'
-                                  ''.format(args.out_prefix), 
-                                  args.nodes_dmp, args.log_file, args.quiet)
-    
-    
-    contig2bin={}
-    b2c={}
-    # Process bin folder
-
-    
-    if 'm' in args.mode:
-        
-        if args.bin_folder:
-            message = 'Bin folder supplied. Processing bin folder.'
-            shared.give_user_feedback(message, args.log_file, args.quiet,
-                    show_time=True)
-    
-            bins=process_bin_folder(args.bin_folder, args.bin_suffix)
-            if bins=={}:
-                message = ('No files found with suffix {} in folder "{}".' 
-                           'Please check command.'
-                           ''.format(args.bin_suffix, args.bin_folder))
-                shared.give_user_feedback(message, args.log_file, args.quiet,
-                        show_time=True)
-                sys.exit(1)
-            contig2bin=invert_bin_dict(bins)
-    
-    
-        # Run BAT on folder if bin folder but not BAT_file is supplied
-        # Or process BAT file if it is supplied
-        
-        
-        if args.bin_folder and args.bin2classification:
-            message = (
-                    'bin2classification file supplied. Processing bin '
-                    'classifications.')
-            shared.give_user_feedback(message, args.log_file, args.quiet,
-                    show_time=True)
-            b2c=process_CAT_table(args.bin2classification, args.nodes_dmp, 
-                                  args.log_file, args.quiet)
-        
-        elif args.bin_folder and not args.bin2classification:
-            message = ('No bin2classification file supplied. Running BAT on bin '
-                       'folder.')
-            shared.give_user_feedback(message, args.log_file, args.quiet,
-                    show_time=True)
-            
-            # If CAT was not run, run BAT
-            if not 'c' in args.mode:
-                shared.run_BAT(args, args.bin_folder, args.database_folder, args.taxonomy_folder,
-                           args.log_file, args.quiet, args.nproc, args.f, args.r, 
-                           args.out_prefix, args.bin_suffix, path_to_CAT=path_to_CAT)
-                
-            # If CAT was run, use the CAT output files
-            else:
-                message = ('Calculating bin annotations from previous CAT run.')
-                shared.give_user_feedback(message, args.log_file, args.quiet,
-                    show_time=True)
-                CAT_protein_fasta=('{0}.CAT.predicted_proteins.faa'
-                                   ''.format(args.out_prefix))
-                CAT_diamond_alignment=('{0}.CAT.alignment.diamond'
-                                       ''.format(args.out_prefix))
-                shared.run_BAT(args, args.bin_folder, args.database_folder, args.taxonomy_folder,
-                           args.log_file, args.quiet, args.nproc, args.f, args.r, 
-                           CAT_protein_fasta, CAT_diamond_alignment,
-                           args.out_prefix, args.bin_suffix, 
-                           path_to_CAT=path_to_CAT)
-            b2c=process_CAT_table('{0}.BAT.bin2classification.txt'.format(args.out_prefix), 
-                                  args.nodes_dmp, args.log_file, args.quiet)
-            
-        elif not args.bin_folder:
-            message = 'No bin folder supplied. No bin classification will be made.'
-            
-            shared.give_user_feedback(message, args.log_file, args.quiet,
-                    show_time=False)
-    
-    
-    
-    # Process BAM files and grab unmapped reads
-    message = 'Processing mapping file(s).\n'
-    shared.give_user_feedback(message, args.log_file, args.quiet,
-            show_time=True)
-    # @Tina: we could just supply the first argument as a list, that will save you the conditional.
-    if len(bam_files)==2:
-        reads, unmapped_reads, sum_of_reads, paired = process_bam_file(bam_files[0], 
-                                                                       args.mapping_quality,
-                                                                       args.path_to_samtools,
-                                                                       BAM_rev_file=bam_files[1])
-    else:
-        reads, unmapped_reads, sum_of_reads, paired = process_bam_file(bam_files[0], 
-                                                                       args.mapping_quality,
-                                                                       args.path_to_samtools)
-    
-    
-    # Get lengths of the contigs from contigs file    
-    contig_length_dict, sum_of_nucleotides = get_contig_lengths(args.contigs_fasta)
-    # make contig_dict
-    contigs, reads, max_primary=make_contig_dict(reads, bam_files, paired, contig2bin)
-
-
-    # If direct_mapping is chosen, map unclassified contigs and unmapped reads
-    # against NR
-    
-    if 'r' in args.mode:
-        setattr(args,'read2classification',True)
-        message = ('Chosen mode: {0}. Classifying unclassified contigs and'
-                    ' unmapped reads with diamond if no classification file is'
-                    ' supplied.'.format(args.mode))
-        shared.give_user_feedback(message, args.log_file, args.quiet,
-            show_time=True)
-        
-        
-        # unmapped_reads is a dictionary that stores the unmapped forward and
-        # reverse reads and looks like this:
-            # unmapped_reads={'fw': [read_id1, read_id2, read_id3], 
-            #                 'rev': [read_id1, read_id2, read_id3]}
-        # I need to mark all the read ids as fw or rev, pull out the sequences,
-        # and then write the input fasta as one document for all reads and 
-        # contigs I want to classify
-        if not args.alignment_unmapped and not args.unmapped2classification:
-            message = ('No unmapped2classification file supplied. Grabbing '
-                       'unmapped and unclassified sequences...')
-            shared.give_user_feedback(message, args.log_file, args.quiet,
-                show_time=True)
-            all_unclassified=list()
-            
-            uncl_unm_fasta='{0}.RAT.unclassified_unmapped.fasta'.format(args.out_prefix)
-            unclassified_contigs = get_unclassified_contigs(contig2bin,
-                                                            c2c, b2c)
-            all_unclassified+=list(unclassified_contigs)
-            make_unclassified_seq_fasta(args.contigs_fasta, unclassified_contigs,
-                                        uncl_unm_fasta, 'fasta', 'w')
-            
-            message = ('Contigs written! Appending forward reads...')
-            shared.give_user_feedback(message, args.log_file, args.quiet,
-                show_time=True)
-            make_unclassified_seq_fasta(reads_files[0], unmapped_reads['fw'],
-                                        uncl_unm_fasta, 'fastq', 'a','_1')
-            all_unclassified+=['{}_1'.format(i) for i in unmapped_reads['fw']]
-            
-            if args.read_file2:
-                message = ('Appending reverse reads...')
-                shared.give_user_feedback(message, args.log_file, args.quiet,
-                    show_time=True)
-                make_unclassified_seq_fasta(reads_files[1], unmapped_reads['rev'],
-                                            uncl_unm_fasta, 'fastq', 'a','_2')
-                all_unclassified+=['{}_2'.format(i) for i in unmapped_reads['rev']]
-            # Run diamond on unclassified contigs and unmapped reads
-            setattr(args,
-                    'alignment_file',
-                    '{0}.RAT.unclassified_unmapped.alignment.diamond'.format(args.out_prefix))
-            shared.run_diamond(args, blast='blastx', prot_fasta=uncl_unm_fasta,
-                                top=11)
-        else:
-            setattr(args,
-                    'alignment_file',
-                    args.alignment_unmapped)
-        if args.alignment_unmapped and not args.unmapped2classification:
-            all_unclassified=list()
-            unclassified_contigs = get_unclassified_contigs(contig2bin,
-                                                            c2c, b2c)
-            all_unclassified+=list(unclassified_contigs)
-            all_unclassified+=['{}_1'.format(i) for i in unmapped_reads['fw']]
-            if args.read_file2:
-                all_unclassified+=['{}_2'.format(i) for i in unmapped_reads['rev']]
-       
-            
-        # Now, the diamond alignment has to be parsed with a CAT function
-        if not args.unmapped2classification:
-    
-            taxid2parent, taxid2rank = tax.import_nodes(args.nodes_dmp, 
-                                                        args.log_file,
-                                                        args.quiet)
-            shared.explore_database_folder(args)
-            seq2hits, all_hits = shared.parse_tabular_alignment(args.alignment_file,
-                                                                decimal.Decimal(1-args.r),
-                                                                args.log_file,
-                                                           args.quiet)
-            fastaid2LCAtaxid = tax.import_fastaid2LCAtaxid(args.fastaid2LCAtaxid_file, 
-                                                           all_hits, args.log_file,
-                                                           args.quiet)
-            taxids_with_multiple_offspring = tax.import_taxids_with_multiple_offspring(
-                args.taxids_with_multiple_offspring_file,
-                args.log_file,
-                args.quiet)
-            message = ('Finding lineages for unclassified/unmapped sequences...')
-            shared.give_user_feedback(message, args.log_file, args.quiet,
-                show_time=True)
-            write_unmapped2classification(seq2hits, 
-                                          all_unclassified,
-                                          fastaid2LCAtaxid, 
-                                          args.out_prefix, 
-                                          taxid2parent,
-                                          taxid2rank,
-                                          taxids_with_multiple_offspring,
-                                          args.no_stars)
-            u2c=process_CAT_table('{0}.RAT.unmapped2classification.txt'.format(args.out_prefix), 
-                                  args.nodes_dmp, 
-                                  args.log_file, 
-                                  args.quiet)
-        else:
-            message = ('Loading unmapped2classification...')
-            shared.give_user_feedback(message, args.log_file, args.quiet,
-                show_time=True)
-            u2c=process_CAT_table(args.unmapped2classification, 
-                                  args.nodes_dmp, 
-                                  args.log_file, 
-                                  args.quiet)
-    else:
-        u2c={}
-            
-    message = 'Writing output tables.'
-    shared.give_user_feedback(message, args.log_file, args.quiet,
-            show_time=True)   
-    
-    make_tax_table(c2c,
-                   contigs, 
-                   unmapped_reads,
-                   contig_length_dict,
-                   contig2bin, 
-                   b2c, 
-                   sum_of_nucleotides, 
-                   sum_of_reads, 
-                   args.out_prefix,
-                   u2c)
-        
-    if 'm' in args.mode:
-        make_bin_table(contig2bin, 
-                       contigs, 
-                       contig_length_dict, 
-                       sum_of_reads, 
-                       args.out_prefix)
-    
-       
-    
-    # Finally: Optional: Classify reads and write per_read table
-    if args.read2classification:
-        reads=classify_reads(reads, c2c, b2c, u2c)
-        write_read_table(reads, args.out_prefix, max_primary)
-
-    
-    message = (
-            '\n-----------------\n\n'
-            '[{0}] RAT is done!'.format(
-                datetime.datetime.now()))
-    shared.give_user_feedback(message, args.log_file, args.quiet,
-            show_time=False)
-    return
-
-
-
-
-
-def write_unmapped2classification(seq2hits,
-                                  all_seqs,
-                                  fastaid2LCAtaxid, 
-                                  out_prefix,
-                                  taxid2parent, 
-                                  taxid2rank, 
-                                  taxids_with_multiple_offspring,
-                                  no_stars):
-    
-    
-    
-    with open('{0}.RAT.unmapped2classification.txt'.format(out_prefix), 'w') as outf:
-        n_classified_contigs = 0
-        outf.write(
-                '# sequence\tclassification\treason\tlineage\tlineage scores\n')
-        
-        for seq in sorted(all_seqs):
-            if seq not in seq2hits:
-                outf.write('{0}\tno taxid assigned\tno hits found\n'.format(
-                    seq))
-                continue
-            
-            n_hits = len(seq2hits[seq])
-            LCAs_ORFs = []
-            
-            
-            (taxid,
-                    top_bitscore) = tax.find_LCA_for_ORF(
-                            seq2hits[seq], fastaid2LCAtaxid, taxid2parent)
-             
-            if not taxid.startswith('no taxid found'):
-                lineage = tax.find_lineage(taxid, taxid2parent)
-    
-                if not no_stars:
-                    lineage = tax.star_lineage(
-                            lineage, taxids_with_multiple_offspring)
-                               
-            LCAs_ORFs.append((taxid, top_bitscore))
-                    
-            if len(LCAs_ORFs) == 0:
-                outf.write('{0}\tno taxid assigned\t'
-                        'no hits to database\n'.format(seq))
-    
-                continue
-            
-            (lineages,
-                    lineages_scores,
-                    based_on_n_ORFs) = tax.find_weighted_LCA(
-                            LCAs_ORFs, taxid2parent, 0.5)
-             
-            if lineages == 'no ORFs with taxids found.':
-                outf.write('{0}\tno taxid assigned\t'
-                        'hits not found in taxonomy files\n'.format(seq))
-    
-                continue
-            
-            if lineages == 'no lineage whitelisted.':
-                outf.write(
-                        '{0}\tno taxid assigned\t'
-                        'no lineage reached minimum bit-score support\n'
-                        ''.format(seq))
-    
-                continue
-        
-            n_classified_contigs += 1
-
-            for (i, lineage) in enumerate(lineages):
-                if not no_stars:
-                    lineage = tax.star_lineage(
-                            lineage, taxids_with_multiple_offspring)
-                scores = ['{0:.2f}'.format(score) for
-                        score in lineages_scores[i]]
-                
-                if len(lineages) == 1:
-                    # There is only one classification.
-                    outf.write(
-                            '{0}\t'
-                            'taxid assigned\t'
-                            'based on {1} hits\t'
-                            '{2}\t'
-                            '{3}\n'.format(
-                                seq,
-                                n_hits,
-                                ';'.join(lineage[::-1]),
-                                ';'.join(scores[::-1])))
-     
-    return
-
-
-
-
-def classify_reads(read_dict, contig2classification, bin2classification, unmapped2classification):
-    # worked=0
-    for read in read_dict:
-        # If the read is mapped to a contig:
-        if read_dict[read]['contig']!=[]:
-            for r in range(len(read_dict[read]['contig'])):
-                # If there is bin classification, store it
-                if bin2classification:
-                    try:
-                        if (read_dict[read]['bin'][r]=='unbinned' or
-                            len(bin2classification[read_dict[read]['bin'][r]])<1):
-                            
-                            read_dict[read]['taxon_bin'].append('')
-                           
-                        else:
-                            
-                            read_dict[read]['taxon_bin'].append(';'.join(bin2classification[read_dict[read]['bin'][r]][0]))
-                        # worked+=1
-                    except IndexError:
-                        
-                        sys.exit(1)
-                
-                # If there is a contig classification, store it
-                if contig2classification:
-                    contig=read_dict[read]['contig'][r]
-                    if (contig2classification[contig]==[] or
-                        len(contig2classification[contig][0])<2 or 
-                        (len(contig2classification[contig][0])==2 and 
-                        contig2classification[contig][0][1]=='131567')):
-                        read_dict[read]['taxon_contig'].append('')
-                    else:
-                        read_dict[read]['taxon_contig'].append(';'.join(contig2classification[contig][0]))
-                    
-                # If there is no contig classification, but a dm classification, store it
-                if contig in unmapped2classification:
-                    if (unmapped2classification[contig]==[] or 
-                    len(unmapped2classification[contig][0])<2 or 
-                    (len(unmapped2classification[contig][0])==2 and 
-                    unmapped2classification[contig][0][1]=='131567')):
-                        read_dict[read]['taxon_contig_dm'].append('')
-                    else:
-                        read_dict[read]['taxon_contig_dm'].append(';'.join(unmapped2classification[contig][0]))
-        # If the read is not mapped:
-        else:
-            
-            fw='{}_1'.format(read)
-            rev='{}_2'.format(read)
-            if fw in unmapped2classification:
-                if (unmapped2classification[fw]==[] or
-                len(unmapped2classification[fw][0])<2 or 
-                (len(unmapped2classification[fw][0])==2 and 
-                 unmapped2classification[fw][0][1]=='131567')):
-                    read_dict[read]['taxon_read_dm'].append('')
-                else:
-                    read_dict[read]['taxon_read_dm'].append('fw: '+';'.join(unmapped2classification[fw][0]))
-            if rev in unmapped2classification:
-                if (unmapped2classification[rev]==[] or
-                len(unmapped2classification[rev][0])<2 or 
-                (len(unmapped2classification[rev][0])==2 and 
-                 unmapped2classification[rev][0][1]=='131567')):
-                    read_dict[read]['taxon_read_dm'].append('')
-                else:
-                    read_dict[read]['taxon_read_dm'].append('rev: '+';'.join(unmapped2classification[rev][0]))
-    
-    return read_dict
-
-
-
-def write_read_table(read_dict, sample_name, max_primary):
-    # Takes the read dictionary with bin lineage and contig lineage and writes
-    # annotation for each read and each tier of annotation into a file
-    read_table=sample_name + '.RAT.read2classification.txt'
-    
-    with open(read_table, 'w') as outf:
-        outf.write('## command: {}\n'.format(' '.join(sys.argv)))
-        outf.write('# read\tclassification\tbin classification\t'
-                   'contig classification\tdirect_mapping_contig\t'
-                   'direct_mapping_read\n'
-                   #'[aligner] unclassified contig\t[aligner] unclassified read\n'
-                   )
-        for read in read_dict:
-
-            for c in range(len(read_dict[read]['contig'])):
-                try:
-                    b_taxon=read_dict[read]['taxon_bin'][c]
-                except IndexError:
-                    b_taxon=''
-                try:    
-                    c_taxon=read_dict[read]['taxon_contig'][c]
-                except IndexError:    
-                    c_taxon=''
-                if b_taxon=='' and c_taxon=='':
-                    try:
-                        c_dm_taxon=read_dict[read]['taxon_contig_dm'][c]
-                        r_dm_taxon=''
-                    except IndexError:
-                        c_dm_taxon=''
-                        r_dm_taxon=''
-                    
-                else:
-                    c_dm_taxon=''
-                    r_dm_taxon=''
-                assigned='taxid assigned'
-                if b_taxon=='' and c_taxon=='' and c_dm_taxon=='':
-                    assigned='no taxid assigned'
-                outf.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\n'.format(read,
-                           assigned, b_taxon, c_taxon, c_dm_taxon,
-                           r_dm_taxon))
-            if len(read_dict[read]['contig'])<max_primary:
-                if len(read_dict[read]['taxon_read_dm'])>0:
-                    for c in range(len(read_dict[read]['taxon_read_dm'])):
-                
-                        try:
-                            r_dm_taxon=read_dict[read]['taxon_read_dm'][c]
-                            
-                        except IndexError:
-                            r_dm_taxon=''
-                        assigned='taxid assigned'
-                        if r_dm_taxon=='':
-                            assigned='no taxid assigned'
-                        outf.write('{0}\t{1}\t\t\t\t{2}\n'.format(read,
-                           assigned, r_dm_taxon))
-                else:
-                    n=max_primary-len(read_dict[read]['taxon_read_dm'])
-                    outf.write(n*'{0}\t{1}\n'.format(read, 'no taxid assigned'))
-    return
-
-
-
-def make_bin_table(contig2bin, 
-                   contig_dict, 
-                   contig_length_dict, 
-                   total_reads, 
-                   out_prefix):
-    # Include lineage?
-    bin_data={}
-    bin_file='{0}.RAT.bin.reads.txt'.format(out_prefix)
-    
-    with open(bin_file, 'w') as op:
-        op.write('## command: {}\n'.format(' '.join(sys.argv)))
-        op.write('# bin\tnumber of reads\tfraction of reads\tbin length\t'
-                 'corrected fraction\n')
-        for contig in contig_dict:
-            if contig in contig2bin:
-                bin_id=contig2bin[contig]
-            else:
-                bin_id='unbinned'
-            if not bin_id in bin_data:
-                bin_data[bin_id]={
-                    'n_reads': 0,
-                    'n_nucleotides': 0
-                    }
-            # if contig is in contig_dict, then reads have mapped to it, otherwise
-            # no reads have mapped to it
-            try:
-                bin_data[bin_id]['n_reads']+=contig_dict[contig]
-                bin_data[bin_id]['n_nucleotides']+=contig_length_dict[contig]
-            except KeyError:
-                pass
-            
-        divisor=get_proper_fraction(bin_data, total_reads)
-        for bin_id in bin_data:
-            read_fraction=bin_data[bin_id]['n_reads']/total_reads
-            if bin_data[bin_id]['n_nucleotides']!=0:
-                corrected_frac=(read_fraction/bin_data[bin_id]['n_nucleotides'])/divisor
-            else:
-                corrected_frac=0
-            op.write("{0}\t{1}\t{2}\t{3}\t{4}\n".format(bin_id, 
-                                                bin_data[bin_id]['n_reads'], 
-                                                read_fraction, 
-                                                bin_data[bin_id]['n_nucleotides'], 
-                                                corrected_frac))
-    return
-
-
-
-
-
-def make_tax_table(c2c_dict, 
-                   contig_dict,
-                   unmapped_reads,
-                   contig_length_dict, 
-                   contig2bin, 
-                   bin2classification, 
-                   sum_of_nucleotides, 
-                   total_reads, 
-                   sample_name,
-                   u2c_dict=None):
+def process_annotation_table(settings: RatSettings, output_table: Path)-> dict[str, list[tuple[str,...]]]:
     """
-    Makes a dictionary that keeps all the necessary info in the same place
-    Writes contig table
-    Writes table with all classifications including subspecies
-    """
-    RAT_contig_header=('# contig\tnumber of reads\tfraction of reads\t'
-                       'contig_length\tAverage Coverage\tlineage\t'
-                       'lineage ranks\tlineage scores\n')
-                       
-    RAT_file_header=('# lineage\tnumber of reads\tfraction of reads\t'
-                     'taxon length\tlineage ranks\n')
-    
-    taxon_dict={}
-    unclassified={
-            'contigs': set(),
-            'n_reads': 0,
-            'n_nucleotides': 0
-            }
-
-    for contig in contig_dict:
-        
-        # If the contig name is '*', that means that a read is unmapped. 
-        # If direct_mapping is enabled, unmapped reads have been run through
-        # diamond and an unmapped2classification dictionary has been supplied
-        # to this function. The reads get assigned a taxon if diamond spit out
-        # a taxon, they get counted as unmapped otherwise.
-        
-        if contig=='*':
-            if u2c_dict:
-                unmapped=0
-                tmp=['fw', 'rev']
-                for direction in tmp:
-                    for read in unmapped_reads[direction]:
-                        u2c_read_id='{0}_{1}'.format(read, 
-                                                     tmp.index(direction)+1)
-                        if u2c_read_id in u2c_dict:
-                            if (u2c_dict[u2c_read_id]==[] or len(u2c_dict[u2c_read_id][0])<2 
-                                or (len(u2c_dict[u2c_read_id][0])==2 and 
-                                u2c_dict[u2c_read_id][0][1]=='131567')):
-                                unmapped+=1
-                            else:
-                                taxon=';'.join(u2c_dict[u2c_read_id][0])
-                                if taxon not in taxon_dict:
-                                    taxon_dict[taxon]={
-                                            'n_reads': 0,
-                                            'n_nucleotides': 0,
-                                            'ranks': u2c_dict[u2c_read_id][1]
-                                            }
-                                taxon_dict[taxon]['n_reads']+=1
-                                # taxon_dict[taxon]['n_nucleotides']+=contig_length_dict[contig]
-            else:
-                unmapped=contig_dict[contig]
-        
-        # If the contig is in contig2bin, that means that it is binned and therefore
-        # will be assigned the lineage of the bin and not the contig
-        elif (contig in contig2bin and 
-              len(bin2classification[contig2bin[contig]])>0):
-        
-            taxon=';'.join(bin2classification[contig2bin[contig]][0])
-         
-            if taxon not in taxon_dict:
-                taxon_dict[taxon]={
-                        'n_reads': 0,
-                        'n_nucleotides': 0,
-                        'ranks': bin2classification[contig2bin[contig]][1]
-                        }
-            # add number of reads that map to the contig to the taxon and
-            # add nucleotides of the contig to the taxon
-            taxon_dict[taxon]['n_reads']+=contig_dict[contig]
-            taxon_dict[taxon]['n_nucleotides']+=contig_length_dict[contig]
-            
-        # If C2C[contig] is an empty list, it's unclassified
-        # If the length of the list of classified tax_ids is shorter than 2, the
-        # contig is not classified at superkingdom level and therefore, for our
-        # purpose unclassified
-        # We check u2c to see whether it was classified in the direct_mapping
-        # step, assign the lineage from u2c or unclassified depending on
-        # result
-        elif (c2c_dict[contig]==[] or len(c2c_dict[contig][0])<2 
-              or (len(c2c_dict[contig][0])==2 and 
-              c2c_dict[contig][0][1]=='131567')):
-            if u2c_dict:
-                if contig not in u2c_dict or (u2c_dict[contig]==[] or len(u2c_dict[contig][0])<2 
-                  or (len(u2c_dict[contig][0])==2 and 
-                  u2c_dict[contig][0][1]=='131567')):
-                    unclassified['n_reads']+=contig_dict[contig]
-                    unclassified['n_nucleotides']+=contig_length_dict[contig]
-                else:
-                    taxon=';'.join(u2c_dict[contig][0])
-                    if taxon not in taxon_dict:
-                        taxon_dict[taxon]={
-                                'n_reads': 0,
-                                'n_nucleotides': 0,
-                                'ranks': u2c_dict[contig][1]
-                                }
-                    taxon_dict[taxon]['n_reads']+=contig_dict[contig]
-                    taxon_dict[taxon]['n_nucleotides']+=contig_length_dict[contig]
-                
-            
-        
-        # The other possibility is that the contig is unbinned, but classified
-        else:
-            taxon=';'.join(c2c_dict[contig][0])
-            if taxon not in taxon_dict:
-                taxon_dict[taxon]={
-                        'n_reads': 0,
-                        'n_nucleotides': 0,
-                        'ranks': c2c_dict[contig][1]
-                        }
-            
-            # add number of reads that map to the contig to the taxon and
-            # add nucleotides of the contig to the taxon
-            taxon_dict[taxon]['n_reads']+=contig_dict[contig]
-            taxon_dict[taxon]['n_nucleotides']+=contig_length_dict[contig]
-    
-    unmapped_line='{0}\t{1}\t{2}\n'.format('unmapped', unmapped,
-                                           unmapped/total_reads)
-    unclassified_line='{0}\t{1}\t{2}\t{3}\t'.format('unclassified',
-                       unclassified['n_reads'],
-                       unclassified['n_reads']/total_reads,
-                       unclassified['n_nucleotides'])
-    
-    
-    # write the output tables for contigs:
-    with open('{0}.RAT.contig.abundance.txt'.format(sample_name), 'w') as outf_contig:
-        outf_contig.write('## command: {}\n'.format(' '.join(sys.argv)))
-        outf_contig.write(RAT_contig_header)
-        # @Tina: not to work with decimals instead of floats.
-        # get the divisor to make corrected fraction add up to 1
-
-        divisor=get_proper_fraction(contig_dict, 
-                                    total_reads, 
-                                    unclassified, 
-                                    contig_length_dict)
-        outf_contig.write(unmapped_line)
-        for contig in contig_dict:
-            if not contig=='*':
-                read_frac=contig_dict[contig]/total_reads
-                corrected_frac=(read_frac/contig_length_dict[contig])/divisor
-                # If contig is binned, then get the lineage of the bin and not the contig
-                try:
-                    if contig in contig2bin:
-                        lineage=';'.join(bin2classification[contig2bin[contig]][0])
-                        rank_list=';'.join(bin2classification[contig2bin[contig]][1])
-                        scores=';'.join(bin2classification[contig2bin[contig]][2])
-                        
-                    else:
-                        lineage=';'.join(c2c_dict[contig][0])
-                        rank_list=';'.join(c2c_dict[contig][1])
-                        scores=';'.join(c2c_dict[contig][2])
-                        
-                except IndexError:
-                    lineage=''
-                    rank_list=''
-                    scores=''
-                outf_contig.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\n'.format(
-                        contig, contig_dict[contig], read_frac, 
-                        contig_length_dict[contig], corrected_frac, lineage, 
-                        rank_list, scores))
-    
-    
-    # write output table for complete lineage
-    with open('{0}.RAT.complete.abundance.txt'.format(sample_name), 'w+') as outf_complete:
-        outf_complete.write('## command: {}\n'.format(' '.join(sys.argv)))
-        outf_complete.write(RAT_file_header)
-        outf_complete.write(unmapped_line)
-        outf_complete.write(unclassified_line+'\n')
-
-        # if unclassified['n_reads']!=0:
-        #     outf_complete.write('{0}\n'.format(((unclassified['n_reads']/total_reads)/unclassified['n_nucleotides'])/divisor))
-        # else:
-        #     outf_complete.write('0\n')
-        
-        for taxon in taxon_dict:
-            read_frac=taxon_dict[taxon]['n_reads']/total_reads
-
-            outf_complete.write('{0}\t{1}\t{2}\t{3}\t{4}\n'.format(
-                    taxon, 
-                    taxon_dict[taxon]['n_reads'],
-                    read_frac, 
-                    taxon_dict[taxon]['n_nucleotides'],
-                    # add average genome size
-                    ';'.join(taxon_dict[taxon]['ranks'])))
-    
-    
-    return 
-
-
-
-
-def get_proper_fraction(rank_dict, 
-                        total_reads, 
-                        unclassified={}, 
-                        contig_length_dict={}):
-    divisor=0
-    if unclassified and unclassified['n_reads']!=0:
-        divisor+=(unclassified['n_reads']/total_reads)/unclassified['n_nucleotides']
-    try:
-        for taxon in rank_dict:
-            if not taxon=='*':
-                if rank_dict[taxon]['n_nucleotides']!=0:
-                    divisor+=(rank_dict[taxon]['n_reads']/total_reads)/rank_dict[taxon]['n_nucleotides']
-    except TypeError:
-        for contig in rank_dict:
-            if not contig=='*':
-                divisor+=(rank_dict[contig]/total_reads)/contig_length_dict[contig]
-    return divisor
-
-
-
-def process_CAT_table(CAT_output_table, 
-                      nodes_dmp, 
-                      log_file, 
-                      quiet):
-    """
-    takes CAT contig2classification or bin2classification table and taxonomy 
-    nodes file as input; returns a dictionary that contains the complete 
+    takes CAT contig2classification or bin2classification table and taxonomy
+    nodes file as input; returns a dictionary that contains the complete
     lineage for each contig/bin:
-    (list of tuples of the format [(tax_id1,tax_id2...), 
-                                   (rank1,rank2,...), 
+    (list of tuples of the format [(tax_id1,tax_id2...),
+                                   (rank1,rank2,...),
                                    (score1,score2...)])
     bin id contains the file extension!
     """
-    c2c={}
-    
+    c2c: dict[str, list[tuple[str, ...]]] = {}
     # get rank for each taxid
-    taxid2rank=tax.import_nodes(nodes_dmp, log_file, quiet)[1]
-    
-    with open(CAT_output_table, 'r') as contigs:
+    taxid2rank=tax.read_nodes(settings.files.nodes, ranks=True)
+
+    with optionally_compressed_handle(output_table, 'r') as contigs:
+
+        # @Tina, I moved the first line check out of the for loop and if the
+        # first line has a # (which it has) it skips it with next()
+        if not next(contigs).startswith("#"):
+            contigs.seek(0) # go back to line 0 if there is no # found
+
         for contig in contigs:
-            
-            # if it is not the first line, get contig id, lineage and lineage scores
-            if not contig.startswith('# '):
-                contig_id=contig.strip().split('\t')[0]
-                c2c[contig_id]=[]
-                
-                # Build a list of tuples for the lineage:
-                # (tax_id1,tax_id2...), (rank1,rank2,...), (score1,score2...)]
-                if len(contig.split('\t'))>3:
-                    tax_ids=contig.split('\t')[3].strip().split(';')
-                    scores=contig.split('\t')[4].strip().split(';')
-                    c2c[contig_id]=[tuple([t for t in tax_ids]),
-                                   tuple([taxid2rank[t.strip('*')] for t in tax_ids]),
-                                   tuple([s for s in scores])]
-                                        
+
+            contig_cols = contig.strip().split('\t')
+
+            # get contig id, lineage and lineage scores
+            contig_id=contig_cols[0]
+            c2c[contig_id]=[]
+
+            # Build a list of tuples for the lineage:
+            # (tax_id1,tax_id2...), (rank1,rank2,...), (score1,score2...)]
+            if len(contig_cols)>3:
+                tax_ids=contig_cols[3].strip().split(';')
+                scores=contig_cols[4].strip().split(';')
+                c2c[contig_id]=[tuple([t for t in tax_ids]),
+                               tuple([taxid2rank[t.strip('*')] for t in tax_ids]),
+                               tuple([s for s in scores])]
+
     return c2c
-            
 
 
 
+@dataclass
+class MappingResult:
+    read_dict: dict[str, dict[str, list[str]]] = field(default_factory=dict)
+    unmapped_reads: dict[str, set[str]] = field(default_factory=lambda: {'fw': set(), 'rev': set()})
+    sum_of_reads: int = 0
+    paired: bool =False
+    contig_dict: dict[str, int] = field(default_factory=dict)
+    max_primary: int = 1
 
-def process_bam_file(BAM_fw_file, mapping_quality, path_to_samtools, BAM_rev_file=False):
+    def iter_unmapped_read_ids(self) -> Iterator[str]:
+        for read in self.unmapped_reads["fw"]:
+            yield f"{read}_1"
+
+        for read in self.unmapped_reads["rev"]:
+            yield f"{read}_2"
+
+def process_bam_file(settings: RatSettings, report: Report) -> MappingResult:
     """
     # function that processes the bam file(s) by picking out the primary alignments
     # and storing the contigs that the forward and reverse reads map to. If only
@@ -1092,180 +88,93 @@ def process_bam_file(BAM_fw_file, mapping_quality, path_to_samtools, BAM_rev_fil
     # it's single reads, it just fills up the fw key of the dictionary, and if
     # there is a reverse file, then the reverse file only adds to the rev key.
     """
-    read_dict={}
-    unmapped_reads={'fw': set(), 'rev': set()}
-    
-    # open alignment file with samtools, so that we don't need pysam dependency
-    cmd=[path_to_samtools, 'view', BAM_fw_file]
-    proc=subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    map_result = MappingResult()
+    for index, bam_file in enumerate(settings.files.bam_files):
+        # open alignment file with samtools, so that we don't need pysam dependency
+        cmd=[str(settings.samtools), 'view', '-F', '0x900', bam_file]
+        with tool_output("samtools") as output, subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=output, text=True) as proc:
 
-    # check whether it is a paired bam file by checking the flags for "read paired"
-    # flag and setting paired to true if it finds it
-    paired=False
-
-
-    # build read_dictionary with list of 0-2 contigs that each read/mate maps to
-    for mapping in proc.stdout:
-        mapping=mapping.decode("utf-8").rstrip().split('\t')
-        read_id, flag, contig, score=mapping[0], int(mapping[1]), mapping[2], int(mapping[4])
+            for mapping in proc.stdout:
+                mapping=mapping.rstrip().split('\t')
+                read_id, flag, contig, score=mapping[0], int(mapping[1]), mapping[2], int(mapping[4])
         
-        if not paired and bin(flag)[-1]=='1':
-            paired=True
-        
-        if read_id not in read_dict:
-            read_dict[read_id]={}
-            read_dict[read_id]['contig']=[]
-            read_dict[read_id]['bin']=[]
-            read_dict[read_id]['taxon_bin']=[]
-            read_dict[read_id]['taxon_contig']=[]
-            read_dict[read_id]['taxon_contig_dm']=[]
-            read_dict[read_id]['taxon_read_dm']=[]
-        
-        # check whether the score is above the threshold and whether the 
-        # 'supplementary alignment' flag is unchecked, if yes, store contig
-        # @Tina: how does this capture unmapped reads? What if a user gives a quality of 0?
-        if score>=mapping_quality and len(bin(flag))<14:
-            read_dict[read_id]['contig'].append(contig)
-        
-        # store unmapped reads as forward and reverse:
-        elif contig=='*' or (score<mapping_quality and len(bin(flag))<14):
-            # check if read is the "first in pair"
-            if paired:
-                if len(bin(flag))>8 and bin(flag)[-7]=='1':
-                    unmapped_reads['fw'].add(read_id)
-                elif len(bin(flag))>8 and bin(flag)[-7]=='0':
-                    unmapped_reads['rev'].add(read_id)
-            else:
-                unmapped_reads['fw'].add(read_id)
-    
-    # if a reverse alignment file is given, add the contig that the mate maps to
-    if BAM_rev_file:
-        cmd=[path_to_samtools, 'view', BAM_rev_file]
-        proc=subprocess.Popen(cmd, stdout=subprocess.PIPE)
+                if flag & 0x1:
+                    map_result.paired=True
 
-        for read in proc.stdout:
-            read=read.decode("utf-8").rstrip().split('\t')
-            read_id, flag, contig, score=read[0], int(read[1]), read[2], int(read[4])
-            if score>=mapping_quality and len(bin(flag))<14:
-                read_dict[read_id]['contig'].append(contig)
-            elif contig=='*' or (score<mapping_quality and len(bin(flag))<14):
-                unmapped_reads['rev'].add(read_id)
-    
-    # calculate sum of reads as number of reads in the dictionary (unmapped reads
-    # are stored as well) for single read mappings, or as twice the number of reads
-    # in the dictionary for paired-end read mappings
-    if paired or BAM_rev_file:
-        sum_of_reads=2*len(read_dict)
-    else:
-        sum_of_reads=len(read_dict)
+                map_result.read_dict.setdefault(read_id, {
+                    "contig": [],
+                    "bin": [],
+                    "taxon_bin": [],
+                    "taxon_contig": [],
+                    "taxon_contig_dm": [],
+                    "taxon_read_dm": [],
+                })
 
-    return read_dict, unmapped_reads, sum_of_reads, paired
-
-
-
-def make_contig_dict(read_dict, 
-                     bam_files, 
-                     paired, 
-                     contig2bin):
-    """
-    takes the read dictionary that stores which read maps where and returns
-    a dictionary that stores how many reads bind to each contig. It also adds
-    bin annotation to the read dict
-    """
-    contig_dict={}
-    contig_dict['*']=0
-    
-    # check how long the list of contigs per read is allowed to be to calculate
-    # unmapped reads and check that everything is working correctly
-    if len(bam_files)>1 or paired:
-        max_primary=2
-    else:
-        max_primary=1
-    
-    for read in read_dict:
-        # if a read (pair) has multiple primary alignments, exit
-        if len(read_dict[read]['contig'])>max_primary:
-            message = (
-                    'Something is wrong with the alignment. Too many mappings '
-                    'detected. Please check your alignment file or map your reads '
-                    'using RAT.')
-            shared.give_user_feedback(message)
-            sys.exit(1)
-        
-        # otherwise, determine the number of unmapped reads and add it to unmapped
-        # build a dictionary of contigs and how many reads map to them
-        # Add bin info to read dictionary
-        else:
-            contig_dict['*']+=max_primary-len(read_dict[read]['contig'])
-            for contig in read_dict[read]['contig']:
-                if not contig in contig_dict:
-                    contig_dict[contig]=0
-                    
-                contig_dict[contig]+=1
-                if contig2bin:
-                    if contig in contig2bin:
-                        read_dict[read]['bin'].append(contig2bin[contig])
-                    else:
-                        read_dict[read]['bin'].append('unbinned')
-                    
-    return contig_dict, read_dict, max_primary
-
-
-
-
-
-def make_unclassified_seq_fasta(seq_fasta, unclassified_seq_ids, 
-                                unclassified_seq_fasta, f_format, f_mode, 
-                                suffix=''):
-    
-    
-    fasta_dict={}
-    if f_format == 'fasta':
-        with shared.optionally_compressed_handle(seq_fasta, 'r') as f1: 
-            for line in f1:
-                if line.startswith('>'):
-                    header = line.rstrip().split(' ')[0].lstrip('>')
-                    if header in fasta_dict:
-                        sys.exit('Duplicate fasta headers in the file!') # This should be prettified.
-                    fasta_dict.setdefault(header, '')
+                if flag & 0x4 or score < settings.mapping_quality:
+                    direction = "rev" if index == 1 or flag & 0x80 else "fw"
+                    map_result.unmapped_reads[direction].add(read_id)
                 else:
-                    fasta_dict[header] += line.rstrip()
-                    
-                    
-    elif f_format=='fastq':
-        with shared.optionally_compressed_handle(seq_fasta, 'r') as f1: 
-            for n, line in enumerate(f1):
-                if n % 4 == 0:
-                    if not line.startswith('@'):
-                        sys.exit('Unknown seuqence identifier symbol in line {n}!') # This should be prettified.
-                    header = line.rstrip().split(' ')[0].lstrip('@') 
-                    
-                    if header in fasta_dict:
-                        sys.exit('Duplicate fasta headers in the file!')
-                    
-                    fasta_dict.setdefault(header, '')
-                elif n % 4 == 1:
-                    fasta_dict[header] += line.rstrip()
-    else:
-        sys.exit('Unknown read file format!')
-    
-    with open(unclassified_seq_fasta, f_mode) as outf: 
-        # print(unclassified_seq_ids) 
-        suffices=['/1', '/2', '_1', '_2']
-        for seq in unclassified_seq_ids: 
-            if seq in fasta_dict:
-                seq_id=seq
-            else:
-                for s in suffices:
-                    if seq+s in fasta_dict:
-                        seq_id=seq+s
-        # print(seq)
-            outf.write('>{0}{1}\n{2}\n'.format(seq_id, suffix,
-                                               fasta_dict[seq]))
-    
-    
+                    map_result.read_dict[read_id]["contig"].append(contig)
 
-def get_unclassified_contigs(contig2bin, c2c, b2c):
+            if proc.wait() != 0:
+                raise ExternalToolError("samtools", f"view exited with a non 0 status: {proc.returncode}")
+
+    contig2bin = invert_bin_dict(settings.files.bin2contigs)
+
+    make_contig_dict(map_result, settings, contig2bin)
+
+
+    if map_result.paired or len(settings.files.bam_files)>1:
+        map_result.sum_of_reads=2*len(map_result.read_dict)
+    else:
+        map_result.sum_of_reads = len(map_result.read_dict)
+
+    return map_result
+
+# @Bastiaan and @Tina are inplace operations too complex? Return values can also be used.
+def make_contig_dict(map_result: MappingResult, settings: RatSettings, contig2bin: dict[str, str]) -> None:
+    max_primary = 2 if len(settings.files.bam_files) > 1 or map_result.paired else 1
+    contig_dict = {"*": 0}
+
+    for read in map_result.read_dict.values():
+        contigs = read["contig"]
+        contig_dict["*"] += max_primary - len(contigs)
+
+        for contig in contigs:
+            contig_dict[contig] = contig_dict.get(contig, 0) + 1
+
+            if contig2bin:
+                read["bin"].append(contig2bin.get(contig, "unbinned"))
+
+    map_result.contig_dict = contig_dict
+    map_result.max_primary = max_primary
+
+
+def make_unclassified_seq_fasta(settings: RatSettings, map_result: MappingResult,
+                                unclassified_contigs: list[str]) -> None:
+    unclassified_seq_ids = set(unclassified_contigs)
+
+    with settings.files.unclassified_fasta.open("w") as outf:
+        for record in FastaParser(settings.files.contigs_fasta):
+            if record.name in unclassified_seq_ids:
+                outf.write(f">{record.name}\n{record.sequence}\n")
+
+        for index, seq_fasta in enumerate(settings.files.read_files, start=1):
+            direction = "fw" if index == 1 else "rev"
+            unmapped_reads = map_result.unmapped_reads[direction]
+
+            for record in FastqParser(seq_fasta):
+                seq_id = record.name
+
+                if seq_id not in unmapped_reads and seq_id.endswith(("/1", "/2", "_1", "_2")):
+                    seq_id = seq_id[:-2]
+
+                if seq_id in unmapped_reads:
+                    outf.write(f">{seq_id}_{index}\n{record.sequence}\n")
+
+
+def get_unclassified_contigs(contig2bin, c2c, b2c) -> list[str]:
     """
     If the contig is in a bin that is unclassified, or if the contig is not in
     a bin AND unclassified: put it in a set.
@@ -1276,82 +185,39 @@ def get_unclassified_contigs(contig2bin, c2c, b2c):
         if c in contig2bin:
             if b2c[contig2bin[c]]:
                 mag_lineage=b2c[contig2bin[c]][0]
-                if len(mag_lineage)>2 or (len(mag_lineage)==2 and 
+                if len(mag_lineage)>2 or (len(mag_lineage)==2 and
                                           mag_lineage[1]!='131567'):
                     classified=True
         if not classified:
             if c2c[c]:
                 lineage=c2c[c][0]
-                if len(lineage)>2 or (len(lineage)==2 and 
+                if len(lineage)>2 or (len(lineage)==2 and
                                           lineage[1]!='131567'):
                     classified=True
         if not classified:
             unclassified_contigs.append(c)
     return unclassified_contigs
-        
 
 
-def get_contig_lengths(contig_file):
+def get_classification(*classifications):
+    for classification in classifications:
+        if classification:
+            lineage = classification[0]
+            if len(lineage) > 2 or (
+                len(lineage) == 2
+                and lineage[1].rstrip("*") != "131567"
+            ):
+                return classification
+    return []
+
+def get_contig_lengths(contig_file: Path) -> tuple[dict[str, int], int]:
     """
     gets the lengths of all contigs from the contig file. Works for all types
     of contig IDs, as long as it is a proper file with unique headers, because
     it checks the length of the strings.
     """
-    contig_length_dict={}
-    sum_of_nucleotides=0
-    
-    # split the fasta file into contigs and prevent empty strings
-    # @Tina: opening a file like this will load the entire file into memory. I would open it line by line myself. This may get super slow depending on how you implement it, it can also be very fast.
-    with open(contig_file, 'r') as inp:
-        # @Tina: what does the [1:] do here? Also shouldn't the strip() remove the trailing newline? or do you mean rstrip()?
-        contigs=inp.read()[1:].strip().split('\n>')
-        
-    # for each contig, store contig name and the length of sequence without whitespace
-    # for each contig, add its length to the sum of nucleotides in the assembly
-    for c in contigs:
-        c_id, c_seq=c.split('\n')[0].strip(), c.split('\n', 1)[1].strip().replace('\n','')
-        contig_length_dict[c_id]=len(c_seq)
-        sum_of_nucleotides+=len(c_seq)
-    
-    return contig_length_dict, sum_of_nucleotides
-
-
-
-
-
-def process_bin_folder(path_to_folder, bin_suffix):
-    """
-    takes the path to a folder containing metagenomic bins and picks out all
-    nucleotide fasta files. Returns a dictionary that contains the bin ids as
-    keys and a set of all contig ids that belong in that bin as values. 
-    Important: Only contains the binned sequences. Every contig that is not
-    in the output dictionary is unbinned.
-    @Tina: Don't we have a function from the BAT workflow that does this?
-    """
-    bin_dict={}
-    bins=os.listdir(path_to_folder)
-    
-    for b in bins:
-        # grabs all fasta files and gets the bin id
-        if b.split('.')[-1]==bin_suffix.split('.')[-1] and not b.rsplit('.', 1)[0].endswith('unbinned'):
-            bin_id=b.strip()
-            bin_dict[bin_id]=set()
-            
-            # open fasta file and split it into contigs
-            contigs=open(path_to_folder+b).read().split('>')[1:]
-            
-            # add all contig ids to set
-            
-            for contig in contigs:
-                try:
-                    bin_dict[bin_id].add(contig.split()[0])
-                except IndexError:
-                    sys.exit(f'The bin {b} is empty or not formatted correctly' 
-                             ' (Look for a ">" sign at the end of the file). '
-                             'Did something go wrong during binning?')
-                
-    return bin_dict
-
+    contig_lengths = {contig.name: len(contig.sequence) for contig in FastaParser(contig_file)}
+    return contig_lengths, sum(contig_lengths.values())
 
 def invert_bin_dict(bin_dict):
     # WORKS
@@ -1372,6 +238,318 @@ def invert_bin_dict(bin_dict):
             contig2bin[contig]=b
     return contig2bin
 
+@dataclass
+class Abundance:
+    n_reads: int = 0
+    n_nucleotides: int = 0
+    classification: list[tuple[str, ...]] = field(default_factory=list)
+
+
+@dataclass
+class RatResult:
+    mapping: MappingResult
+    c2c: dict[str, list[tuple[str, ...]]]
+    b2c: dict[str, list[tuple[str, ...]]]
+    unclassified_contigs: list[str]
+    all_unclassified: list[str]
+    contig2bin: dict[str, str] = field(default_factory=dict)
+    u2c: dict[str, list[tuple[str, ...]]] = field(default_factory=dict)
+    contig_data: dict[str, Abundance] = field(default_factory=dict)
+    taxon_dict: dict[str, Abundance] = field(default_factory=dict)
+    bin_data: dict[str, Abundance] = field(default_factory=dict)
+
+
+def load_classifications(settings: RatSettings, report: Report, map_result: MappingResult) -> RatResult:
+    files = settings.files
+    b2c: dict[str, list[tuple[str,...]]] = {}
+
+    if files.contigs2classification is not None:
+        c2c = process_annotation_table(settings, files.contigs2classification)
+    else:
+        c2c = {name: [] for name in FastaParser(files.contigs_fasta).iter_headers()}
+    report.progress_next()
+
+    if files.bin2classification is not None:
+        b2c = process_annotation_table(settings, files.bin2classification)
+    report.progress_next()
+
+    contig2bin = invert_bin_dict(files.bin2contigs)
+    unclassified_contigs = get_unclassified_contigs(
+        contig2bin, c2c, b2c,
+    )
+    report.progress_next()
+
+    all_unclassified = unclassified_contigs.copy()
+    all_unclassified.extend(map_result.iter_unmapped_read_ids())
+    report.progress_next()
+
+    return RatResult(map_result, c2c, b2c, unclassified_contigs, all_unclassified, contig2bin)
+
+
+def extract_unclassified_sequences(settings: RatSettings, report: Report, result: RatResult) -> None:
+    make_unclassified_seq_fasta(
+        settings, result.mapping, result.unclassified_contigs,
+    )
+
+
+def run_rat_alignment(settings: RatSettings, report: Report) -> None:
+    run_aligner(settings.aligner, report)
+
+# TODO: maybe integrate this with the run_classification function in pipeline.py
+def write_unmapped2classification(settings: RatSettings, report: Report, result: RatResult) -> None:
+    files = settings.files
+    alignment = AlignmentParser(files.alignment_unmapped, settings.range_, workers=settings.threads).parse()
+    report.progress_next()
+
+    taxonomy = tax.Taxonomy.import_nodes(files.nodes)
+    fastaid2LCAtaxid = tax.import_fastaid2LCAtaxid(files.fastaid2LCA, set(alignment.hit_names), workers=settings.threads)
+    taxids_with_multiple_offspring = tax.import_taxids_with_multiple_offspring(files.taxids_with_multiple_offspring)
+    report.progress_next()
+
+    classifications = ClassificationEngine(
+        taxonomy,
+        taxonomy.taxid_of_hits(alignment.hit_names, fastaid2LCAtaxid),
+        settings.fraction, settings.threads,
+    ).classify(
+        EntityType.SEQUENCE,
+        {unclassified: [unclassified] for unclassified in result.all_unclassified},
+        alignment
+    )
+    report.progress_next()
+
+    with files.unmapped2classification.open("w") as unmapped_out:
+        writer = ClassificationWriter(
+            unmapped_out,
+            entity_type=EntityType.SEQUENCE,
+            fraction=settings.fraction,
+            range_=settings.range_,
+            branches=taxids_with_multiple_offspring,
+            no_stars=settings.no_stars
+        )
+        for entity in range(len(classifications)):
+            writer.write(classifications, entity)
+
+    report.progress_next()
+    return
+
+def calculate_abundances(
+    settings: RatSettings, report: Report, rat_result: RatResult,
+) -> None:
+    files = settings.files
+    if files.unmapped2classification is not None:
+        rat_result.u2c = process_annotation_table(
+            settings, files.unmapped2classification,
+        )
+    report.progress_next()
+
+    contig_length_dict, _ = get_contig_lengths(files.contigs_fasta)
+    rat_result.contig_data = {
+        contig: Abundance(n_reads, contig_length_dict[contig])
+        for contig, n_reads in rat_result.mapping.contig_dict.items()
+        if contig != "*"
+    }
+    rat_result.taxon_dict = {
+        "unmapped": Abundance(rat_result.mapping.contig_dict["*"]),
+        "unclassified": Abundance(),
+    }
+    rat_result.bin_data = {
+        "unmapped": Abundance(rat_result.mapping.contig_dict["*"]),
+    }
+    report.progress_next()
+
+    for contig, contig_data in rat_result.contig_data.items():
+        bin_id = rat_result.contig2bin.get(contig, "unbinned")
+        contig_data.classification = get_classification(
+            rat_result.b2c.get(bin_id, []),
+            rat_result.c2c.get(contig, []),
+            rat_result.u2c.get(contig, []),
+        )
+        taxon = (
+            ";".join(contig_data.classification[0])
+            if contig_data.classification else "unclassified"
+        )
+        taxon_data = rat_result.taxon_dict.setdefault(
+            taxon,
+            Abundance(classification=contig_data.classification),
+        )
+        taxon_data.n_reads += contig_data.n_reads
+        taxon_data.n_nucleotides += contig_data.n_nucleotides
+
+        bin_data = rat_result.bin_data.setdefault(bin_id, Abundance())
+        bin_data.n_reads += contig_data.n_reads
+        bin_data.n_nucleotides += contig_data.n_nucleotides
+
+    report.progress_next()
+
+    for read in rat_result.mapping.iter_unmapped_read_ids():
+        classification = get_classification(rat_result.u2c.get(read, []))
+        if classification:
+            taxon = ";".join(classification[0])
+            taxon_data = rat_result.taxon_dict.setdefault(
+                taxon, Abundance(classification=classification),
+            )
+            taxon_data.n_reads += 1
+            rat_result.taxon_dict["unmapped"].n_reads -= 1
+
+    report.progress_next()
+
+
+def classify_reads(settings: RatSettings, report: Report, rat_result: RatResult) -> None:
+    for name, read in rat_result.mapping.read_dict.items():
+        read["taxon_bin"] = []
+        read["taxon_contig"] = []
+        read["taxon_contig_dm"] = []
+        read["taxon_read_dm"] = []
+
+        for contig, bin_id in zip(read["contig"], read["bin"]):
+            for key, table, identifier in (
+                ("taxon_bin", rat_result.b2c, bin_id),
+                ("taxon_contig", rat_result.c2c, contig),
+                ("taxon_contig_dm", rat_result.u2c, contig),
+            ):
+                classification = get_classification(
+                    table.get(identifier, []),
+                )
+                read[key].append(
+                    ";".join(classification[0]) if classification else "",
+                )
+
+        for number, direction in ((1, "fw"), (2, "rev")):
+            if name in rat_result.mapping.unmapped_reads[direction]:
+                classification = get_classification(
+                    rat_result.u2c.get(f"{name}_{number}", []),
+                )
+                read["taxon_read_dm"].append(
+                    f"{direction}: " + ";".join(classification[0])
+                    if classification else "",
+                )
+
+
+def get_proper_fraction(rank_dict: dict[str, Abundance]) -> float:
+    return sum(
+        read.n_reads / read.n_nucleotides
+        for read in rank_dict.values()
+        if read.n_nucleotides
+    )
+
+
+def make_tax_table(settings: RatSettings, rat_result: RatResult) -> None:
+    total_reads = rat_result.mapping.sum_of_reads
+    divisor = get_proper_fraction(rat_result.contig_data)
+
+    with settings.files.contig_abundance.open(
+        "w", encoding="utf-8",
+    ) as outf_contig:
+        outf_contig.write(f"## command: {' '.join(sys.argv)}\n")
+        outf_contig.write('# contig\tnumber of reads\tfraction of reads\t'
+                          'contig_length\tAverage Coverage\tlineage\t'
+                          'lineage ranks\tlineage scores\n')
+        unmapped = rat_result.mapping.contig_dict["*"]
+        read_frac = unmapped / total_reads if total_reads else 0.0
+        outf_contig.write(
+            f"unmapped\t{unmapped}\t{read_frac}\t0\t0\t\t\t\n",
+        )
+
+        for contig, read in rat_result.contig_data.items():
+            read_frac = read.n_reads / total_reads if total_reads else 0.0
+            corrected_frac = (
+                read.n_reads / read.n_nucleotides / divisor
+                if read.n_nucleotides and divisor else 0.0
+            )
+            lineage, ranks, scores = (
+                (";".join(values) for values in read.classification)
+                if read.classification else ("", "", "")
+            )
+            outf_contig.write(
+                f"{contig}\t{read.n_reads}\t{read_frac}\t"
+                f"{read.n_nucleotides}\t{corrected_frac}\t"
+                f"{lineage}\t{ranks}\t{scores}\n"
+            )
+
+    with settings.files.complete_abundance.open("w", encoding="utf-8") as outf_complete:
+        outf_complete.write(f"## command: {' '.join(sys.argv)}\n")
+        outf_complete.write('# lineage\tnumber of reads\tfraction of reads\t'
+                            'taxon length\tlineage ranks\n')
+
+        for lineage, read in rat_result.taxon_dict.items():
+            read_frac = read.n_reads / total_reads if total_reads else 0.0
+            ranks = ";".join(read.classification[1]) if read.classification else ""
+            outf_complete.write(
+                f"{lineage}\t{read.n_reads}\t{read_frac}\t"
+                f"{read.n_nucleotides}\t{ranks}\n"
+            )
+
+
+def make_bin_table(settings: RatSettings, rat_result: RatResult) -> None:
+    total_reads = rat_result.mapping.sum_of_reads
+    divisor = get_proper_fraction(rat_result.bin_data)
+
+    with settings.files.bin_abundance.open("w", encoding="utf-8") as op:
+        op.write(f"## command: {' '.join(sys.argv)}\n")
+        op.write(
+            "# bin\tnumber of reads\tfraction of reads\t"
+            "bin length\tcorrected fraction\n"
+        )
+
+        for bin_id, read in rat_result.bin_data.items():
+            read_fraction = read.n_reads / total_reads if total_reads else 0.0
+            corrected_frac = (
+                read.n_reads / read.n_nucleotides / divisor
+                if read.n_nucleotides and divisor else 0.0
+            )
+            op.write(
+                f"{bin_id}\t{read.n_reads}\t{read_fraction}\t"
+                f"{read.n_nucleotides}\t{corrected_frac}\n"
+            )
+
+
+def write_read_table(settings: RatSettings, rat_result: RatResult) -> None:
+    with settings.files.read_classification.open("w", encoding="utf-8") as outf:
+        outf.write(f"## command: {' '.join(sys.argv)}\n")
+        outf.write(
+            "# read\tclassification\tbin classification\t"
+            "contig classification\tdirect_mapping_contig\t"
+            "direct_mapping_read\n"
+            #'[aligner] unclassified contig\t[aligner] unclassified read\n'
+        )
+
+        for name, read in rat_result.mapping.read_dict.items():
+            for c in range(len(read["contig"])):
+                b_taxon = read["taxon_bin"][c]
+                c_taxon = read["taxon_contig"][c]
+                c_dm_taxon = (
+                    "" if b_taxon or c_taxon
+                    else read["taxon_contig_dm"][c]
+                )
+                if b_taxon is not None or c_taxon is not None or c_dm_taxon is not None:
+                    assigned = "taxid assigned"
+                else:
+                    assigned = "no taxid assigned"
+                outf.write(
+                    f"{name}\t{assigned}\t{b_taxon}\t"
+                    f"{c_taxon}\t{c_dm_taxon}\t\n"
+                )
+
+            for r_dm_taxon in read["taxon_read_dm"]:
+                if r_dm_taxon is not None:
+                    assigned = "taxid assigned"
+                else:
+                    assigned = "no taxid assigned"
+                outf.write(f"{name}\t{assigned}\t\t\t\t{r_dm_taxon}\n")
+
+
+def write_reports(settings: RatSettings, report: Report, rat_result: RatResult) -> RatResult:
+    make_tax_table(settings, rat_result)
+    report.progress_next()
+
+    if settings.files.bin_abundance is not None:
+        make_bin_table(settings, rat_result)
+    report.progress_next()
+
+    if settings.files.read_classification is not None:
+        write_read_table(settings, rat_result)
+    report.progress_next()
+    return rat_result
 
 if __name__ == '__main__':
     sys.exit('Run \'CAT_pack reads\' to run Read Annotation Tool (RAT).')

@@ -1,208 +1,144 @@
-#!/usr/bin/env python3
-
-"""
-Shared taxonomic classification engine for CAT and BAT.
-
-It makes the logic that is currently duplicated between CAT and BAT centrally accesable.
-
-"""
-
-from __future__ import annotations
-
-from dataclasses import dataclass
+"""Shared taxonomic classification engine for CAT and BAT"""
+import logging
+from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
-from enum import Enum, auto
+from itertools import chain
 from typing import Mapping, Sequence
-import tax
 
-class ORFStatus(Enum):
-    """Classification status of a single predicted ORF
+import numpy as np
 
-    Attributes:
-    ASSIGNED: has taxid  and LCA assigned to ORF
-    NO_HIT: ORF has no accepted homology hit
-    NO_TAXID: ORF accepted homology hits but no usable taxid assosiation
-    """
-    NO_HIT = auto()
-    NO_TAXID = auto()
-    ASSIGNED = auto()
+from CAT_pack.utils.typing import EntityType
+from . import tax
+from .io.parsers import AlignmentInput
+from .results import Classification, ClassificationStatus
 
-class ClassificationStatus(Enum):
-    ASSIGNED = auto()
-    NO_ORFS = auto()
-    NO_HITS = auto()
-    NO_TAXIDS = auto()
-    NO_LINEAGE_SUPPORT = auto()
+log = logging.getLogger("CAT_pack")
 
 
-@dataclass(slots=True)
-class ORFClassification:
-    orf_id: str
-    status: ORFStatus
-    n_hits: int = 0
-    taxid: str | None = None # TODO: replace with int down the line
-    message: str | None = None
-    top_bitscore: Decimal | None = None
-    lineage: tuple[str, ...] = () # TODO: update on lineage internal change
-
-@dataclass(frozen=True, slots=True)
-class TaxonomicAssignment:
-    """
-    One taxonomic assignment supported for an entity
-    if f < 0.5 can cause multiple classifications in one contig.
-    """
-    taxid: str
-    lineage: tuple[str, ...]
-    lineage_scores: tuple[Decimal, ...]
-
-
-
-class TaxonomyNamespace(Enum):
-    """
-    Support for multiple taxonomy namespaces in the future
-    """
-    NCBI = auto()
-
-
-@dataclass(slots=True)
-class ClassificationResult:
-    """
-    A unified classification result for CAT and BAT
-    """
-    entity_id: str
-    #entity_type: EntityType #TODO: for later addition (other types like viral)
-    status: ClassificationStatus
-    #sequence_type: SequenceType #TODO: For later addition
-    taxonomy_namespace: TaxonomyNamespace = TaxonomyNamespace.NCBI
-    assignments: tuple[TaxonomicAssignment, ...] = ()
-    total_n_ORFs: int = 0
-    based_on_n_ORFs: int = 0
-    orf_results: tuple[ORFClassification, ...] = ()
-
+# DEVNOTE: Add a flowchart in devdocs to make this more clear for non
+# Numpy users
 class ClassificationEngine:
-    """
-    Shared ORF and WG  classifier for CAT and BAT
+    """Classify ORFs and combine their total support for one contig or bin."""
 
-    NOTE: Not planning on implementing algorythm changes/optimizations here yet.
-    First changing architecture to Object oriented and after that is done and
-    results are identical the optimization can be done.
-    """
-    def __init__(self,*,taxid2parent:Mapping[str,str], fastaid2taxid: Mapping[str, str], fraction:Decimal) -> None:
-        self.taxid2parent = taxid2parent
-        self.fastaid2taxid = fastaid2taxid
+    def __init__(
+        self, taxonomy: tax.Taxonomy, fastaid2taxid: np.ndarray,
+        fraction: Decimal, threads: int = 1,
+    ) -> None:
+        self.taxonomy = taxonomy
+        self.hit2taxon = fastaid2taxid
         self.fraction = fraction
+        self.threads = threads
 
-    def classify_orf(self, orf_id: str, hits: Sequence[tuple[str, Decimal]] | None) -> ORFClassification:
-        if not hits:
-            return ORFClassification(
-                orf_id=orf_id,
-                status=ORFStatus.NO_HIT
-            )
-        taxid, top_bitscore = tax.find_LCA_for_ORF(
-            hits, self.fastaid2taxid, self.taxid2parent)
+    def classify(
+        self, entity_type: EntityType, entity2ORFs: Mapping[str, Sequence[str]], alignment: AlignmentInput,
+    ) -> Classification:
+        log.info(f"Starting classification calculation: {len(entity2ORFs)} {entity_type}.")
+        orf_entities_names = sorted(entity2ORFs)
+        n_entities = len(orf_entities_names)
 
-        if taxid.startswith("no taxid found"):
-            return ORFClassification(
-                orf_id=orf_id,
-                status=ORFStatus.NO_TAXID,
-                n_hits=len(hits),
-                top_bitscore=top_bitscore,
-                message=taxid
-            )
+        # Flatten ORFs, ordered by contig/bin.
+        ORF_names = list(chain.from_iterable(entity2ORFs[name] for name in orf_entities_names))
+        n_ORFs = np.array([len(entity2ORFs[name]) for name in orf_entities_names], dtype=np.int64)
+        ORF_starts = np.concatenate(([0], np.cumsum(n_ORFs)))
+        ORF2contig_or_bin = np.repeat(np.arange(n_entities), n_ORFs)
+        ORF2alignment_index, ORF_has_hits, LCA_per_ORF, n_hits_per_ORF, n_w_tax, top_bitscore_per_ORF = (self.per_ORF_stats(ORF_names, alignment))
 
-        lineage = tax.find_lineage(taxid, self.taxid2parent)
+        # Combine the ORF lowest common ancestors per contig (or bin)
+        # and weighted by their tob bit score(s)
+        weighted_LCAs = tax.WeightedLCA.find(
+            self.taxonomy, ORF2contig_or_bin, LCA_per_ORF,
+            top_bitscore_per_ORF, self.fraction, n_entities)
+        log.info("Finished Weighted LCA")
+        assignment_starts = np.searchsorted(weighted_LCAs.assignment_entity, np.arange(n_entities + 1))
 
-        # TODO implement lineage starring, implementation here is not usefull for testing and will need to be
-        # removed due to taxid becoming int in the future within this method
+        def count_per_entity(ORF_mask: np.ndarray) -> np.ndarray:
+            return np.bincount(ORF2contig_or_bin[ORF_mask], minlength=n_entities)
 
-        return ORFClassification(
-            orf_id=orf_id,
-            status=ORFStatus.ASSIGNED,
-            n_hits=len(hits),
-            taxid=taxid,
-            top_bitscore=top_bitscore,
-            lineage=tuple(lineage)
+        n_ORFs_with_hits = count_per_entity(ORF_has_hits)
+        n_ORFs_with_taxid = count_per_entity(LCA_per_ORF != tax.ORF.NO_TAXID)
+        n_assignments = np.diff(assignment_starts)
+
+        # DEVNOTE: For in the devdocs. np.select picks the first matching condition
+        classification_status = np.select(
+            [n_ORFs == 0, n_ORFs_with_hits == 0, n_ORFs_with_taxid == 0, n_assignments == 0],
+            [status.value for status in (
+                ClassificationStatus.NO_ORFS, ClassificationStatus.NO_HITS,
+                ClassificationStatus.NO_TAXIDS, ClassificationStatus.NO_LINEAGE_SUPPORT)],
+            default=ClassificationStatus.ASSIGNED.value,
         )
 
-    def classify_group(self, *, entity_id: str, orf_ids: Sequence[str], orf2hits: Mapping[str, Sequence[tuple[str, Decimal]]]) -> ClassificationResult:
-        """
-        Classificaion of one contig or bin from ORFs
-        """
-        if not orf_ids: return ClassificationResult(
-            entity_id=entity_id,
-            status=ClassificationStatus.NO_ORFS,
-        )
-        orf_results= []
-        lca_ORFs = []
-
-        for orf_id in orf_ids:
-            # get a ORF classification for one ORF and append it
-            result = self.classify_orf(orf_id, orf2hits.get(orf_id))
-            orf_results.append(result)
-
-            if result.status == ORFStatus.NO_HIT:
-                continue
-
-            if result.status == ORFStatus.NO_TAXID:
-                lca_ORFs.append((result.message, result.top_bitscore))
-                continue
-
-            lca_ORFs.append((result.taxid, result.top_bitscore))
-
-        if not lca_ORFs:
-            return ClassificationResult(
-                entity_id=entity_id,
-                status=ClassificationStatus.NO_HITS,
-                assignments=(),
-                total_n_ORFs=len(orf_ids),
-                based_on_n_ORFs=0,
-                orf_results=tuple(orf_results)
-            )
-
-        lineages, lineages_scores, based_on_n_orfs = tax.find_weighted_LCA(
-            lca_ORFs,
-            self.taxid2parent,
-            self.fraction
+        return Classification(
+            entity_type=entity_type,
+            entities=orf_entities_names,
+            status=classification_status,
+            orf_offsets=ORF_starts,
+            orf_names=ORF_names,
+            orf_row=ORF2alignment_index,
+            orf_lca=LCA_per_ORF,
+            orf_n_hits=n_hits_per_ORF,
+            n_w_tax=n_w_tax,
+            orf_top_bitscore=top_bitscore_per_ORF,
+            n_orfs_with_taxid=n_ORFs_with_taxid,
+            assignment_offsets=assignment_starts,
+            weighted=weighted_LCAs,
+            alignment=alignment,
+            taxonomy=self.taxonomy,
         )
 
-        if lineages == "no ORFs with taxids found.":
-            return ClassificationResult(
-                entity_id=entity_id,
-                status=ClassificationStatus.NO_TAXIDS,
-                assignments=(),
-                total_n_ORFs=len(orf_ids),
-                based_on_n_ORFs=0,
-                orf_results=tuple(orf_results)
+    def per_ORF_stats(self, ORF_names: Sequence[str], alignment: AlignmentInput):
+        n_ORFs = len(ORF_names)
+
+        ORF2alignment_index = np.fromiter(
+            (alignment.orf_index.get(ORF, tax.ORF.NO_HIT) for ORF in ORF_names), dtype=np.int64, count=n_ORFs)
+        ORF_has_hits = ORF2alignment_index != tax.ORF.NO_HIT
+
+        alignment_indices = ORF2alignment_index[ORF_has_hits]
+        hits_start = alignment.orf_offsets[alignment_indices]
+        hits_end = alignment.orf_offsets[alignment_indices + 1]
+
+        hit_taxids = self.hit2taxon[alignment.hit_ids]
+        log.info(f"hit taxonomy lookup: {len(hit_taxids)}accepted hits")
+        n_alignment_ORFs = len(alignment.orf_names)
+        workers = min(self.threads, max(1, n_alignment_ORFs // 20_000))
+
+        log.info(f"Starting ORF LCA calculation: with {n_alignment_ORFs} alignment ORFs, "
+                f"{len(hit_taxids)} accepted hits, and {workers} workers.")
+        if workers > 1:
+            ORF_bounds = np.linspace(
+                0, n_alignment_ORFs, workers + 1, dtype=np.int64
             )
-
-        if lineages == "no lineage whitelisted.":
-            return ClassificationResult(
-                entity_id=entity_id,
-                status=ClassificationStatus.NO_LINEAGE_SUPPORT,
-                assignments=(),
-                total_n_ORFs=len(orf_ids),
-                based_on_n_ORFs=0,
-                orf_results=tuple(orf_results)
-            )
-
-        assignments: list [TaxonomicAssignment] = []
-
-        for i, lineage in enumerate(lineages):
-            assignments.append(
-                TaxonomicAssignment(
-                    taxid=lineage[0],
-                    lineage=tuple(lineage),
-                    lineage_scores=tuple(lineages_scores[i]),
+            hit_bounds = alignment.orf_offsets[ORF_bounds]
+            offset_batches = (
+                alignment.orf_offsets[start:end + 1] - hit_start
+                for start, end, hit_start in zip(
+                    ORF_bounds[:-1], ORF_bounds[1:], hit_bounds[:-1]
                 )
             )
-        return ClassificationResult(
-            entity_id=entity_id,
-            status=ClassificationStatus.ASSIGNED,
-            assignments=tuple(assignments),
-            total_n_ORFs=len(orf_ids),
-            based_on_n_ORFs=based_on_n_orfs,
-            orf_results=tuple(orf_results),
-        )
+            hit_batches = (
+                hit_taxids[start:end]
+                for start, end in zip(hit_bounds[:-1], hit_bounds[1:])
+            )
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                batches = list(pool.map(self.taxonomy.find_LCA_for_ORF,offset_batches, hit_batches))
+            alignment_ORF_LCAs = np.concatenate([batch[0] for batch in batches])
+            alignment_w_tax = np.concatenate([batch[1] for batch in batches])
+        else:
+             alignment_ORF_LCAs, alignment_w_tax = self.taxonomy.find_LCA_for_ORF(
+                 alignment.orf_offsets, hit_taxids
+             )
 
+        LCA_per_ORF = np.full(n_ORFs, tax.ORF.NO_TAXID, dtype=np.int32)
+        LCA_per_ORF[ORF_has_hits] = alignment_ORF_LCAs[alignment_indices]
 
+        n_hits_per_ORF = np.zeros(n_ORFs, dtype=np.int64)
+        n_hits_per_ORF[ORF_has_hits] = hits_end - hits_start
+
+        n_hits_w_tax_per_ORF = np.zeros(n_ORFs, dtype=np.int64)
+        n_hits_w_tax_per_ORF[ORF_has_hits] = alignment_w_tax[alignment_indices]
+
+        top_bitscore_per_ORF = np.zeros(n_ORFs, dtype=np.int64)
+        top_bitscore_per_ORF[ORF_has_hits] = alignment.bitscores[hits_start]
+
+        return (ORF2alignment_index, ORF_has_hits, LCA_per_ORF, n_hits_per_ORF,
+                n_hits_w_tax_per_ORF, top_bitscore_per_ORF)
 
