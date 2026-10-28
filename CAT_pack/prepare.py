@@ -1,10 +1,8 @@
-import gzip
 import logging
 import shutil
 from pathlib import Path
-from typing import TextIO
 
-from io.parsers import optionally_compressed_handle
+from CAT_pack.io.parsers import optionally_compressed_handle
 from . import tax
 from .config.settings import PrepareSettings
 from .tools.tool_runner import run_tool

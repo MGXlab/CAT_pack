@@ -4,7 +4,7 @@ import subprocess
 import sys
 from dataclasses import field, dataclass
 from pathlib import Path
-from typing import Iterator, Any
+from typing import Iterator
 
 from CAT_pack import tax
 from CAT_pack.classification import ClassificationEngine
