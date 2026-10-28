@@ -114,7 +114,13 @@ def make_fastaid2LCAtaxid_file(
 
             LCAtaxid = tax.find_LCA(list_of_lineages)
             if LCAtaxid is None:
-                raise InputError(f"Disconnected taxonomic lineages in FASTA header {fastaid}.", path=settings.db_fasta)
+                raise InputError(
+                    f"Cannot find a shared taxonomic ancestor for the protein "
+                    f"accessions keys in FASTA header {fastaid}.",
+                    path=settings.files.nodes,
+                    hint="Their taxonomic lineages should share a root taxid. "
+                         "please use a valid input file",
+                )
             outf1.write(f"{fastaid}\t{LCAtaxid}\n")
             if fastaid not in prot_accession2taxid or LCAtaxid != prot_accession2taxid[fastaid]:
                 corrected += 1
