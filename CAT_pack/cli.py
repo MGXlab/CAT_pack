@@ -2,9 +2,9 @@
 import shlex
 import sys
 from decimal import Decimal
+from importlib.metadata import metadata
 from pathlib import Path
 from typing import Annotated
-from importlib.metadata import metadata
 
 import typer
 from rich.console import Console, Group
@@ -14,7 +14,6 @@ from rich.table import Table
 from rich.text import Text
 from typer import Option
 
-from . import about
 from .cli_options import (
     DiamondPathOption, diamond_options, execution_options, mmseqs_options, memory_options, with_option_groups,
 )
