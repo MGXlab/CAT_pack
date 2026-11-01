@@ -228,8 +228,8 @@ def run_download(
     locks = ExitStack()
     settings = None
     try:
-        files.data_folder.parent.mkdir(parents=True, exist_ok=True)
-        locks.enter_context(lock_outputs([files.data_folder]))
+        files.data_folder.mkdir(parents=True, exist_ok=True)
+        locks.enter_context(lock_outputs([files.data_folder / ".CAT_pack.download.lock"]))
         for step_index, current_step in enumerate(plan):
             # A bit of a misuse of the term supplied. this is for if cleanup isn't enabled
             if current_step.supplied:
@@ -239,7 +239,6 @@ def run_download(
             log.info(f"Starting: {current_step.name}")
             if step_index == 0:
                 settings = validate_download(args, files)
-                files.data_folder.mkdir(parents=True, exist_ok=True)
                 if not settings.no_log:
                     locks.enter_context(file_logging(log, files.log_file, settings.debug))
             elif current_step.name == "Downloading":
