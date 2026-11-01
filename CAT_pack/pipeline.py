@@ -27,6 +27,7 @@ from .reads import process_bam_file, load_classifications, extract_unclassified_
 from .tools.aligner import run_aligner
 from .tools.bwa_mem import run_bwa_mem
 from .tools.pyrodigal import run_protein_prediction
+from .utils.check import check_output_prefix
 from .utils.errors import CatError
 from .utils.locking import lock_outputs
 from .utils.logging import Status, Report, file_logging
@@ -316,9 +317,25 @@ def run(args: CatOptions | BatOptions | RatOptions | PrepareOptions, report: Rep
         log.info("Doing some pre-flight checks first.")
         report(current_step.name, Status.RUNNING, 0, 1)
         log.info(f"Starting: {current_step.name}")
+        if is_prepare:
+            args.db_dir.mkdir(parents=True, exist_ok=True)
+            locks.enter_context(lock_outputs([args.db_dir / ".prepare.lock"]))
+        else:
+            prefixes = [args.output_prefix]
+            if isinstance(args, RatOptions):
+                if "c" in args.mode.value and args.contigs2classification is None:
+                    prefixes.append(make_cat_options(args).output_prefix)
+                if "m" in args.mode.value and args.bin2classification is None:
+                    prefixes.append(make_bat_options(args).output_prefix)
+            outputs = [*prefixes, log_path]
+            for path in outputs:
+                check_output_prefix(path)
+            locks.enter_context(lock_outputs(path.with_name(f".{path.name}.lock") for path in outputs))
+
         settings = get_validated_settings(args)
 
-        if is_prepare: settings.files.data_folder.mkdir(parents=True, exist_ok=True)
+        if is_prepare:
+            locks.enter_context(lock_outputs([log_path.with_name(f".{log_path.name}.lock")]))
         locks.enter_context(file_logging(log, log_path, args.debug))
         if is_prepare: copy_taxonomy(settings)
 
