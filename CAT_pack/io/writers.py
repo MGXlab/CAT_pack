@@ -1,10 +1,12 @@
 """Write the shared CAT/BAT classification report format."""
 from decimal import Decimal
-from typing import TextIO
+from pathlib import Path
+from typing import TextIO, IO
 
 from CAT_pack.io.parsers import format_bitscore
 from CAT_pack.results import Classification, ClassificationStatus, Lineage
-from CAT_pack.tax import Taxonomy, ORF
+from CAT_pack.tax import Taxonomy, ORF, convert_to_names, convert_to_official_names
+from CAT_pack.utils.errors import InputError
 from CAT_pack.utils.typing import EntityType
 
 
@@ -120,3 +122,84 @@ class ClassificationWriter:
             lineage = self.format_lineage(taxids)
             self._lineages[taxid] = lineage
         return lineage
+
+
+def write_names(
+    f1: TextIO,
+    outf1: IO[str],
+    taxid2rank: dict[str, str],
+    taxid2name: dict[str, str],
+    input_file: Path,
+    only_official: bool = False,
+    exclude_scores: bool = False,
+) -> None:
+    line: str | list[str]
+
+    for line in f1:
+        if line.startswith("#"):
+            line = line[2:].rstrip().split("\t")
+
+            if "lineage" not in line:
+                continue
+
+            lineage_index = line.index("lineage")
+
+            scores_index = None
+            for i in range(len(line)):
+                if line[i].startswith("lineage scores"):
+                    scores_index = i
+
+            full_length = len(line)
+            break
+    else:
+        raise InputError(f"{input_file} is not a supported classification file.", path=input_file)
+
+    f1.seek(0)
+
+    for line_number, line in enumerate(f1, 1):
+        line = line.rstrip()
+
+        if line.startswith("#"):
+            if "lineage" not in line.lstrip("#").lstrip().split("\t"):
+                outf1.write(f"{line}\n")
+                continue
+
+            if only_official:
+                outf1.write(f"{line}\tsuperkingdom\tphylum\tclass\torder\t"
+                            "family\tgenus\tspecies\n")
+            else:
+                outf1.write(f"{line}\tfull lineage names\n")
+
+            continue
+
+        line = line.split("\t")
+
+        if len(line) != full_length:
+            # Entry does not have a full annotation.
+            # DEVNOTE: Python version 3.11 does not allow backslashes inside expression parts of f-strings
+            outf1.write("{0}\n".format("\t".join(line)))
+            continue
+
+        if any([c.startswith("no taxid found") for c in line[2:4]]):
+            # ORF has database hits but the accession number is not found
+            # in the taxonomy files.
+            outf1.write("{0}\n".format("\t".join(line)))
+            continue
+
+        if line[lineage_index] in {"", "unmapped", "unclassified"}:
+            outf1.write("{0}\n".format("\t".join(line)))
+            continue
+
+        lineage = line[lineage_index].split(";")
+
+        if scores_index and not exclude_scores:
+            scores = line[scores_index].split(";")
+        else:
+            scores = None
+
+        if only_official:
+            names = convert_to_official_names(lineage, taxid2rank, taxid2name, scores)
+        else:
+            names = convert_to_names(lineage, taxid2rank, taxid2name, scores)
+
+        outf1.write("{0}\t{1}\n".format("\t".join(line), "\t".join(names)))

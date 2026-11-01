@@ -330,3 +330,17 @@ class DownloadSettings:
     quiet: bool
     no_log: bool
     debug: bool
+
+@dataclass(frozen=True)
+class AddNamesFiles(TaxonomyFiles):
+    input_file: Path
+    output_file: Path
+
+
+@dataclass(frozen=True)
+class AddNamesSettings(ExecutionSettings):
+    files: AddNamesFiles
+    log_file: Path
+    only_official: bool
+    exclude_scores: bool
+    force: bool

@@ -7,12 +7,13 @@ from decimal import Decimal
 from pathlib import Path
 
 from .options import AlignerName, BatOptions, CatOptions, ExecutionOptions, DiamondOptions, PrepareOptions, \
-    MemoryOptions, DownloadOptions, RatOptions, AnnotationOptions
+    MemoryOptions, DownloadOptions, RatOptions, AnnotationOptions, AddNamesOptions
 from .settings import (
     BatFiles, BatSettings, CatFiles, CatSettings, ClassificationSettings, DatabaseFiles, DiamondParameters,
     DiamondPrepareSettings, DiamondSettings, ExecutionSettings, MMseqsPrepareSettings,
     PrepareOutputs, PrepareSettings, TaxonomyFiles, MemorySettings,
     DownloadFile, DownloadOutputs, DownloadSettings, NRUrls, GTDBUrls, GTDBDownloadOutputs, RatFiles, RatSettings,
+    AddNamesSettings, AddNamesFiles,
 )
 from ..io.parsers import BinParser
 from ..utils.check import (
@@ -600,15 +601,51 @@ def validate_rat_args(args: RatOptions) -> RatSettings:
         no_stars=args.no_stars
     )
 
-def get_validated_settings(args: CatOptions | BatOptions | RatOptions | PrepareOptions) -> CatSettings | BatSettings | RatSettings | PrepareSettings:
+
+def validate_add_names(args: AddNamesOptions) -> AddNamesSettings:
+    checks = ValErrorCollector()
+    execution = checks.check(validate_execution, args)
+    # @bastiaan shall we validate here if the input is non corrupt and is formated in a CAT_pack fashion?
+    input_file = checks.check(check_file_not_empty, args.input_file, "Input file")
+    taxonomy = checks.check(validate_taxonomy, args.database / "names.dmp", args.database / "nodes.dmp")
+    checks.check(check_output_prefix, args.output_file)
+    checks.check(check_output_prefix, args.log_path)
+
+    if not args.force:
+        checks.check(check_outputs, [args.output_file])
+
+    checks.finish()
+
+    return AddNamesSettings(
+        files=AddNamesFiles(
+            names=taxonomy.names,
+            nodes=taxonomy.nodes,
+            input_file=input_file,
+            output_file=args.output_file,
+        ),
+        log_file=args.log_path,
+        threads=execution.threads,
+        quiet=execution.quiet,
+        verbose=execution.verbose,
+        debug=execution.debug,
+        memory=execution.memory,
+        only_official=args.only_official,
+        exclude_scores=args.exclude_scores,
+        force=args.force,
+    )
+
+
+def get_validated_settings(args: CatOptions | BatOptions | RatOptions | PrepareOptions | AddNamesOptions) -> CatSettings | BatSettings | RatSettings | PrepareSettings | AddNamesSettings:
     if isinstance(args, RatOptions):
         return validate_rat_args(args)
     if isinstance(args, (CatOptions, BatOptions)):
         log.debug(f"Starting validation on CatOptions or BatOptions")
         return validate_cat(args)
-    if type(args) == PrepareOptions:
+    if isinstance(args, PrepareOptions):
         log.debug(f"Starting validation on PrepareOptions")
         return validate_prepare(args)
+    if isinstance(args, AddNamesOptions):
+        return validate_add_names(args)
     raise TypeError(f"Hmmm, that type of options class I don't know yet")
 
 

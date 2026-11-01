@@ -18,7 +18,7 @@ from .cli_options import (
     DiamondPathOption, diamond_options, execution_options, mmseqs_options, memory_options, with_option_groups,
 )
 from .config.options import BatOptions, CatOptions, ExecutionOptions, DiamondOptions, MMseqsOptions, PrepareOptions, \
-    MemoryOptions, DownloadOptions, RatMode, RatOptions
+    MemoryOptions, DownloadOptions, RatMode, RatOptions, AddNamesOptions
 from .config.validation import get_file_names, make_prefix
 from .pipeline import build_plan, run_download, run
 from .progress import ProgressTracker
@@ -725,3 +725,85 @@ def rat(contigs_fasta: Annotated[
         #console.print(Panel(Text("Completed"),title="RAT completed", border_style="green"))
 
 
+@app.command(
+    "add_names",
+    options_metavar="-i <FILE> -o <FILE> -d <DIR> [options] [-h / --help]",
+)
+def add_names(
+    input_file: Annotated[Path, Option(
+        "--input_file", "-i",
+        metavar="<FILE>",
+        help="Can be classification or ORF2LCA output file from CAT, BAT or RAT.",
+    )],
+    output_file: Annotated[Path, Option(
+        "--output_file", "-o",
+        metavar="<FILE>",
+        help="Output file.",
+    )],
+    database: Annotated[Path | None, Option(
+        "--database", "-d",
+        metavar="<DIR>",
+        help="Directory that contains database and taxonomy files.",
+    )] = None,
+    only_official: Annotated[bool, Option(
+        "--only_official",
+        help="Only output official taxonomic ranks (superkingdom, "
+            "phylum, class, order, family, genus, species)",
+        rich_help_panel="Optional arguments",
+    )] = AddNamesOptions.only_official,
+    exclude_scores: Annotated[bool, Option(
+        "--exclude_scores",
+        help="Do not include bit-score support scores in the lineage of a classification output file",
+        rich_help_panel="Optional arguments",
+    )] = AddNamesOptions.exclude_scores,
+    force: Annotated[bool, Option(
+        "--force",
+        help="Force overwrite existing files.",
+        rich_help_panel="Optional arguments",
+    )] = AddNamesOptions.force,
+    quiet: Annotated[bool, Option(
+        "--quiet", "-q",
+        help="Suppress verbosity.",
+        rich_help_panel="Optional arguments",
+    )] = AddNamesOptions.quiet,
+    debug: Annotated[bool, Option(
+        "--debug",
+        help="Show unexpected-error tracebacks.",
+        rich_help_panel="Optional arguments",
+    )] = AddNamesOptions.debug,
+):
+    """Add taxonomic names to CAT, BAT, or RAT output files."""
+    console = Console(stderr=True)
+
+    args = AddNamesOptions(
+        input_file=input_file,
+        output_file=output_file,
+        database=database,
+        only_official=only_official,
+        exclude_scores=exclude_scores,
+        force=force,
+        quiet=quiet,
+        debug=debug,
+    )
+    log = init_logging(debug, quiet=quiet, console=console)
+
+    try:
+        argument_print(args, "add_names", log, console)
+        tracker = ProgressTracker(build_plan(args), quiet=quiet, console=console)
+        with tracker.display():
+            outputs = run(args, tracker)
+    except KeyboardInterrupt:
+        console.print("Adding names cancelled.")
+        raise typer.Exit(code=130)
+    except CatError as error:
+        show_error(error, console)
+        raise typer.Exit(code=1)
+    except Exception:
+        log.exception("Unexpected error occurred while adding names.", exc_info=debug)
+        if debug:
+            console.print_exception()
+        raise typer.Exit(code=1)
+
+    if not quiet:
+        output_file = outputs["Named output"]
+        console.print(Text(f"Names written to {output_file}!", style="green"))
