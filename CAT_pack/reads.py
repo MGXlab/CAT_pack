@@ -401,7 +401,8 @@ def classify_reads(settings: RatSettings, report: Report, rat_result: RatResult)
         read["taxon_contig_dm"] = []
         read["taxon_read_dm"] = []
 
-        for contig, bin_id in zip(read["contig"], read["bin"]):
+        for contig in read["contig"]:
+            bin_id = rat_result.contig2bin.get(contig, "unbinned")
             for key, table, identifier in (
                 ("taxon_bin", rat_result.b2c, bin_id),
                 ("taxon_contig", rat_result.c2c, contig),
@@ -521,7 +522,7 @@ def write_read_table(settings: RatSettings, rat_result: RatResult) -> None:
                     "" if b_taxon or c_taxon
                     else read["taxon_contig_dm"][c]
                 )
-                if b_taxon is not None or c_taxon is not None or c_dm_taxon is not None:
+                if b_taxon or c_taxon or c_dm_taxon:
                     assigned = "taxid assigned"
                 else:
                     assigned = "no taxid assigned"
@@ -531,7 +532,7 @@ def write_read_table(settings: RatSettings, rat_result: RatResult) -> None:
                 )
 
             for r_dm_taxon in read["taxon_read_dm"]:
-                if r_dm_taxon is not None:
+                if r_dm_taxon:
                     assigned = "taxid assigned"
                 else:
                     assigned = "no taxid assigned"
