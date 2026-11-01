@@ -19,6 +19,10 @@ from CAT_pack.utils.logging import Report
 from CAT_pack.utils.typing import EntityType
 
 
+def format_lineage(lineage: str, *, no_stars: bool = False) -> str:
+    return lineage.replace("*", "") if no_stars else lineage
+
+
 def process_annotation_table(settings: RatSettings, output_table: Path)-> dict[str, list[tuple[str,...]]]:
     """
     takes CAT contig2classification or bin2classification table and taxonomy
@@ -180,22 +184,11 @@ def get_unclassified_contigs(contig2bin, c2c, b2c) -> list[str]:
     a bin AND unclassified: put it in a set.
     """
     unclassified_contigs=list()
-    for c in c2c:
-        classified=False
-        if c in contig2bin:
-            if b2c[contig2bin[c]]:
-                mag_lineage=b2c[contig2bin[c]][0]
-                if len(mag_lineage)>2 or (len(mag_lineage)==2 and
-                                          mag_lineage[1]!='131567'):
-                    classified=True
-        if not classified:
-            if c2c[c]:
-                lineage=c2c[c][0]
-                if len(lineage)>2 or (len(lineage)==2 and
-                                          lineage[1]!='131567'):
-                    classified=True
-        if not classified:
-            unclassified_contigs.append(c)
+    for contig, contig_classification in c2c.items():
+        bin_id = contig2bin.get(contig)
+        bin_classification = b2c.get(bin_id, []) if bin_id is not None else []
+        if not get_classification(bin_classification, contig_classification):
+            unclassified_contigs.append(contig)
     return unclassified_contigs
 
 
@@ -243,6 +236,7 @@ class Abundance:
     n_reads: int = 0
     n_nucleotides: int = 0
     classification: list[tuple[str, ...]] = field(default_factory=list)
+    suggestive_taxids: set[str] = field(default_factory=set)
 
 
 @dataclass
@@ -365,7 +359,7 @@ def calculate_abundances(
             rat_result.u2c.get(contig, []),
         )
         taxon = (
-            ";".join(contig_data.classification[0])
+            format_lineage(";".join(contig_data.classification[0]), no_stars=True)
             if contig_data.classification else "unclassified"
         )
         taxon_data = rat_result.taxon_dict.setdefault(
@@ -374,6 +368,11 @@ def calculate_abundances(
         )
         taxon_data.n_reads += contig_data.n_reads
         taxon_data.n_nucleotides += contig_data.n_nucleotides
+        if contig_data.classification:
+            taxon_data.suggestive_taxids.update(
+                taxid.rstrip("*") for taxid in contig_data.classification[0]
+                if taxid.endswith("*")
+            )
 
         bin_data = rat_result.bin_data.setdefault(bin_id, Abundance())
         bin_data.n_reads += contig_data.n_reads
@@ -384,11 +383,15 @@ def calculate_abundances(
     for read in rat_result.mapping.iter_unmapped_read_ids():
         classification = get_classification(rat_result.u2c.get(read, []))
         if classification:
-            taxon = ";".join(classification[0])
+            taxon = format_lineage(";".join(classification[0]), no_stars=True)
             taxon_data = rat_result.taxon_dict.setdefault(
                 taxon, Abundance(classification=classification),
             )
             taxon_data.n_reads += 1
+            taxon_data.suggestive_taxids.update(
+                taxid.rstrip("*") for taxid in classification[0]
+                if taxid.endswith("*")
+            )
             rat_result.taxon_dict["unmapped"].n_reads -= 1
 
     report.progress_next()
@@ -461,6 +464,7 @@ def make_tax_table(settings: RatSettings, rat_result: RatResult) -> None:
                 (";".join(values) for values in read.classification)
                 if read.classification else ("", "", "")
             )
+            lineage = format_lineage(lineage, no_stars=settings.no_stars)
             outf_contig.write(
                 f"{contig}\t{read.n_reads}\t{read_frac}\t"
                 f"{read.n_nucleotides}\t{corrected_frac}\t"
@@ -473,6 +477,11 @@ def make_tax_table(settings: RatSettings, rat_result: RatResult) -> None:
                             'taxon length\tlineage ranks\n')
 
         for lineage, read in rat_result.taxon_dict.items():
+            if not settings.no_stars and read.suggestive_taxids:
+                lineage = ";".join(
+                    taxid + ("*" if taxid in read.suggestive_taxids else "")
+                    for taxid in lineage.split(";")
+                )
             read_frac = read.n_reads / total_reads if total_reads else 0.0
             ranks = ";".join(read.classification[1]) if read.classification else ""
             outf_complete.write(
@@ -522,6 +531,9 @@ def write_read_table(settings: RatSettings, rat_result: RatResult) -> None:
                     "" if b_taxon or c_taxon
                     else read["taxon_contig_dm"][c]
                 )
+                b_taxon = format_lineage(b_taxon, no_stars=settings.no_stars)
+                c_taxon = format_lineage(c_taxon, no_stars=settings.no_stars)
+                c_dm_taxon = format_lineage(c_dm_taxon, no_stars=settings.no_stars)
                 if b_taxon or c_taxon or c_dm_taxon:
                     assigned = "taxid assigned"
                 else:
@@ -532,6 +544,7 @@ def write_read_table(settings: RatSettings, rat_result: RatResult) -> None:
                 )
 
             for r_dm_taxon in read["taxon_read_dm"]:
+                r_dm_taxon = format_lineage(r_dm_taxon, no_stars=settings.no_stars)
                 if r_dm_taxon:
                     assigned = "taxid assigned"
                 else:

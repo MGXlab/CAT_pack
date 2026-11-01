@@ -284,6 +284,10 @@ def cat(
             Path,
             Option("--output-prefix", "-o", metavar="<prefix>")
         ] = CatOptions.output_prefix,
+        no_stars: Annotated[bool, Option(
+            "--no_stars", "--no-stars",
+            help="Suppress marking of suggestive taxonomic assignments.",
+        )] = CatOptions.no_stars,
         top: Annotated[
             int,
             Option("--top", min=0, max=100,
@@ -323,6 +327,7 @@ def cat(
         fraction=Decimal(str(fraction)),
         log_file=log_file,
         output_prefix=output_prefix,
+        no_stars=no_stars,
         aligner=aligner,
         diamond=diamond,
         mmseqs=mmseqs,

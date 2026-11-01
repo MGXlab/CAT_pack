@@ -597,7 +597,7 @@ def validate_rat_args(args: RatOptions) -> RatSettings:
         memory=execution.memory, cat=cat_settings, bat=bat_settings,
         mapping_quality=args.mapping_quality, aligner=aligner,
         range_=classification.range_, fraction=classification.fraction,
-        no_stars=classification.no_stars
+        no_stars=args.no_stars
     )
 
 def get_validated_settings(args: CatOptions | BatOptions | RatOptions | PrepareOptions) -> CatSettings | BatSettings | RatSettings | PrepareSettings:
