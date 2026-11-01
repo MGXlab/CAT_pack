@@ -1,6 +1,8 @@
 """protein aligners DIAMOND and MMseqs2"""
 import logging
-import shutil
+from dataclasses import replace
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from .tool_runner import run_tool
 from ..config.settings import DiamondSettings, MMseqsSettings
@@ -11,15 +13,15 @@ log = logging.getLogger("CAT_pack")
 def run_diamond(diamond: DiamondSettings, report):
     log.info("Homology search with DIAMOND is starting. Please be patient.")
 
-    if not diamond.tmpdir.is_dir():
-        log.info(f"making tmp dir: {diamond.tmpdir}")
-        diamond.tmpdir.mkdir(parents=True, exist_ok=True)
+    tmp_parent = diamond.tmpdir.resolve()
+    tmp_parent.mkdir(parents=True, exist_ok=True) # DEVNOTE: Maybe do this already in validation
 
-    try:
+    with TemporaryDirectory(
+        prefix="CAT_pack_DIAMOND_", dir=tmp_parent, ignore_cleanup_errors=True,
+    ) as tmpdir:
+        diamond = replace(diamond, tmpdir=Path(tmpdir))
         run_tool(diamond.get_command(), "DIAMOND", operation="homology search")
         log.info(f"DIAMOND finished. Alignment written to {diamond.alignment}\n")
-    finally:
-        shutil.rmtree(diamond.tmpdir, ignore_errors=True)
 
 
 def run_mmseqs2(mmseqs: MMseqsSettings, report):
