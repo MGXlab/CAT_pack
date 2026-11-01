@@ -498,7 +498,7 @@ def is_gz(file_path):
 
 def optionally_compressed_handle(
     file_path: str | Path,
-    mode: Literal["r", "rb", "rt", "w", "wb", "wt", "a", "ab", "at"],
+    mode: Literal["r", "rb", "rt", "w", "wb", "wt", "a", "ab", "at"] = 'r',
 ) -> TextIO:
     """Return an appropriate file handle to operate on.
 
