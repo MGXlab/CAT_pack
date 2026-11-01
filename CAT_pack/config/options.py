@@ -130,3 +130,15 @@ class DownloadOptions(ExecutionOptions):
     no_log: bool = False
 
 
+@dataclass(frozen=True, kw_only=True)
+class AddNamesOptions(ExecutionOptions):
+    input_file: Path
+    output_file: Path
+    database: Path | None = None
+    only_official: bool = False
+    exclude_scores: bool = False
+    force: bool = False
+
+    @property
+    def log_path(self) -> Path:
+        return self.output_file.with_name(f"{self.output_file.name}.log")

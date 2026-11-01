@@ -476,6 +476,90 @@ def find_LCA(list_of_lineages: Sequence[Iterable[Taxid]]) -> Taxid | None:
             return taxid
     return None
 
+def import_names(names_dmp) -> dict[str, str]:
+    log.info("Loading file %s.", names_dmp)
+    taxid2name = {}
+
+    with open(names_dmp, "r") as f1:
+        for line_number, line in enumerate (f1, 1):
+            line = line.rstrip("\r\n").split("\t")
+            #added this check to prevent a index error
+            if len(line) < 7:
+                raise InputError(f"Malformed taxonomy name at line number: {line_number}.",
+                                 path=names_dmp, hint="Use an NCBI nodes.dmp file that is tab separated.")
+
+            if line[6] == "scientific name":
+                taxid = line[0]
+                name = line[2]
+
+                taxid2name[taxid] = name
+
+    return taxid2name
+
+
+def convert_to_names(lineage: list[str],
+                     taxid2rank: dict[str, str],
+                     taxid2name: dict[str, str],
+                     scores: list[str] | None=None
+    )-> list[str]:
+    names = []
+    for (i, taxid) in enumerate(lineage):
+        starred = taxid.endswith("*")
+        taxid = taxid.rstrip("*")
+
+        name = taxid2name[taxid]
+        rank = taxid2rank[taxid]
+
+        if starred: name+= "*"
+
+        if scores is not None:
+            names.append(f"{name} ({rank}): {scores[i]}")
+        else:
+            names.append(f"{name} ({rank})")
+
+    return names
+
+
+def convert_to_official_names(
+            lineage: list[str],
+            taxid2rank: dict[str, str],
+            taxid2name: dict[str, str],
+            scores: list[str] | None = None,
+    ) -> list[str]:
+    official_ranks = ["superkingdom", "phylum", "class", "order", "family",
+                      "genus", "species"]
+    lineage_ranks = [taxid2rank[taxid.rstrip("*")] for taxid in lineage]
+
+    official_names = ["no support"] * 7
+
+    for i, rank in enumerate(official_ranks):
+        if rank in lineage_ranks:
+            index = lineage_ranks.index(rank)
+
+            taxid = lineage[index]
+            starred = taxid.endswith("*")
+            taxid = taxid.rstrip("*")
+            name = taxid2name[taxid]
+
+            if starred: name += "*"
+
+            if scores is not None:
+                official_names[i] = f"{name}: {scores[index]}"
+            else:
+                official_names[i] = name
+
+    # Fill the official lineage with NAs if a lower classification is present.
+    index_lowest_classification = 0
+    for i, name in enumerate(official_names):
+        if name != "no support":
+            index_lowest_classification = i
+
+    for i in range(index_lowest_classification):
+        if official_names[i] == "no support":
+            official_names[i] = "NA"
+
+    return official_names
+
 
 if __name__ == "__main__":
     sys.exit("Run \'CAT_pack\' to run CAT, BAT, or RAT.")
