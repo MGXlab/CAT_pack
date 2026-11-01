@@ -27,9 +27,17 @@ from .utils.logging import init_logging
 
 app = typer.Typer()
 
+def version(value: bool):
+    print(f"CAT_pack v{metadata(__package__ or __name__)['Version']}")
+    if value:
+        raise typer.Exit()
+
 @app.callback()
-def main():
-    """Ah oh"""
+def main(version: Annotated[
+        bool | None, typer.Option("--version", callback=version)
+    ] = None):
+    pass
+
 
 
 def argument_print(arguments, tool, log, console):
