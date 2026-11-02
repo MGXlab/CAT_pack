@@ -107,6 +107,17 @@ class FastaParser:
             contig2ORFs[contig].append(orf_name)
         return contig2ORFs
 
+
+def import_contig_lengths(contigs_fasta: Path) -> dict[str, int]:
+    log.info("Gathering contig lengths from %s.", contigs_fasta)
+    contig2length = {}
+
+    for record in FastaParser(contigs_fasta):
+        contig = record.name.split()[0]
+        contig2length[contig] = len(record.sequence)
+
+    return contig2length
+
 @dataclass(frozen=True, slots=True)
 class FastqRecord:
     name: str

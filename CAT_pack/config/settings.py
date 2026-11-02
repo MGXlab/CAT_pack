@@ -347,3 +347,17 @@ class AddNamesSettings(ExecutionSettings):
     only_official: bool
     exclude_scores: bool
     force: bool
+
+
+@dataclass(frozen=True)
+class SummariseFiles:
+    input_file: Path
+    output_file: Path
+    contigs_fasta: Path | None
+
+
+@dataclass(frozen=True)
+class SummariseSettings(ExecutionSettings):
+    files: SummariseFiles
+    log_file: Path
+    force: bool
