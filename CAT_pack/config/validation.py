@@ -7,7 +7,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from .options import AlignerName, BatOptions, CatOptions, ExecutionOptions, DiamondOptions, PrepareOptions, \
-    MemoryOptions, DownloadOptions, RatOptions, AnnotationOptions, AddNamesOptions, SummariseOptions
+    MemoryOptions, DownloadOptions, RatOptions, AnnotationOptions, AddNamesOptions, SummariseOptions, MMseqsOptions
 from .settings import (
     BatFiles, BatSettings, CatFiles, CatSettings, ClassificationSettings, DatabaseFiles, DiamondParameters,
     DiamondPrepareSettings, DiamondSettings, ExecutionSettings, MMseqsPrepareSettings,
@@ -98,6 +98,18 @@ def validate_diamond(options: DiamondOptions) -> DiamondParameters:
         executable, options.mode, options.no_self_hits,
         options.block_size, options.index_chunks,
     )
+
+def validate_mmseqs(options: MMseqsOptions) -> Path:
+    command = str(options.executable.resolve()) if options.executable else "mmseqs"
+    executable = shutil.which(command)
+
+    if executable is None:
+        raise ExternalToolError(
+            "MMseqs2", "executable not found.",
+            hint="Supply --path-to-mmseqs. Or activate an environment containing MMseqs(2)",
+        )
+
+    return Path(executable)
 
 
 def validate_database(folder: Path, *, require_diamond=False) -> DatabaseFiles:

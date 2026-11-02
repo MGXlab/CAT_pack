@@ -58,6 +58,7 @@ class DatabaseFiles(TaxonomyFiles):
     fastaid2LCA: Path
     branches: Path
     diamond: Path | None
+    mmseqs2: Path | None
 
 
 @dataclass(frozen=True)
@@ -109,7 +110,40 @@ class DiamondSettings(DiamondParameters):
 
 @dataclass(frozen=True)
 class MMseqsSettings:
-    pass
+    mmseqs: Path
+    query: Path
+    database: Path
+    alignment: Path
+    tmpdir: Path
+    threads: int
+    sensitivity: float
+    split_memory_limit: str
+    top: int
+    compression: bool
+    verbose: bool
+    tiny_out: bool = True
+
+    def get_command(self) -> list[str]:
+        command = [
+            self.mmseqs, "easy-search",
+            self.query.resolve(), self.database.resolve(),
+            self.alignment.resolve(), self.tmpdir.resolve(),
+            "-s", self.sensitivity,
+            "--threads", self.threads,
+            "--compressed", int(self.compression),
+            "--split-memory-limit", self.split_memory_limit,
+            "-v", 3 if self.verbose else 0,
+        ]
+
+        if self.tiny_out:
+            command += ["--format-output", "query,target,bits"]
+
+        if self.verbose:
+            command += ["-v", 3]
+        else:
+            command += ["-v", 0]
+
+        return [str(arg) for arg in command]
 
 
 @dataclass(frozen=True)
@@ -124,6 +158,7 @@ class AnnotationFiles:
     nodes: Path
     orf_report: Path
     diamond_database: Path | None
+    mmseqs2_database: Path | None
 
 
 @dataclass(frozen=True)
@@ -140,14 +175,14 @@ class BatFiles(AnnotationFiles):
 @dataclass(frozen=True)
 class CatSettings(ExecutionSettings, ClassificationSettings):
     files: CatFiles
-    aligner: DiamondSettings | None
+    aligner: DiamondSettings | MMseqsSettings  | None
     log_file: Path
 
 
 @dataclass(frozen=True)
 class BatSettings(ExecutionSettings, ClassificationSettings):
     files: BatFiles
-    aligner: DiamondSettings | None
+    aligner: DiamondSettings | MMseqsSettings  | None
     log_file: Path
 
 
@@ -185,7 +220,7 @@ class RatSettings(ExecutionSettings, ClassificationSettings):
     sort_memory_mib: int | None = None
     cat: CatSettings | None = None
     bat: BatSettings | None = None
-    aligner: DiamondSettings | None = None
+    aligner: DiamondSettings | MMseqsSettings  | None = None
 
 
 # Database preparation settings and outputs.
