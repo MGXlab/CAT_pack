@@ -18,7 +18,7 @@ from .cli_options import (
     DiamondPathOption, diamond_options, execution_options, mmseqs_options, memory_options, with_option_groups,
 )
 from .config.options import BatOptions, CatOptions, ExecutionOptions, DiamondOptions, MMseqsOptions, PrepareOptions, \
-    MemoryOptions, DownloadOptions, RatMode, RatOptions, AddNamesOptions
+    MemoryOptions, DownloadOptions, RatMode, RatOptions, AddNamesOptions, SummariseOptions
 from .config.validation import get_file_names, make_prefix
 from .pipeline import build_plan, run_download, run
 from .progress import ProgressTracker
@@ -822,5 +822,75 @@ def add_names(
         raise typer.Exit(code=1)
 
     if not quiet:
-        output_file = outputs["Named output"]
-        console.print(Text(f"Names written to {output_file}!", style="green"))
+        console.print(Text(f"Names written to {outputs['Output']}!", style="green"))
+
+@app.command("summarise", options_metavar="-i <FILE> -o <FILE> (-c <FILE>) [options] [-h / --help]")
+def summarise(
+    input_file: Annotated[Path, Option(
+        "--input_file", "-i",
+        metavar="<FILE>",
+        help="Path to named CAT contig classification file or BAT bin "
+            "classification file. Currently only official ranks are "
+            "supported, and only classification files containing a single "
+            "classification per contig / bin. If you want to summarise a "
+            "contig classification file, you have to supply the contigs "
+            "fasta file with argument [-c / --contigs_fasta]."
+    )],
+    output_file: Annotated[Path, Option(
+        "--output_file", "-o",
+        metavar="<FILE>",
+        help="Output file."
+    )],
+    contigs_fasta: Annotated[Path | None, Option(
+        "--contigs_fasta", "-c",
+        metavar="<FILE>",
+        help="Contigs fasta file. Required if you want to "
+            "summarise a contig classification file."
+        )] = SummariseOptions.contigs_fasta,
+    force: Annotated[bool, Option(
+        "--force",
+        help="Force overwrite existing files.",
+    )] = SummariseOptions.force,
+    quiet: Annotated[bool, Option(
+        "--quiet", "-q",
+        help="Suppress verbosity.",
+    )] = SummariseOptions.quiet,
+    debug: Annotated[bool, Option(
+        "--debug",
+        help="Show unexpected-error tracebacks.",
+    )] = SummariseOptions.debug,
+):
+    """Summarise a named CAT or BAT classification file."""
+    args = SummariseOptions(
+        input_file=input_file,
+        output_file=output_file,
+        contigs_fasta=contigs_fasta,
+        force=force,
+        quiet=quiet,
+        debug=debug,
+    )
+    console = Console(stderr=True)
+    log = init_logging(debug, quiet=quiet, console=console)
+
+    try:
+        argument_print(args, "summarise", log, console)
+        tracker = ProgressTracker(build_plan(args), quiet=quiet, console=console)
+        with tracker.display():
+            outputs = run(args, tracker)
+    except KeyboardInterrupt:
+        console.print("Summarising cancelled.")
+        raise typer.Exit(code=130)
+    except CatError as error:
+        show_error(error, console)
+        raise typer.Exit(code=1)
+    except Exception:
+        log.exception(
+            "Unexpected error while summarising.",
+            exc_info=debug,
+        )
+        if debug:
+            console.print_exception()
+        raise typer.Exit(code=1)
+
+    if not quiet:
+        console.print(Text(f"{outputs['Output']} is created!", style="green"))

@@ -5,14 +5,14 @@ from decimal import Decimal
 from pathlib import Path
 from tarfile import TarError
 from tempfile import NamedTemporaryFile
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
-from . import tax
 from CAT_pack.io.download import (
     DownloadQueueReport, DownloadReport, multi_download,
     check_files, process_files, cleanup_downloads,
 )
 from CAT_pack.utils.typing import EntityType
+from . import tax
 from .classification import ClassificationEngine
 from .config.options import BatOptions, CatOptions, PrepareOptions, DownloadOptions, RatOptions, AddNamesOptions, \
     SummariseOptions
@@ -21,7 +21,7 @@ from .config.settings import BatFiles, BatSettings, CatFiles, CatSettings, Downl
 from .config.validation import check_orfs_match_contigs, get_file_names, get_validated_settings, make_prefix, \
     validate_download, get_download_file_names, make_cat_options, make_bat_options
 from .io.parsers import ClassificationParser, optionally_compressed_handle, import_contig_lengths
-from .io.writers import ClassificationWriter, write_names, summarise_bins, summarise_contigs
+from .io.writers import ClassificationWriter, write_names, write_summary
 from .prepare import (
     copy_taxonomy, make_diamond_database,
     make_fastaid2LCAtaxid_file, make_mmseqs2_database,
@@ -58,7 +58,7 @@ class Step:
         return self.name
 
 
-def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | DownloadOptions | AddNamesOptions, files=None) -> list[Step]:
+def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | DownloadOptions | AddNamesOptions | SummariseOptions, files=None) -> list[Step]:
     if type(args) == PrepareOptions:
         return [
             Step("Input validation"),
@@ -383,7 +383,7 @@ def run(args: CatOptions | BatOptions | RatOptions | PrepareOptions | AddNamesOp
             return {
                 "Results": completed_steps[-1].result,
                 "Steps": completed_steps,
-                "Named output": settings.files.output_file,
+                "Output": settings.files.output_file,
                 "Log": settings.log_file,
             }
         if isinstance(args, RatOptions):
@@ -487,8 +487,12 @@ def summarise(settings: SummariseSettings, report: Report) -> Path:
     log = logging.getLogger("CAT_pack")
     files = settings.files
     contig2length = {}
+    entity_type: Literal[EntityType.CONTIG, EntityType.BIN]
 
-    if files.contigs_fasta is not None:
+    if files.contigs_fasta is None:
+        entity_type = EntityType.BIN
+    else:
+        entity_type = EntityType.CONTIG
         contig2length = import_contig_lengths(files.contigs_fasta)
         report.progress_next()
 
@@ -507,19 +511,14 @@ def summarise(settings: SummariseSettings, report: Report) -> Path:
             temporary = Path(outf1.name)
 
             with optionally_compressed_handle(files.input_file) as f1:
-                if files.contigs_fasta is None:
-                    summarise_bins(
-                        f1, outf1.file,
-                        input_file=files.input_file,
-                    )
-                else:
-                    summarise_contigs(
-                        f1,
-                        outf1.file,
-                        contig2length,
-                        input_file=files.input_file,
-                        contigs_fasta=files.contigs_fasta,
-                    )
+                write_summary(
+                    f1,
+                    outf1.file,
+                    input_file=files.input_file,
+                    entity_type=entity_type,
+                    contig2length=contig2length,
+                    contigs_fasta=files.contigs_fasta,
+                )
 
         if not settings.force:
             check_outputs([files.output_file])

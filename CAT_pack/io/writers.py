@@ -1,7 +1,7 @@
 """Write the shared CAT/BAT classification report format."""
 from decimal import Decimal
 from pathlib import Path
-from typing import TextIO, IO, Any, Literal
+from typing import TextIO, IO, Literal
 
 from CAT_pack.io.parsers import format_bitscore
 from CAT_pack.results import Classification, ClassificationStatus, Lineage
