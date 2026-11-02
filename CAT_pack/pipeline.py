@@ -153,7 +153,7 @@ def run_classification(settings: CatSettings | BatSettings, report: Report) -> t
     files: CatFiles | BatFiles = settings.files
     log = logging.getLogger("CAT_pack")
     inputs = ClassificationParser(
-        files, settings.range_, workers=settings.threads
+        files, settings.range_, parser_settings=settings.alignment_parsing, workers=settings.threads
     ).parse()
     check_orfs_match_contigs(
         inputs.contig_names, inputs.contig2ORFs, files.proteins_fasta
