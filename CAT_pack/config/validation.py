@@ -7,13 +7,13 @@ from decimal import Decimal
 from pathlib import Path
 
 from .options import AlignerName, BatOptions, CatOptions, ExecutionOptions, DiamondOptions, PrepareOptions, \
-    MemoryOptions, DownloadOptions, RatOptions, AnnotationOptions, AddNamesOptions
+    MemoryOptions, DownloadOptions, RatOptions, AnnotationOptions
 from .settings import (
     BatFiles, BatSettings, CatFiles, CatSettings, ClassificationSettings, DatabaseFiles, DiamondParameters,
     DiamondPrepareSettings, DiamondSettings, ExecutionSettings, MMseqsPrepareSettings,
     PrepareOutputs, PrepareSettings, TaxonomyFiles, MemorySettings,
     DownloadFile, DownloadOutputs, DownloadSettings, NRUrls, GTDBUrls, GTDBDownloadOutputs, RatFiles, RatSettings,
-    AddNamesSettings, AddNamesFiles,
+    ParserSettings,
 )
 from ..io.parsers import BinParser
 from ..utils.check import (
@@ -41,8 +41,15 @@ def validate_execution(options: ExecutionOptions) -> ExecutionSettings:
         log.info("[red]Memory mode[/red]: automatic")
     return ExecutionSettings(options.threads, options.quiet, options.verbose, options.debug, memory=memory)
 
+def validate_parser(bit_score_column:int, tiny_out: bool) -> ParserSettings:
+    checks = ValErrorCollector()
+    if bit_score_column != AnnotationOptions.bit_score_column:
+        checks.add(InputError("You cannot supply a custom bit score column when not supplying a alignment file."))
+    if tiny_out:
+        bit_score_column = ParserSettings.bit_score_column
+    return ParserSettings(bit_score_column)
 
-def validate_classification(range_, fraction) -> ClassificationSettings:
+def validate_classification(range_, fraction, parser_settings) -> ClassificationSettings:
     checks = ValErrorCollector()
     log.debug("Checking range parameter")
     range_ = checks.check(check_number, range_, "Range", 0, 100)
@@ -51,7 +58,7 @@ def validate_classification(range_, fraction) -> ClassificationSettings:
     fraction = checks.check(check_number, fraction, "Fraction", 0, Decimal("0.99"))
     log.info(f"Checked Fraction parameter: {fraction}")
     checks.finish()
-    return ClassificationSettings(range_, fraction)
+    return ClassificationSettings(range_, fraction, parser_settings)
 
 
 def validate_memory(options: MemoryOptions) -> MemorySettings:
@@ -325,8 +332,10 @@ def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
     checks = ValErrorCollector()
     log.info(f"Validating execution arguments")
     execution = checks.check(validate_execution, args)
+    log.info(f"Validating alignment parser settings")
+    parser_settings = checks.check(validate_parser, args.bit_score_column, args.diamond.tiny_out)
     log.info(f"Validating classification arguments")
-    classification = checks.check(validate_classification, args.range_, args.fraction)
+    classification = checks.check(validate_classification, args.range_, args.fraction, parser_settings)
     log.info(f"Validating alignment arguments")
     aligner_name = checks.check(validate_aligner_name, args.aligner)
     top = checks.check(check_integer, args.top, "top", 0, 100)
@@ -348,7 +357,6 @@ def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
                 "MMseqs2 execution is not implemented yet.",
                 hint="Use --aligner diamond or supply an existing alignment and proteins.",
             )) # TODO: Implement MMseqs2?
-
     checks.finish()
 
     aligner = None
@@ -377,7 +385,7 @@ def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
             files=files, aligner=aligner,
             memory=execution.memory,
             range_=classification.range_, fraction=classification.fraction,
-            log_file=args.log_path, no_stars=args.no_stars,
+            log_file=args.log_path, no_stars=args.no_stars, alignment_parsing=classification.alignment_parsing,
         )
     else:
         raise TypeError(f"Hmmm, that type of options I don't know yet")
@@ -395,7 +403,6 @@ def validate_rat_files(args: RatOptions) -> RatFiles:
     checks.check(check_integer, args.mapping_quality, "Mapping quality", 0, 255)
     if args.sort_memory_mib is not None:
         checks.check(check_integer, args.sort_memory_mib, "Sort memory (MiB)", 1, sys.maxsize)
-    checks.check(validate_classification, args.range_, args.fraction)
     checks.check(validate_memory, args.memory)
 
 
@@ -542,7 +549,10 @@ def validate_rat_args(args: RatOptions) -> RatSettings:
     checks = ValErrorCollector()
     files = checks.check(validate_rat_files, args)
     execution = checks.check(validate_execution, args)
-    classification = checks.check(validate_classification, args.range_, args.fraction)
+    log.info(f"Validating alignment parser settings")
+    parser_settings = checks.check(validate_parser, args.bit_score_column, args.diamond.tiny_out)
+    log.info(f"Validating classification arguments")
+    classification = checks.check(validate_classification, args.range_, args.fraction, parser_settings)
     bwa = None
     if args.read_file and not args.bam_file:
         bwa = checks.check(shutil.which, str(args.path_to_bwa))
@@ -601,51 +611,15 @@ def validate_rat_args(args: RatOptions) -> RatSettings:
         no_stars=args.no_stars
     )
 
-
-def validate_add_names(args: AddNamesOptions) -> AddNamesSettings:
-    checks = ValErrorCollector()
-    execution = checks.check(validate_execution, args)
-    # @bastiaan shall we validate here if the input is non corrupt and is formated in a CAT_pack fashion?
-    input_file = checks.check(check_file_not_empty, args.input_file, "Input file")
-    taxonomy = checks.check(validate_taxonomy, args.database / "names.dmp", args.database / "nodes.dmp")
-    checks.check(check_output_prefix, args.output_file)
-    checks.check(check_output_prefix, args.log_path)
-
-    if not args.force:
-        checks.check(check_outputs, [args.output_file])
-
-    checks.finish()
-
-    return AddNamesSettings(
-        files=AddNamesFiles(
-            names=taxonomy.names,
-            nodes=taxonomy.nodes,
-            input_file=input_file,
-            output_file=args.output_file,
-        ),
-        log_file=args.log_path,
-        threads=execution.threads,
-        quiet=execution.quiet,
-        verbose=execution.verbose,
-        debug=execution.debug,
-        memory=execution.memory,
-        only_official=args.only_official,
-        exclude_scores=args.exclude_scores,
-        force=args.force,
-    )
-
-
-def get_validated_settings(args: CatOptions | BatOptions | RatOptions | PrepareOptions | AddNamesOptions) -> CatSettings | BatSettings | RatSettings | PrepareSettings | AddNamesSettings:
+def get_validated_settings(args: CatOptions | BatOptions | RatOptions | PrepareOptions) -> CatSettings | BatSettings | RatSettings | PrepareSettings:
     if isinstance(args, RatOptions):
         return validate_rat_args(args)
     if isinstance(args, (CatOptions, BatOptions)):
         log.debug(f"Starting validation on CatOptions or BatOptions")
         return validate_cat(args)
-    if isinstance(args, PrepareOptions):
+    if type(args) == PrepareOptions:
         log.debug(f"Starting validation on PrepareOptions")
         return validate_prepare(args)
-    if isinstance(args, AddNamesOptions):
-        return validate_add_names(args)
     raise TypeError(f"Hmmm, that type of options class I don't know yet")
 
 

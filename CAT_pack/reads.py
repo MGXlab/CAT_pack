@@ -9,8 +9,7 @@ from typing import Iterator
 from CAT_pack import tax
 from CAT_pack.classification import ClassificationEngine
 from CAT_pack.config.settings import RatSettings
-from CAT_pack.io.parsers import FastaParser, FastqParser
-from CAT_pack.io.parsers import optionally_compressed_handle, AlignmentParser
+from CAT_pack.io.parsers import FastaParser, FastqParser, optionally_compressed_handle, AlignmentParser
 from CAT_pack.io.writers import ClassificationWriter
 from CAT_pack.tools.aligner import run_aligner
 from CAT_pack.tools.tool_runner import tool_output
@@ -292,7 +291,7 @@ def run_rat_alignment(settings: RatSettings, report: Report) -> None:
 # TODO: maybe integrate this with the run_classification function in pipeline.py
 def write_unmapped2classification(settings: RatSettings, report: Report, result: RatResult) -> None:
     files = settings.files
-    alignment = AlignmentParser(files.alignment_unmapped, settings.range_, workers=settings.threads).parse()
+    alignment = AlignmentParser(files.alignment_unmapped, settings.range_, settings.alignment_parsing, workers=settings.threads).parse()
     report.progress_next()
 
     taxonomy = tax.Taxonomy.import_nodes(files.nodes)

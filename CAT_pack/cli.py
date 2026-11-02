@@ -288,6 +288,10 @@ def cat(
                     "should also be supplied with argument --proteins_fasta."
                    , metavar="<file>")
         ] = CatOptions.alignment,
+        bit_score_column: Annotated[
+            int,
+            Option("--bit_score_column", help="Select a custom bit score column when working with a non default BLAST6 alignment table."),
+        ] = CatOptions.bit_score_column,
         output_prefix: Annotated[
             Path,
             Option("--output-prefix", "-o", metavar="<prefix>")
@@ -331,6 +335,7 @@ def cat(
         database=database,
         proteins=proteins,
         alignment=alignment,
+        bit_score_column=bit_score_column,
         range_=Decimal(str(range_)),
         fraction=Decimal(str(fraction)),
         log_file=log_file,
@@ -403,6 +408,11 @@ def bat(
                     "should also be supplied with argument --proteins_fasta."
                    , metavar="<file>")
         ] = BatOptions.alignment,
+        bit_score_column: Annotated[
+            int,
+            Option("--bit_score_column",
+                   help="Select a custom bit score column when working with a non default BLAST6 alignment table."),
+        ] = BatOptions.bit_score_column,
         output_prefix: Annotated[
             Path,
             Option("--output-prefix", "--out_prefix", "-o", metavar="<prefix>", help="Prefix for output files.")
@@ -449,6 +459,7 @@ def bat(
         log_file=log_file,
         output_prefix=output_prefix,
         aligner=aligner,
+        bit_score_column=bit_score_column,
         diamond=diamond,
         mmseqs=mmseqs,
         memory=memory,
@@ -610,6 +621,11 @@ def rat(contigs_fasta: Annotated[
             int, Option("--mapping_quality", min=0, max=255, help="Minimum mapping quality phred score")] = RatOptions.mapping_quality,
         proteins: Annotated[Path | None, Option("--proteins_fasta", "-p", help="Reuse predicted contig proteins for CAT/BAT.")] = RatOptions.proteins,
         alignment: Annotated[Path | None, Option("--alignment_table", "-a", help="Reuse CAT/BAT protein alignments; also supply --proteins_fasta.")] = RatOptions.alignment,
+        bit_score_column: Annotated[
+            int,
+            Option("--bit_score_column",
+                   help="Select a custom bit score column when working with a non default BLAST6 alignment table."),
+        ] = RatOptions.bit_score_column,
         range_: Annotated[float, Option("--range", min=0, max=100)] = float(RatOptions.range_),
         fraction: Annotated[float, Option("--fraction", "-f", min=0, max=0.99)] = float(RatOptions.fraction),
         top: Annotated[int, Option("--top", min=0, max=100)] = RatOptions.top,
@@ -647,6 +663,7 @@ def rat(contigs_fasta: Annotated[
         mapping_quality=mapping_quality,
         proteins=proteins,
         alignment=alignment,
+        bit_score_column=bit_score_column,
         range_=Decimal(str(range_)),
         fraction=Decimal(str(fraction)),
         top=top,

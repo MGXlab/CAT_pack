@@ -40,11 +40,12 @@ def diamond_options(
         "--no-self-hits", rich_help_panel="DIAMOND",
         help="Do not report identical self hits by DIAMOND.",
     )] = DiamondOptions.no_self_hits,
+    tiny_out: Annotated[bool, Option("--no_tiny_out", "--default_out", help="This flag disables the minified alignment output CAT pack uses by default", flag_value=False, show_default=False)] = DiamondOptions.tiny_out,
     path_to_diamond: DiamondPathOption = DiamondOptions.path_to_diamond,
 ) -> DiamondOptions:
     return DiamondOptions(
         mode=diamond_mode, block_size=block_size, index_chunks=index_chunks,
-        no_self_hits=no_self_hits, path_to_diamond=path_to_diamond,
+        no_self_hits=no_self_hits, path_to_diamond=path_to_diamond, tiny_out=tiny_out
     )
 
 
