@@ -132,7 +132,6 @@ class MMseqsSettings:
             "--threads", self.threads,
             "--compressed", int(self.compression),
             "--split-memory-limit", self.split_memory_limit,
-            "-v", 3 if self.verbose else 0,
         ]
 
         if self.tiny_out:

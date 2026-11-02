@@ -411,4 +411,4 @@ def top_tabular_alignment(f1: TextIO, outf1: TextIO, top: int, bit_score_column:
         for bitscore, line in hits:
             if bitscore * 100 < cutoff:
                 break
-            outf1.write(line)
+            outf1.write(line.rstrip("\r\n") + "\n")
