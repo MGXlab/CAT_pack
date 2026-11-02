@@ -46,6 +46,18 @@ class MemoryOptions:
 
 
 @dataclass(frozen=True, kw_only=True)
+class SummariseOptions(ExecutionOptions):
+    input_file: Path
+    output_file: Path
+    contigs_fasta: Path | None = None
+    force: bool = False
+
+    @property
+    def log_path(self) -> Path:
+        return self.output_file.with_name(f"{self.output_file.name}.log")
+
+
+@dataclass(frozen=True, kw_only=True)
 class AnnotationOptions(ExecutionOptions):
     database: Path
     proteins: Path | None = None
