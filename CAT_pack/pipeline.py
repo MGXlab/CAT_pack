@@ -90,7 +90,7 @@ def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | Dow
                 "Alignment",
                 supplied=args.alignment is not None,
                 runner=lambda settings, report: run_aligner(settings.aligner, report),
-                citation="Please cite DIAMOND when using CAT or BAT in your publication."
+                citation=f"Please cite {args.aligner} when using CAT or BAT in your publication."
             ),
             Step("Classify", runner=run_classification,
                  unit="bins" if isinstance(args, BatOptions) else "contigs"),

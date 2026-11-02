@@ -10,7 +10,7 @@ from .options import AlignerName, BatOptions, CatOptions, ExecutionOptions, Diam
     MemoryOptions, DownloadOptions, RatOptions, AnnotationOptions, AddNamesOptions, SummariseOptions, MMseqsOptions
 from .settings import (
     BatFiles, BatSettings, CatFiles, CatSettings, ClassificationSettings, DatabaseFiles, DiamondParameters,
-    DiamondPrepareSettings, DiamondSettings, ExecutionSettings, MMseqsPrepareSettings,
+    DiamondPrepareSettings, DiamondSettings, ExecutionSettings, MMseqsPrepareSettings, MMseqsSettings,
     PrepareOutputs, PrepareSettings, TaxonomyFiles, MemorySettings,
     DownloadFile, DownloadOutputs, DownloadSettings, NRUrls, GTDBUrls, GTDBDownloadOutputs, RatFiles, RatSettings,
     AddNamesSettings, AddNamesFiles, ParserSettings, SummariseSettings, SummariseFiles,
@@ -112,7 +112,7 @@ def validate_mmseqs(options: MMseqsOptions) -> Path:
     return Path(executable)
 
 
-def validate_database(folder: Path, *, require_diamond=False) -> DatabaseFiles:
+def validate_database(folder: Path, *, require_diamond=False, require_mmseqs2=False) -> DatabaseFiles:
     checks = ValErrorCollector()
     folder = checks.check(check_folder, folder, "Database folder")
 
@@ -123,6 +123,10 @@ def validate_database(folder: Path, *, require_diamond=False) -> DatabaseFiles:
     if require_diamond:
         diamond = checks.check(check_db_file, folder, ".dmnd", "DIAMOND database")
 
+    mmseqs2 = None
+    if require_mmseqs2:
+        mmseqs2 = checks.check(check_db_file, folder, ".mmseqs2", "MMseqs2 database")
+
     fastaid2LCA = checks.check(check_db_file, folder, "fastaid2LCAtaxid", "fastaid2LCAtaxid file")
     branches = checks.check(
         check_db_file, folder, "taxids_with_multiple_offspring",
@@ -132,7 +136,7 @@ def validate_database(folder: Path, *, require_diamond=False) -> DatabaseFiles:
     checks.finish()
     return DatabaseFiles(
         fastaid2LCA=fastaid2LCA, branches=branches, diamond=diamond,
-        names=taxonomy.names, nodes=taxonomy.nodes,
+        mmseqs2=mmseqs2, names=taxonomy.names, nodes=taxonomy.nodes,
     )
 
 # the replace(args) makes sure that if the run is started just before midnight
@@ -305,7 +309,11 @@ def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | Non
             ))
 
     need_diamond_db = args.alignment is None and aligner == "diamond"
-    database = checks.check(validate_database, args.database, require_diamond=need_diamond_db)
+    need_mmseqs2_db = args.alignment is None and aligner == "mmseqs2"
+    database = checks.check(
+        validate_database, args.database,
+        require_diamond=need_diamond_db, require_mmseqs2=need_mmseqs2_db,
+    )
 
     prefix = args.output_prefix
     checks.check(check_output_prefix, prefix)
@@ -337,6 +345,7 @@ def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | Non
         names=database.names, nodes=database.nodes,
         orf_report=orf_report, report=report,
         **report_fields, diamond_database=database.diamond,
+        mmseqs2_database=database.mmseqs2,
     )
 
 
@@ -356,29 +365,39 @@ def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
 
     tmpdir = args.tmpdir if args.tmpdir is not None else args.output_prefix.parent / "tmp"
     diamond = None
+    mmseqs = None
     if args.alignment is None:
+        if classification is not None and top is not None and top <= classification.range_:
+            checks.add(InputError("Top must be higher than range."))
         if aligner_name == "diamond":
             log.debug(f"Using diamond")
             log.info(f"Validating diamond arguments")
             diamond = checks.check(validate_diamond, args.diamond)
-            if classification is not None and top is not None and top <= classification.range_:
-                checks.add(InputError("Top must be higher than range."))
         elif aligner_name == "mmseqs2":
             log.debug(f"Using mmseqs2")
-            checks.add(InputError(
-                "MMseqs2 execution is not implemented yet.",
-                hint="Use --aligner diamond or supply an existing alignment and proteins.",
-            )) # TODO: Implement MMseqs2?
+            log.info("Validating mmseqs2 arguments")
+            mmseqs = checks.check(validate_mmseqs, args.mmseqs)
     checks.finish()
 
     aligner = None
-    if args.alignment is None:
+    if args.alignment is None and aligner_name == "diamond":
         aligner = DiamondSettings(
             diamond=diamond.diamond, mode=diamond.mode, no_self_hits=diamond.no_self_hits,
             block_size=diamond.block_size, index_chunks=diamond.index_chunks,
             query=files.proteins_fasta, database=files.diamond_database,
             alignment=files.alignment, tmpdir=tmpdir, threads=execution.threads,
-            top=top, compression=args.compress, verbose=execution.verbose
+            top=top, compression=args.compress, verbose=execution.verbose,
+            tiny_out=args.diamond.tiny_out,
+        )
+    elif args.alignment is None and aligner_name == "mmseqs2":
+        aligner = MMseqsSettings(
+            mmseqs=mmseqs, query=files.proteins_fasta,
+            database=files.mmseqs2_database, alignment=files.alignment,
+            tmpdir=tmpdir, threads=execution.threads,
+            sensitivity=args.mmseqs.sensitivity,
+            split_memory_limit=args.mmseqs.split_memory_limit,
+            top=top, compression=args.compress, verbose=execution.verbose,
+            tiny_out=args.diamond.tiny_out,
         )
 
     if isinstance(args, BatOptions):
@@ -389,6 +408,7 @@ def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
             memory=execution.memory,
             range_=classification.range_, fraction=classification.fraction,
             log_file=args.log_path, no_stars=args.no_stars,
+            alignment_parsing=classification.alignment_parsing,
         )
     elif isinstance(args, CatOptions):
         return CatSettings(
@@ -620,7 +640,7 @@ def validate_rat_args(args: RatOptions) -> RatSettings:
         memory=execution.memory, cat=cat_settings, bat=bat_settings,
         mapping_quality=args.mapping_quality, aligner=aligner,
         range_=classification.range_, fraction=classification.fraction,
-        no_stars=args.no_stars
+        no_stars=args.no_stars, alignment_parsing=classification.alignment_parsing,
     )
 
 
