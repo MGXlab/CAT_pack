@@ -625,7 +625,7 @@ def validate_rat_args(args: RatOptions) -> RatSettings:
             tmpdir=(args.tmpdir or args.output_prefix.parent)
                    / f"{args.output_prefix.name}.RAT.tmp",
             threads=execution.threads, top=top, compression=args.compress,
-            verbose=execution.verbose, blast_flavour="blastx", tiny_out=True,
+            verbose=execution.verbose, blast_flavour="blastx", tiny_out=args.diamond.tiny_out,
         )
     else:
         checks.finish()
