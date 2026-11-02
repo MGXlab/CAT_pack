@@ -31,11 +31,19 @@ class ExecutionSettings:
     debug: bool
     memory: MemorySettings = field(default_factory=MemorySettings, kw_only=True)
 
+@dataclass()
+class ParserSettings:
+    bit_score_column: int = 2
+    # Feedback from @Bastiaan
+    # DEVnote to make the multiplier dependent on the significance of the bitscore.
+    bit_score_multiplier = 10
+
 
 @dataclass(frozen=True)
 class ClassificationSettings:
     range_: Decimal
     fraction: Decimal
+    alignment_parsing: ParserSettings
     no_stars: bool = field(default=False, kw_only=True)
 
 
@@ -244,11 +252,6 @@ class PrepareSettings(ExecutionSettings):
     diamond: DiamondPrepareSettings | None
     mmseqs: MMseqsPrepareSettings | None = None
 
-@dataclass()
-class ParserSettings:
-    # Feedback from @Bastiaan
-    # DEVnote to make the multiplier dependent on the significance of the bitscore.
-    bit_score_multiplier = 10
 
 
 

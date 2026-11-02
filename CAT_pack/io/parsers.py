@@ -289,11 +289,11 @@ class AlignmentParser:
 
     _chunk_rows = 100_000
 
-    def __init__(self, path: Path, range_: Decimal, cat_only: bool | None = None, workers: int = 1) -> None:
+    def __init__(self, path: Path, range_: Decimal, parser_settings: ParserSettings, workers: int = 1) -> None:
         self.path = path
         self.cutoff_numerator, self.cutoff_denominator = ((Decimal(100) - range_)/Decimal(100)).as_integer_ratio()
-        self.cat_only = cat_only
         self.workers = workers
+        self.parser_settings = parser_settings
 
     def _read_in_batches(self, source, first_line, bitscore_index):
         import polars as pl
@@ -358,13 +358,7 @@ class AlignmentParser:
             top_bitscore = 0
             below_cutoff = False
             first_line = next(source, None)
-            if self.cat_only is None:
-                n_fields = len(first_line.rstrip("\r\n").split("\t")) if first_line is not None else 12
-                if n_fields != 3 and n_fields < 12:
-                    raise InputError("Alignment must have three CAT columns or twelve BLAST6 columns.", path=self.path)
-                bitscore_index = 2 if n_fields == 3 else 11
-            else:
-                bitscore_index = 2 if self.cat_only else 11
+            bitscore_index = self.parser_settings.bit_score_column
 
             batches = cleanup.enter_context(closing(self._read_in_batches(source, first_line, bitscore_index))) if first_line is not None else ()
             for alignment_batch, selected_columns in batches:
@@ -436,10 +430,10 @@ class ClassificationParser:
     """Load ORF groups, accepted alignment hits, and their taxonomy data."""
 
     def __init__(self, files: CatFiles | BatFiles, range_: Decimal,
-                 cat_only: bool | None = None, workers: int = 1) -> None:
+                 parser_settings: ParserSettings, workers: int = 1) -> None:
         self.files = files
         self.range_ = range_
-        self.cat_only = cat_only
+        self.parser_settings = parser_settings
         self.workers = workers
 
     def parse(self) -> ClassificationInputs:
@@ -457,7 +451,7 @@ class ClassificationParser:
             for contig in contig_names:
                 entity2ORFs[contig] = contig2ORFs.get(contig, [])
 
-        alignment = AlignmentParser(self.files.alignment, self.range_, self.cat_only, workers=self.workers).parse()
+        alignment = AlignmentParser(self.files.alignment, self.range_, self.parser_settings, workers=self.workers).parse()
         taxonomy = tax.Taxonomy.import_nodes(self.files.nodes)
 
         fastaid2LCAtaxid = read_fastaid2LCAtaxid(self.files.fastaid2LCA, set(alignment.hit_names), workers=self.workers)

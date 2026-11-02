@@ -106,20 +106,31 @@ def check_diamond(path: Path | None = None) -> Path:
     return Path(found)
 
 
-def check_number(value, label: str, minimum, maximum) -> Decimal:
+def check_number(value, label: str, minimum=None, maximum=None) -> Decimal:
     try:
         number = Decimal(str(value))
     except (InvalidOperation, ValueError):
         number = None
     if number is not None and number.is_finite() and minimum <= number <= maximum:
         return number
-    raise InputError(f"{label} must be a number between {minimum} and {maximum}.")
+    if minimum is not None and maximum is not None:
+        raise InputError(f"{label} must be a number between {minimum} and {maximum}.")
+    else:
+        # DEVNOTE: Yes this is indeed already checked by typer. But typer
+        #  checking is now set to "strict" and in the feature is may be an option
+        #  to set that lower so all errors can be aggregated here instead of only the
+        #  cli input errors first and then the more rigorous checking
+        raise InputError(f"{label} must be a number or decimal")
 
 
-def check_integer(value, label: str, minimum, maximum) -> int:
+def check_integer(value, label: str, minimum=None, maximum=None) -> int:
     number = check_number(value, label, minimum, maximum)
     if number != number.to_integral_value():
-        raise InputError(f"{label} must be an integer between {minimum} and {maximum}.")
+        if minimum is not None and maximum is not None:
+            raise InputError(f"{label} must be an integer between {minimum} and {maximum}.")
+        else:
+            # DEVNOTE: See note in check_number
+            raise InputError(f"{label} must be a integer or decimal")
     return int(number)
 
 

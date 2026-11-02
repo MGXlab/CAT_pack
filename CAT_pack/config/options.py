@@ -27,6 +27,7 @@ class DiamondOptions:
     no_self_hits: bool = False
     block_size: float = 12.0
     index_chunks: int = 1
+    tiny_out: bool = True
     path_to_diamond: Path | None = None
 
 
@@ -61,6 +62,7 @@ class AnnotationOptions(ExecutionOptions):
     compress: bool = False
     memory: MemoryOptions = field(default_factory=MemoryOptions)
     no_stars: bool = False
+    bit_score_column: int = 11
 
     @property
     def log_path(self) -> Path:
