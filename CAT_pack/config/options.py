@@ -36,6 +36,7 @@ class MMseqsOptions:
     sensitivity: float = 5.7
     split_memory_limit: str = "0"
     executable: Path | None = None
+    gpu: bool = False
 
 
 @dataclass(frozen=True)
@@ -135,6 +136,7 @@ class PrepareOptions(ExecutionOptions):
     common_prefix: str | None = None
     build_mmseqs2: bool = False
     path_to_mmseqs: Path | None = None
+    gpu: bool = False
 
 @dataclass(frozen=True, kw_only=True)
 class DownloadOptions(ExecutionOptions):

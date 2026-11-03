@@ -24,7 +24,7 @@ from .io.parsers import ClassificationParser, optionally_compressed_handle, impo
 from .io.writers import ClassificationWriter, write_names, write_summary
 from .prepare import (
     copy_taxonomy, make_diamond_database,
-    make_fastaid2LCAtaxid_file, make_mmseqs2_database,
+    make_fastaid2LCAtaxid_file, make_mmseqs2_database, make_mmseqs2_gpu_database,
     write_taxids_with_multiple_offspring_file,
 )
 from .reads import process_bam_file, load_classifications, extract_unclassified_sequences, run_rat_alignment, \
@@ -68,6 +68,9 @@ def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | Dow
             *([Step("Make MMseqs2 database",
                     supplied=files is not None and files.mmseqs2_database.is_file(),
                     runner=make_mmseqs2_database)] if args.build_mmseqs2 else []),
+            *([Step("Make MMseqs2 GPU database",
+                    supplied=files is not None and files.mmseqs2_gpu_database.is_file(),
+                    runner=make_mmseqs2_gpu_database)] if args.build_mmseqs2 and args.gpu else []),
             Step("Make fastaid2LCAtaxid",
                  supplied=files is not None and files.fastaid2LCAtaxid.is_file(),
                  runner=make_fastaid2LCAtaxid_file),
