@@ -40,7 +40,7 @@ def diamond_options(
         "--no-self-hits", rich_help_panel="DIAMOND",
         help="Do not report identical self hits by DIAMOND.",
     )] = DiamondOptions.no_self_hits,
-    no_tiny_out: Annotated[bool, Option("--no_tiny_out", "--blast6_out", help="This flag disables the minified alignment output CAT pack uses by default", show_default=False)] = not DiamondOptions.tiny_out,
+    no_tiny_out: Annotated[bool, Option("--blast6_out", help="This flag disables the minified alignment output CAT pack uses by default", show_default=False)] = not DiamondOptions.tiny_out,
     path_to_diamond: DiamondPathOption = DiamondOptions.path_to_diamond,
 ) -> DiamondOptions:
     return DiamondOptions(
@@ -52,7 +52,7 @@ def diamond_options(
 def mmseqs_options(
     sensitivity: Annotated[float, Option(
         "--sensitivity", min=1.0, max=7.5, rich_help_panel="MMseqs2",
-        help="MMseqs2 sensitivity (-s).",
+        help="MMseqs2 CPU sensitivity (-s). GPU searches always use maximum sensitivity.",
     )] = MMseqsOptions.sensitivity,
     split_memory_limit: Annotated[str, Option(
         "--split-memory-limit", rich_help_panel="MMseqs2",
@@ -62,10 +62,14 @@ def mmseqs_options(
         "--path-to-mmseqs", rich_help_panel="MMseqs2",
         help="Path to MMseqs2. Supply if it is not on PATH.",
     )] = MMseqsOptions.executable,
+    gpu: Annotated[bool, Option(
+        "--gpu", rich_help_panel="MMseqs2",
+        help="Use MMseqs2 GPU search. Requires a database prepared with --build-mmseqs2 --gpu.",
+    )] = MMseqsOptions.gpu,
 ) -> MMseqsOptions:
     return MMseqsOptions(
         sensitivity=sensitivity, split_memory_limit=split_memory_limit,
-        executable=path_to_mmseqs,
+        executable=path_to_mmseqs, gpu=gpu,
     )
 
 

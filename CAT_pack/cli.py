@@ -188,6 +188,8 @@ def prepare(
             ),] = PrepareOptions.common_prefix,
         build_mmseqs2: Annotated[bool, Option("--build-mmseqs2",
                     help="Also create an MMseqs2 sequence database.")] = PrepareOptions.build_mmseqs2,
+        gpu: Annotated[bool, Option("--gpu",
+                    help="Also prepare a GPU MMseqs2 database. Requires --build-mmseqs2.")] = PrepareOptions.gpu,
         path_to_mmseqs: Annotated[Path | None, Option("--path-to-mmseqs",
                     help="Path to MMseqs2, used with --build-mmseqs2.")] = PrepareOptions.path_to_mmseqs,
         *, execution: ExecutionOptions,
@@ -202,6 +204,7 @@ def prepare(
         path_to_diamond=path_to_diamond,
         common_prefix=common_prefix,
         build_mmseqs2=build_mmseqs2,
+        gpu=gpu,
         path_to_mmseqs=path_to_mmseqs,
         threads=execution.threads,
         quiet=execution.quiet,
@@ -238,6 +241,8 @@ def prepare(
             table.add_row(label, str(path))
         if args.build_mmseqs2:
             table.add_row("MMseqs2", str(files.mmseqs2_database))
+        if args.gpu:
+            table.add_row("MMseqs2 GPU", str(files.mmseqs2_gpu_database))
         console.print(table)
         console.print(f"Use -d {files.data_folder} with CAT_pack7 CAT or BAT.")
 

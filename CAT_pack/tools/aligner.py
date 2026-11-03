@@ -7,7 +7,9 @@ from tempfile import TemporaryDirectory
 from CAT_pack.io.parsers import optionally_compressed_handle
 from CAT_pack.io.writers import top_tabular_alignment
 from .tool_runner import run_tool
+from .gpu import check_mmseqs_gpu
 from ..config.settings import DiamondSettings, MMseqsSettings
+from ..utils.errors import ExternalToolError
 
 log = logging.getLogger("CAT_pack")
 
@@ -27,6 +29,8 @@ def run_diamond(diamond: DiamondSettings, report):
 
 def run_mmseqs2(mmseqs: MMseqsSettings, report) -> None:
     log.info("Homology search with MMseqs2 is starting. Please be patient.")
+    if mmseqs.gpu and mmseqs.sensitivity:
+        log.warning("MMseqs2 GPU search uses maximum sensitivity; --sensitivity does not apply.")
 
     tmp_parent = mmseqs.tmpdir.resolve()
     tmp_parent.mkdir(parents=True, exist_ok=True)

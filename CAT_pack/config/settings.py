@@ -122,17 +122,26 @@ class MMseqsSettings:
     compression: bool
     verbose: bool
     tiny_out: bool = True
+    gpu: bool = False
+    search_type: int | None = None
 
     def get_command(self) -> list[str]:
         command = [
             self.mmseqs, "easy-search",
             self.query.resolve(), self.database.resolve(),
             self.alignment.resolve(), self.tmpdir.resolve(),
-            "-s", self.sensitivity,
             "--threads", self.threads,
             "--compressed", int(self.compression),
             "--split-memory-limit", self.split_memory_limit,
         ]
+
+        if self.gpu:
+            command += ["--gpu", 1]
+        else:
+            command += ["-s", self.sensitivity]
+
+        if self.search_type is not None:
+            command += ["--search-type", self.search_type]
 
         if self.tiny_out:
             command += ["--format-output", "query,target,bits"]
@@ -262,6 +271,16 @@ class MMseqsPrepareSettings:
             command.extend(["-v", "0"])
         return command
 
+    def get_gpu_command(self, database: Path) -> list[str]:
+        command = [
+            str(self.mmseqs), "makepaddedseqdb",
+            str(self.database.resolve()), str(database.resolve()),
+            "--threads", str(self.threads),
+        ]
+        if not self.verbose:
+            command.extend(["-v", "0"])
+        return command
+
 
 @dataclass(frozen=True)
 class PrepareOutputs:
@@ -274,6 +293,10 @@ class PrepareOutputs:
     mmseqs2_database: Path
     fastaid2LCAtaxid: Path
     taxids_with_multiple_offspring: Path
+
+    @property
+    def mmseqs2_gpu_database(self) -> Path:
+        return self.mmseqs2_database.with_name(f"{self.mmseqs2_database.name}_gpu")
 
 
 @dataclass(frozen=True)

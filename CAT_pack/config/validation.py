@@ -19,6 +19,7 @@ from ..io.parsers import BinParser
 from ..utils.check import (
     check_db_file, check_diamond, check_fasta_file, check_folder, check_integer, check_number,
     check_output_prefix, check_outputs, check_pyrodigal, check_file_not_empty, check_file,
+    check_mmseqs_gpu_database,
 )
 from ..utils.errors import ExternalToolError, InputError, ValErrorCollector
 from ..utils.memory import GIB
@@ -88,6 +89,13 @@ def validate_aligner_name(name: str) -> AlignerName:
     return normalized
 
 
+def validate_aligner_options(args: AnnotationOptions) -> AlignerName:
+    aligner = validate_aligner_name(args.aligner)
+    if args.mmseqs.gpu and aligner != "mmseqs2":
+        raise InputError("--gpu requires --aligner mmseqs2.")
+    return aligner
+
+
 def validate_diamond(options: DiamondOptions) -> DiamondParameters:
     checks = ValErrorCollector()
     executable = checks.check(check_diamond, options.path_to_diamond)
@@ -106,13 +114,33 @@ def validate_mmseqs(options: MMseqsOptions) -> Path:
     if executable is None:
         raise ExternalToolError(
             "MMseqs2", "executable not found.",
-            hint="Supply --path-to-mmseqs. Or activate an environment containing MMseqs(2)",
+            hint=("Supply --path-to-mmseqs. When using --gpu the MMseqs2 must be a GPU enabled build"
+                  if options.gpu else
+                  "Supply --path-to-mmseqs. Or activate an environment containing MMseqs(2)"),
         )
 
     return Path(executable)
 
 
-def validate_database(folder: Path, *, require_diamond=False, require_mmseqs2=False) -> DatabaseFiles:
+def validate_mmseqs_database(folder: Path, gpu: bool = False) -> Path:
+    if gpu:
+        suffix = ".mmseqs2_gpu"
+        label = "MMseqs2 GPU database"
+    else:
+        suffix = ".mmseqs2"
+        label = "MMseqs2 database"
+    try:
+        database = check_db_file(folder, suffix, label)
+    except InputError as error:
+        if gpu:
+            error.hint = ("Prepare a GPU copy with --build-mmseqs2 --gpu "
+                          "using the same --common-prefix as the existing database.")
+        raise
+    return check_mmseqs_gpu_database(database) if gpu else database
+
+
+def validate_database(folder: Path, *, require_diamond=False, require_mmseqs2=False,
+                      gpu=False) -> DatabaseFiles:
     checks = ValErrorCollector()
     folder = checks.check(check_folder, folder, "Database folder")
 
@@ -125,7 +153,7 @@ def validate_database(folder: Path, *, require_diamond=False, require_mmseqs2=Fa
 
     mmseqs2 = None
     if require_mmseqs2:
-        mmseqs2 = checks.check(check_db_file, folder, ".mmseqs2", "MMseqs2 database")
+        mmseqs2 = checks.check(validate_mmseqs_database, folder, gpu=gpu)
 
     fastaid2LCA = checks.check(check_db_file, folder, "fastaid2LCAtaxid", "fastaid2LCAtaxid file")
     branches = checks.check(
@@ -239,6 +267,8 @@ def validate_prepare(args: PrepareOptions, files: PrepareOutputs | None = None) 
     taxonomy = checks.check(validate_taxonomy, args.names, args.nodes)
     acc2tax = checks.check(check_file_not_empty, args.acc2tax, "Accession-to-taxid file")
     files = files or get_file_names(args)
+    if args.gpu and not args.build_mmseqs2:
+        checks.add(InputError("--gpu requires --build-mmseqs2 when preparing a database."))
     threads = checks.check(check_integer, args.threads, "Threads", 1, sys.maxsize)
     if not files.prefix or files.prefix in {".", ".."} or any(c in files.prefix for c in '/\\:'):
         checks.add(InputError("The prefix contains directory separators",
@@ -247,7 +277,8 @@ def validate_prepare(args: PrepareOptions, files: PrepareOutputs | None = None) 
         checks.add(InputError("Database output location must be a directory.", path=files.data_folder))
     for output in (files.names, files.nodes, files.log_file, files.diamond_database,
                    files.mmseqs2_database, files.fastaid2LCAtaxid,
-                   files.taxids_with_multiple_offspring):
+                   files.taxids_with_multiple_offspring,
+                   *([files.mmseqs2_gpu_database] if args.gpu else [])):
         if output.exists() and not output.is_file():
             checks.add(InputError("Expected a file at the output location.", path=output))
 
@@ -257,7 +288,10 @@ def validate_prepare(args: PrepareOptions, files: PrepareOutputs | None = None) 
 
     # Keeps mmseq2 use optional
     mmseqs = None
-    if args.build_mmseqs2 and not files.mmseqs2_database.is_file():
+    if args.gpu and files.mmseqs2_gpu_database.is_file():
+        checks.check(check_mmseqs_gpu_database, files.mmseqs2_gpu_database)
+    if args.build_mmseqs2 and (not files.mmseqs2_database.is_file()
+                              or (args.gpu and not files.mmseqs2_gpu_database.is_file())):
         command = str(args.path_to_mmseqs.resolve()) if args.path_to_mmseqs else "mmseqs"
         found = shutil.which(command)
         if found is None:
@@ -313,6 +347,7 @@ def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | Non
     database = checks.check(
         validate_database, args.database,
         require_diamond=need_diamond_db, require_mmseqs2=need_mmseqs2_db,
+        gpu=args.mmseqs.gpu,
     )
 
     prefix = args.output_prefix
@@ -358,7 +393,7 @@ def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
     log.info(f"Validating classification arguments")
     classification = checks.check(validate_classification, args.range_, args.fraction, parser_settings)
     log.info(f"Validating alignment arguments")
-    aligner_name = checks.check(validate_aligner_name, args.aligner)
+    aligner_name = checks.check(validate_aligner_options, args)
     top = checks.check(check_integer, args.top, "top", 0, 100)
     log.info(f"Validating file arguments")
     files = checks.check(validate_cat_files, args, aligner_name)
@@ -398,6 +433,7 @@ def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
             split_memory_limit=args.mmseqs.split_memory_limit,
             top=top, compression=args.compress, verbose=execution.verbose,
             tiny_out=args.diamond.tiny_out,
+            gpu=args.mmseqs.gpu,
         )
 
     if isinstance(args, BatOptions):
@@ -522,7 +558,9 @@ def validate_rat_files(args: RatOptions) -> RatFiles:
         bin2classification=(args.bin2classification or Path(f"{prefix}.BAT.bin2classification.txt")) if "m" in args.mode.value else None,
         unmapped2classification=(args.unmapped2classification or Path(f"{prefix}.RAT.unmapped2classification.txt")) if direct else None,
         unclassified_fasta=Path(f"{prefix}.RAT.unclassified.fna") if direct else None,
-        alignment_unmapped=(args.alignment_unmapped or Path(f"{prefix}.RAT.unclassified.alignment.diamond")) if direct else None,
+        alignment_unmapped=(args.alignment_unmapped or Path(
+            f"{prefix}.RAT.unclassified.alignment.{args.aligner}"
+            f"{'.gz' if args.compress else ''}")) if direct else None,
         contig_abundance=Path(f"{prefix}.RAT.contig.abundance.txt"),
         complete_abundance=Path(f"{prefix}.RAT.complete.abundance.txt"),
         bin_abundance=Path(f"{prefix}.RAT.bin.reads.txt") if bins else None,
@@ -579,6 +617,7 @@ def make_bat_options(args: RatOptions) -> BatOptions:
 
 def validate_rat_args(args: RatOptions) -> RatSettings:
     checks = ValErrorCollector()
+    aligner_name = checks.check(validate_aligner_options, args)
     files = checks.check(validate_rat_files, args)
     execution = checks.check(validate_execution, args)
     log.info(f"Validating alignment parser settings")
@@ -605,10 +644,15 @@ def validate_rat_args(args: RatOptions) -> RatSettings:
 
     aligner = None
     if "r" in args.mode.value and args.alignment_unmapped is None and args.unmapped2classification is None:
-        diamond = checks.check(validate_diamond, args.diamond)
-        database = checks.check(
-            check_db_file, args.database, ".dmnd", "DIAMOND database",
-        )
+        diamond = None
+        mmseqs = None
+        database = None
+        if aligner_name == "diamond":
+            diamond = checks.check(validate_diamond, args.diamond)
+            database = checks.check(check_db_file, args.database, ".dmnd", "DIAMOND database")
+        elif aligner_name == "mmseqs2":
+            mmseqs = checks.check(validate_mmseqs, args.mmseqs)
+            database = checks.check(validate_mmseqs_database, args.database, gpu=args.mmseqs.gpu)
         top = checks.check(check_integer, args.top, "Top", 0, 100)
 
         if classification is not None and top is not None:
@@ -617,16 +661,26 @@ def validate_rat_args(args: RatOptions) -> RatSettings:
 
         #checks.finish before the aligner arguments are loaded t
         checks.finish()
-        aligner = DiamondSettings(
-            diamond=diamond.diamond, mode=diamond.mode,
-            no_self_hits=diamond.no_self_hits, block_size=diamond.block_size,
-            index_chunks=diamond.index_chunks, query=files.unclassified_fasta,
-            database=database, alignment=files.alignment_unmapped,
-            tmpdir=(args.tmpdir or args.output_prefix.parent)
-                   / f"{args.output_prefix.name}.RAT.tmp",
-            threads=execution.threads, top=top, compression=args.compress,
-            verbose=execution.verbose, blast_flavour="blastx", tiny_out=args.diamond.tiny_out,
-        )
+        tmpdir = (args.tmpdir or args.output_prefix.parent) / f"{args.output_prefix.name}.RAT.tmp"
+        if aligner_name == "mmseqs2":
+            aligner = MMseqsSettings(
+                mmseqs=mmseqs, query=files.unclassified_fasta, database=database,
+                alignment=files.alignment_unmapped, tmpdir=tmpdir,
+                threads=execution.threads, sensitivity=args.mmseqs.sensitivity,
+                split_memory_limit=args.mmseqs.split_memory_limit, top=top,
+                compression=args.compress, verbose=execution.verbose,
+                tiny_out=args.diamond.tiny_out, gpu=args.mmseqs.gpu,
+                search_type=2,
+            )
+        else:
+            aligner = DiamondSettings(
+                diamond=diamond.diamond, mode=diamond.mode,
+                no_self_hits=diamond.no_self_hits, block_size=diamond.block_size,
+                index_chunks=diamond.index_chunks, query=files.unclassified_fasta,
+                database=database, alignment=files.alignment_unmapped, tmpdir=tmpdir,
+                threads=execution.threads, top=top, compression=args.compress,
+                verbose=execution.verbose, blast_flavour="blastx", tiny_out=args.diamond.tiny_out,
+            )
     else:
         checks.finish()
 
