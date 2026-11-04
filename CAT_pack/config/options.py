@@ -120,7 +120,8 @@ class RatOptions(AnnotationOptions):
     read2classification: bool = False
     unmapped2classification: Path | None = None
     mapping_quality: int = 2
-    path_to_bwa: Path |str = 'bwa'
+    mapper: Literal["bwa", "bwa-mem2"] = "bwa"
+    path_to_bwa: Path | str | None = None
     path_to_samtools: Path | str = 'samtools'
     sort_memory_mib: int | None = None
 

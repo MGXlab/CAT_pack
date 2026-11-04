@@ -7,7 +7,7 @@ from CAT_pack.io.parsers import optionally_compressed_handle
 from . import tax
 from .config.settings import PrepareSettings
 from .tools.tool_runner import run_tool
-from .utils.check import check_mmseqs_gpu_database, check_outputs
+from .utils.check import check_outputs
 from .utils.errors import InputError
 from .utils.logging import Report, Status
 
