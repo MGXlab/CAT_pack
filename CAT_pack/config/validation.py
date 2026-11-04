@@ -617,6 +617,8 @@ def make_bat_options(args: RatOptions) -> BatOptions:
 
 def validate_rat_args(args: RatOptions) -> RatSettings:
     checks = ValErrorCollector()
+    if args.mapper not in {"bwa", "bwa-mem2"}:
+        checks.add(InputError("Mapper must be bwa or bwa-mem2."))
     aligner_name = checks.check(validate_aligner_options, args)
     files = checks.check(validate_rat_files, args)
     execution = checks.check(validate_execution, args)
@@ -626,9 +628,10 @@ def validate_rat_args(args: RatOptions) -> RatSettings:
     classification = checks.check(validate_classification, args.range_, args.fraction, parser_settings)
     bwa = None
     if args.read_file and not args.bam_file:
-        bwa = checks.check(shutil.which, str(args.path_to_bwa))
+        bwa = checks.check(shutil.which, str(args.path_to_bwa or args.mapper))
         if bwa is None:
-            checks.add(ExternalToolError("BWA","executable not found."))
+            checks.add(ExternalToolError("BWA-MEM2" if args.mapper == "bwa-mem2" else "BWA",
+                                         "executable not found.", hint="Supply --path_to_bwa."))
 
     samtools = checks.check(shutil.which, str(args.path_to_samtools))
     if samtools is None:
@@ -688,6 +691,7 @@ def validate_rat_args(args: RatOptions) -> RatSettings:
     return RatSettings(
         files=files, log_file=args.log_path,
         bwa=bwa, samtools=samtools,
+        mapper=args.mapper,
         sort_memory_mib=args.sort_memory_mib,
         threads=execution.threads, quiet=execution.quiet,
         verbose=execution.verbose, debug=execution.debug,

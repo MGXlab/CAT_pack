@@ -8,10 +8,12 @@ from CAT_pack.tools.tool_runner import run_tool, tool_output
 from CAT_pack.utils.errors import ExternalToolError
 
 
-def check_index(contigs_fasta: Path) -> bool:
+def check_index(contigs_fasta: Path, mapper: str = "bwa") -> bool:
+    suffixes = ((".0123", ".amb", ".ann", ".bwt.2bit.64", ".pac")
+                if mapper == "bwa-mem2" else (".amb", ".ann", ".bwt", ".pac", ".sa"))
     return all(
         Path(f"{contigs_fasta}{suffix}").is_file()
-        for suffix in (".amb", ".ann", ".bwt", ".pac", ".sa")
+        for suffix in suffixes
     )
 
 
@@ -19,34 +21,34 @@ def check_index(contigs_fasta: Path) -> bool:
 
 def run_bwa_mem(settings: RatSettings, report)-> None:
     files = settings.files
+    tool = "BWA-MEM2" if settings.mapper == "bwa-mem2" else "BWA MEM"
 
     log = logging.getLogger("CAT_pack")
     log.info(
-        "Running bwa mem for read mapping. File {0}.sorted will be "
-        "generated. Do not forget to cite bwa mem and Samtools when using "
-        "RAT in your publication!".format(files.mapping_sam))
+        "Running %s for read mapping. Output: %s. Please cite %s and SAMtools "
+        "when using RAT in your publication!", tool, files.bam_files[0], tool)
     with (
         tempfile.TemporaryDirectory(prefix="RAT-", dir=files.bam_files[0].parent) as tmp,
-        tool_output("BWA MEM") as bwa_output,
+        tool_output(tool) as bwa_output,
         tool_output("SAMtools") as samtools_output,
     ):
         try:
-            if check_index(files.contigs_fasta):
+            if check_index(files.contigs_fasta, settings.mapper):
                 log.info("Contigs FASTA is already indexed.")
             else:
                 log.info("Indexing contigs FASTA...")
                 run_tool([str(settings.bwa), "index", str(files.contigs_fasta)],
-                    "BWA MEM","index")
+                    tool,"index")
         except Exception as error:
             log.exception(error)
-            raise ExternalToolError("BWA MEM", "An error occured during indexing (or checking for indexing): {error}")
+            raise ExternalToolError(tool, f"Indexing failed: {error}") from error
 
         tmp = Path(tmp)
         tmp_bam_file = tmp / "sorted.bam"
         bwa_process = None
         samtools_process = None
         try:
-            log.info("Running bwa mem...")
+            log.info("Running %s...", tool)
 
             bwa_command = [
                 str(settings.bwa), "mem",
@@ -84,14 +86,14 @@ def run_bwa_mem(settings: RatSettings, report)-> None:
             bwa_status = bwa_process.wait()
 
             if bwa_status != 0:
-                raise ExternalToolError("BWA MEM", f"Mapping failed due to an unexpected error during bwa mem running. Error: {bwa_status}")
+                raise ExternalToolError(tool, f"Mapping failed with exit code {bwa_status}.")
             if samtool_status != 0:
                 raise ExternalToolError("Samtools", f"Mapping failed due to an unexpected error during samtools running. Error {samtool_status}")
 
             tmp_bam_file.replace(files.bam_files[0])
 
         except (OSError, subprocess.CalledProcessError) as error:
-            raise ExternalToolError("BWA MEM/SAMtools",
+            raise ExternalToolError(f"{tool}/SAMtools",
                 f"Mapping failed with error: {error}")
 
         finally:
