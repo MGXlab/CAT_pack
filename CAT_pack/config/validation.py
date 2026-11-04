@@ -41,11 +41,8 @@ def validate_execution(options: ExecutionOptions) -> ExecutionSettings:
         log.info("[red]Memory mode[/red]: automatic")
     return ExecutionSettings(options.threads, options.quiet, options.verbose, options.debug, memory=memory)
 
-def validate_parser(bit_score_column:int, tiny_out: bool) -> ParserSettings:
-    checks = ValErrorCollector()
-    if bit_score_column != AnnotationOptions.bit_score_column:
-        checks.add(InputError("You cannot supply a custom bit score column when not supplying a alignment file."))
-    if tiny_out:
+def validate_parser(bit_score_column: int, tiny_out: bool, supplied_alignment: bool = False) -> ParserSettings:
+    if tiny_out and not supplied_alignment:
         bit_score_column = ParserSettings.bit_score_column
     return ParserSettings(bit_score_column)
 
@@ -278,7 +275,8 @@ def validate_prepare(args: PrepareOptions, files: PrepareOutputs | None = None) 
     )
 
 
-def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | None) -> CatFiles | BatFiles:
+def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | None,
+                       reuse: CatFiles | None = None) -> CatFiles | BatFiles:
     checks = ValErrorCollector()
 
     is_bat = isinstance(args, BatOptions)
@@ -295,12 +293,15 @@ def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | Non
 
     proteins = None
     alignment = None
-    if args.proteins is not None:
+    if reuse is not None:
+        proteins = reuse.proteins_fasta
+        alignment = reuse.alignment
+    elif args.proteins is not None:
         proteins = checks.check(check_fasta_file, args.proteins, "Protein file")
     elif args.alignment is None:
         checks.check(check_pyrodigal)
 
-    if args.alignment is not None:
+    if reuse is None and args.alignment is not None:
         alignment = checks.check(check_file_not_empty, args.alignment, "Alignment file")
         if args.proteins is None:
             checks.add(InputError(
@@ -308,8 +309,8 @@ def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | Non
                 hint="use --proteins_fasta together with --alignment_table",
             ))
 
-    need_diamond_db = args.alignment is None and aligner == "diamond"
-    need_mmseqs2_db = args.alignment is None and aligner == "mmseqs2"
+    need_diamond_db = reuse is None and args.alignment is None and aligner == "diamond"
+    need_mmseqs2_db = reuse is None and args.alignment is None and aligner == "mmseqs2"
     database = checks.check(
         validate_database, args.database,
         require_diamond=need_diamond_db, require_mmseqs2=need_mmseqs2_db,
@@ -323,11 +324,11 @@ def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | Non
     outputs = [orf_report, report]
     proteins_gff = None
     intermediate_prefix = f"{prefix}.concatenated" if is_bat else str(prefix)
-    if args.proteins is None:
+    if reuse is None and args.proteins is None:
         proteins = Path(f"{intermediate_prefix}.predicted_proteins.faa")
         proteins_gff = Path(f"{intermediate_prefix}.predicted_proteins.gff")
         outputs.extend((proteins, proteins_gff))
-    if args.alignment is None:
+    if reuse is None and args.alignment is None:
         suffix = ".gz" if args.compress else ""
         alignment = Path(f"{intermediate_prefix}.alignment.{aligner or args.aligner}{suffix}")
         outputs.append(alignment)
@@ -349,24 +350,26 @@ def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | Non
     )
 
 
-def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
+def validate_cat(args: CatOptions | BatOptions, *, reuse: CatSettings | None = None) -> CatSettings | BatSettings:
     checks = ValErrorCollector()
     log.info(f"Validating execution arguments")
     execution = checks.check(validate_execution, args)
     log.info(f"Validating alignment parser settings")
-    parser_settings = checks.check(validate_parser, args.bit_score_column, args.diamond.tiny_out)
+    parser_settings = (reuse.alignment_parsing if reuse is not None else
+                       checks.check(validate_parser, args.bit_score_column, args.diamond.tiny_out,
+                                    args.alignment is not None))
     log.info(f"Validating classification arguments")
     classification = checks.check(validate_classification, args.range_, args.fraction, parser_settings)
     log.info(f"Validating alignment arguments")
     aligner_name = checks.check(validate_aligner_name, args.aligner)
     top = checks.check(check_integer, args.top, "top", 0, 100)
     log.info(f"Validating file arguments")
-    files = checks.check(validate_cat_files, args, aligner_name)
+    files = checks.check(validate_cat_files, args, aligner_name, reuse.files if reuse is not None else None)
 
     tmpdir = args.tmpdir if args.tmpdir is not None else args.output_prefix.parent / "tmp"
     diamond = None
     mmseqs = None
-    if args.alignment is None:
+    if reuse is None and args.alignment is None:
         if classification is not None and top is not None and top <= classification.range_:
             checks.add(InputError("Top must be higher than range."))
         if aligner_name == "diamond":
@@ -380,7 +383,7 @@ def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
     checks.finish()
 
     aligner = None
-    if args.alignment is None and aligner_name == "diamond":
+    if reuse is None and args.alignment is None and aligner_name == "diamond":
         aligner = DiamondSettings(
             diamond=diamond.diamond, mode=diamond.mode, no_self_hits=diamond.no_self_hits,
             block_size=diamond.block_size, index_chunks=diamond.index_chunks,
@@ -389,7 +392,7 @@ def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
             top=top, compression=args.compress, verbose=execution.verbose,
             tiny_out=args.diamond.tiny_out,
         )
-    elif args.alignment is None and aligner_name == "mmseqs2":
+    elif reuse is None and args.alignment is None and aligner_name == "mmseqs2":
         aligner = MMseqsSettings(
             mmseqs=mmseqs, query=files.proteins_fasta,
             database=files.mmseqs2_database, alignment=files.alignment,
@@ -490,6 +493,9 @@ def validate_rat_files(args: RatOptions) -> RatFiles:
                     checks.check(check_fasta_file, path, "Bin FASTA")
                 bins = checks.check(parser.parse, paths)
     direct = "r" in args.mode.value
+    if direct and args.alignment_unmapped is None and args.unmapped2classification is None and not args.read_file:
+        checks.add(InputError("Original read files are required for a fresh direct search.",
+                              hint="Supply --read-file, or reuse --alignment_unmapped or --u2c."))
 
     fastaid2LCA = None
     taxids_with_multiple_offspring = None
@@ -582,7 +588,8 @@ def validate_rat_args(args: RatOptions) -> RatSettings:
     files = checks.check(validate_rat_files, args)
     execution = checks.check(validate_execution, args)
     log.info(f"Validating alignment parser settings")
-    parser_settings = checks.check(validate_parser, args.bit_score_column, args.diamond.tiny_out)
+    parser_settings = checks.check(validate_parser, args.bit_score_column, args.diamond.tiny_out,
+                                   args.alignment_unmapped is not None)
     log.info(f"Validating classification arguments")
     classification = checks.check(validate_classification, args.range_, args.fraction, parser_settings)
     bwa = None
@@ -601,7 +608,7 @@ def validate_rat_args(args: RatOptions) -> RatSettings:
 
     bat_settings = None
     if "m" in args.mode.value and args.bin2classification is None:
-        bat_settings = checks.check(validate_cat, make_bat_options(args))
+        bat_settings = checks.check(validate_cat, make_bat_options(args), reuse=cat_settings)
 
     aligner = None
     if "r" in args.mode.value and args.alignment_unmapped is None and args.unmapped2classification is None:

@@ -18,6 +18,8 @@ _hit_mask = 0
 
 # DEVNOTE: Multiple fastaid2LCAtaxid files? Could speed up parallel loading
 def read_fastaid2LCAtaxid(fastaid2LCAtaxid_file: Path, all_hits: set[str], workers: int = 1) -> dict[str, str]:
+    if not all_hits:
+        return {}
     log.info(f"Loading file {fastaid2LCAtaxid_file}.")
     workers = min(workers, MAX_WORKERS)
     if workers == 1 or fastaid2LCAtaxid_file.stat().st_size < MIN_TO_RUN_PARALLEL:
