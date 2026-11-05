@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import shlex
+import shutil
 import sys
 from decimal import Decimal
 from importlib.metadata import metadata
@@ -182,16 +183,16 @@ def prepare(
                         "database and taxonomy files will be created", metavar="<DIR>")],
         path_to_diamond: DiamondPathOption = PrepareOptions.path_to_diamond,
         common_prefix: Annotated[str | None, Option(
-                "--common-prefix",
+                "--common_prefix",
                 help="Prefix for all files that will be created",
                 show_default="<date>_CAT_pack",
             ),] = PrepareOptions.common_prefix,
-        build_mmseqs2: Annotated[bool, Option("--build-mmseqs2",
+        build_mmseqs2: Annotated[bool, Option("--build_mmseqs2",
                     help="Also create an MMseqs2 sequence database.")] = PrepareOptions.build_mmseqs2,
         gpu: Annotated[bool, Option("--gpu",
-                    help="Also prepare a GPU MMseqs2 database. Requires --build-mmseqs2.")] = PrepareOptions.gpu,
-        path_to_mmseqs: Annotated[Path | None, Option("--path-to-mmseqs",
-                    help="Path to MMseqs2, used with --build-mmseqs2.")] = PrepareOptions.path_to_mmseqs,
+                    help="Also prepare a GPU MMseqs2 database. Requires --build_mmseqs2.")] = PrepareOptions.gpu,
+        path_to_mmseqs: Annotated[Path | None, Option("--path_to_mmseqs",
+                    help="Path to MMseqs2, used with --build_mmseqs2.")] = PrepareOptions.path_to_mmseqs,
         *, execution: ExecutionOptions,
 
 ):
@@ -268,6 +269,10 @@ def cat(
                    help="Directory that contains database and taxonomy files",
                    metavar="<directory>")
         ],
+        taxonomy: Annotated[Path | None, Option(
+            "-t", exists=True, file_okay=False, metavar="<DIR>",
+            help="Legacy taxonomy directory. Offer to move names.dmp and nodes.dmp into --database.",
+        )] = None,
         range_: Annotated[
             float,
             Option("--range", "-r", min=0.0, max=100,
@@ -334,6 +339,26 @@ def cat(
         mmseqs: MMseqsOptions,
         memory: MemoryOptions,
 ):
+
+    if taxonomy is not None and taxonomy.resolve() != database.resolve():
+        if not database.is_dir():
+            raise typer.BadParameter("Database directory does not exist.", param_hint="-d")
+        files = [(taxonomy / name, database / name) for name in ("names.dmp", "nodes.dmp")]
+        for source, destination in files:
+            if not source.is_file():
+                raise typer.BadParameter(f"Taxonomy file not found: {source}", param_hint="-t")
+            if destination.exists() or destination.is_symlink():
+                raise typer.BadParameter(f"Will not overwrite existing file: {destination}", param_hint="-t")
+        if not typer.confirm(
+            f"-t is no longer needed. Move names.dmp and nodes.dmp from '{taxonomy}' into '{database}'?",
+            default=False,
+        ):
+            raise typer.Exit()
+        try:
+            for source, destination in files:
+                shutil.move(str(source), str(destination))
+        except OSError as error:
+            raise typer.BadParameter(f"Could not move taxonomy files: {error}", param_hint="-t") from error
 
     arguments = CatOptions(
         contigs=contigs,

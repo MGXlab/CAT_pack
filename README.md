@@ -40,6 +40,8 @@ To cite the code itself:
 ![PyPI Version](https://img.shields.io/pypi/v/cat-pack)
 ![Conda Version](https://img.shields.io/conda/vn/bioconda/cat)
 ![Conda Downloads](https://img.shields.io/conda/dn/bioconda/cat?label=BioConda%20Downloads)
+![GitHub License](https://img.shields.io/github/license/MGXlab/CAT_pack?color=blue)
+
 ## Dependencies and where to get them
 * Python >=3.11, https://www.python.org/.
 

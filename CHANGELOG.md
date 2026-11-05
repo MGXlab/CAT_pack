@@ -1,5 +1,16 @@
 # Changelog
 
+## 7.0.0 [beta20261109]
+* CAT, BAT, and RAT have been rewritten with an object-oriented approach.
+* CAT pack can now be installed as a Python package with `pip install cat-pack`. Python 3.11 or newer is required.
+* New CL: run `CAT_pack cat`, `CAT_pack bat`, or `CAT_pack rat`, with progress bars for individual steps.
+* Configurable memory budgets for batched gene prediction through `--low-memory`, and `--available-memory`.
+* MMseqs2 support added for RAT and GPU support on Linux with `--gpu`.
+* Compact three-column alignment output is now the default. Use `--blast6_out` for the default BLAST6 output or `--bit_score_column` when importing custom alignment table layouts.
+* Database and taxonomy files are now stored together in one directory, supplied with `-d`. The separate `-t` argument is deprecated.
+* RAT supports BWA-MEM2 as an alternative read mapper with `--mapper bwa-mem2`. Read mapping is piped directly into SAMtools sorting, with added memory control with the `--sort-memory-mib` flag.
+* File locking for downloads, database preparation, and classification runs prevents concurrent runs from writing to the same output locations.
+
 ## 6.1 [beta20251020]
 * Pyrodigal support enables multi-threading of gene predictions.
 * MMseqs2 support as speedier? alternative for DIAMOND.
