@@ -7,10 +7,10 @@ from decimal import Decimal
 from pathlib import Path
 
 from .options import AlignerName, BatOptions, CatOptions, ExecutionOptions, DiamondOptions, PrepareOptions, \
-    MemoryOptions, DownloadOptions, RatOptions, AnnotationOptions, AddNamesOptions, SummariseOptions
+    MemoryOptions, DownloadOptions, RatOptions, AnnotationOptions, AddNamesOptions, SummariseOptions, MMseqsOptions
 from .settings import (
     BatFiles, BatSettings, CatFiles, CatSettings, ClassificationSettings, DatabaseFiles, DiamondParameters,
-    DiamondPrepareSettings, DiamondSettings, ExecutionSettings, MMseqsPrepareSettings,
+    DiamondPrepareSettings, DiamondSettings, ExecutionSettings, MMseqsPrepareSettings, MMseqsSettings,
     PrepareOutputs, PrepareSettings, TaxonomyFiles, MemorySettings,
     DownloadFile, DownloadOutputs, DownloadSettings, NRUrls, GTDBUrls, GTDBDownloadOutputs, RatFiles, RatSettings,
     AddNamesSettings, AddNamesFiles, ParserSettings, SummariseSettings, SummariseFiles,
@@ -19,6 +19,7 @@ from ..io.parsers import BinParser
 from ..utils.check import (
     check_db_file, check_diamond, check_fasta_file, check_folder, check_integer, check_number,
     check_output_prefix, check_outputs, check_pyrodigal, check_file_not_empty, check_file,
+    check_mmseqs_gpu_database,
 )
 from ..utils.errors import ExternalToolError, InputError, ValErrorCollector
 from ..utils.memory import GIB
@@ -41,11 +42,8 @@ def validate_execution(options: ExecutionOptions) -> ExecutionSettings:
         log.info("[red]Memory mode[/red]: automatic")
     return ExecutionSettings(options.threads, options.quiet, options.verbose, options.debug, memory=memory)
 
-def validate_parser(bit_score_column:int, tiny_out: bool) -> ParserSettings:
-    checks = ValErrorCollector()
-    if bit_score_column != AnnotationOptions.bit_score_column:
-        checks.add(InputError("You cannot supply a custom bit score column when not supplying a alignment file."))
-    if tiny_out:
+def validate_parser(bit_score_column: int, tiny_out: bool, supplied_alignment: bool = False) -> ParserSettings:
+    if tiny_out and not supplied_alignment:
         bit_score_column = ParserSettings.bit_score_column
     return ParserSettings(bit_score_column)
 
@@ -88,6 +86,13 @@ def validate_aligner_name(name: str) -> AlignerName:
     return normalized
 
 
+def validate_aligner_options(args: AnnotationOptions) -> AlignerName:
+    aligner = validate_aligner_name(args.aligner)
+    if args.mmseqs.gpu and aligner != "mmseqs2":
+        raise InputError("--gpu requires --aligner mmseqs2.")
+    return aligner
+
+
 def validate_diamond(options: DiamondOptions) -> DiamondParameters:
     checks = ValErrorCollector()
     executable = checks.check(check_diamond, options.path_to_diamond)
@@ -99,8 +104,40 @@ def validate_diamond(options: DiamondOptions) -> DiamondParameters:
         options.block_size, options.index_chunks,
     )
 
+def validate_mmseqs(options: MMseqsOptions) -> Path:
+    command = str(options.executable.resolve()) if options.executable else "mmseqs"
+    executable = shutil.which(command)
 
-def validate_database(folder: Path, *, require_diamond=False) -> DatabaseFiles:
+    if executable is None:
+        raise ExternalToolError(
+            "MMseqs2", "executable not found.",
+            hint=("Supply --path-to-mmseqs. When using --gpu the MMseqs2 must be a GPU enabled build"
+                  if options.gpu else
+                  "Supply --path-to-mmseqs. Or activate an environment containing MMseqs(2)"),
+        )
+
+    return Path(executable)
+
+
+def validate_mmseqs_database(folder: Path, gpu: bool = False) -> Path:
+    if gpu:
+        suffix = ".mmseqs2_gpu"
+        label = "MMseqs2 GPU database"
+    else:
+        suffix = ".mmseqs2"
+        label = "MMseqs2 database"
+    try:
+        database = check_db_file(folder, suffix, label)
+    except InputError as error:
+        if gpu:
+            error.hint = ("Prepare a GPU copy with --build-mmseqs2 --gpu "
+                          "using the same --common-prefix as the existing database.")
+        raise
+    return check_mmseqs_gpu_database(database) if gpu else database
+
+
+def validate_database(folder: Path, *, require_diamond=False, require_mmseqs2=False,
+                      gpu=False) -> DatabaseFiles:
     checks = ValErrorCollector()
     folder = checks.check(check_folder, folder, "Database folder")
 
@@ -111,6 +148,10 @@ def validate_database(folder: Path, *, require_diamond=False) -> DatabaseFiles:
     if require_diamond:
         diamond = checks.check(check_db_file, folder, ".dmnd", "DIAMOND database")
 
+    mmseqs2 = None
+    if require_mmseqs2:
+        mmseqs2 = checks.check(validate_mmseqs_database, folder, gpu=gpu)
+
     fastaid2LCA = checks.check(check_db_file, folder, "fastaid2LCAtaxid", "fastaid2LCAtaxid file")
     branches = checks.check(
         check_db_file, folder, "taxids_with_multiple_offspring",
@@ -120,7 +161,7 @@ def validate_database(folder: Path, *, require_diamond=False) -> DatabaseFiles:
     checks.finish()
     return DatabaseFiles(
         fastaid2LCA=fastaid2LCA, branches=branches, diamond=diamond,
-        names=taxonomy.names, nodes=taxonomy.nodes,
+        mmseqs2=mmseqs2, names=taxonomy.names, nodes=taxonomy.nodes,
     )
 
 # the replace(args) makes sure that if the run is started just before midnight
@@ -223,6 +264,8 @@ def validate_prepare(args: PrepareOptions, files: PrepareOutputs | None = None) 
     taxonomy = checks.check(validate_taxonomy, args.names, args.nodes)
     acc2tax = checks.check(check_file_not_empty, args.acc2tax, "Accession-to-taxid file")
     files = files or get_file_names(args)
+    if args.gpu and not args.build_mmseqs2:
+        checks.add(InputError("--gpu requires --build-mmseqs2 when preparing a database."))
     threads = checks.check(check_integer, args.threads, "Threads", 1, sys.maxsize)
     if not files.prefix or files.prefix in {".", ".."} or any(c in files.prefix for c in '/\\:'):
         checks.add(InputError("The prefix contains directory separators",
@@ -231,7 +274,8 @@ def validate_prepare(args: PrepareOptions, files: PrepareOutputs | None = None) 
         checks.add(InputError("Database output location must be a directory.", path=files.data_folder))
     for output in (files.names, files.nodes, files.log_file, files.diamond_database,
                    files.mmseqs2_database, files.fastaid2LCAtaxid,
-                   files.taxids_with_multiple_offspring):
+                   files.taxids_with_multiple_offspring,
+                   *([files.mmseqs2_gpu_database] if args.gpu else [])):
         if output.exists() and not output.is_file():
             checks.add(InputError("Expected a file at the output location.", path=output))
 
@@ -241,7 +285,10 @@ def validate_prepare(args: PrepareOptions, files: PrepareOutputs | None = None) 
 
     # Keeps mmseq2 use optional
     mmseqs = None
-    if args.build_mmseqs2 and not files.mmseqs2_database.is_file():
+    if args.gpu and files.mmseqs2_gpu_database.is_file():
+        checks.check(check_mmseqs_gpu_database, files.mmseqs2_gpu_database)
+    if args.build_mmseqs2 and (not files.mmseqs2_database.is_file()
+                              or (args.gpu and not files.mmseqs2_gpu_database.is_file())):
         command = str(args.path_to_mmseqs.resolve()) if args.path_to_mmseqs else "mmseqs"
         found = shutil.which(command)
         if found is None:
@@ -262,7 +309,8 @@ def validate_prepare(args: PrepareOptions, files: PrepareOutputs | None = None) 
     )
 
 
-def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | None) -> CatFiles | BatFiles:
+def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | None,
+                       reuse: CatFiles | None = None) -> CatFiles | BatFiles:
     checks = ValErrorCollector()
 
     is_bat = isinstance(args, BatOptions)
@@ -279,12 +327,15 @@ def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | Non
 
     proteins = None
     alignment = None
-    if args.proteins is not None:
+    if reuse is not None:
+        proteins = reuse.proteins_fasta
+        alignment = reuse.alignment
+    elif args.proteins is not None:
         proteins = checks.check(check_fasta_file, args.proteins, "Protein file")
     elif args.alignment is None:
         checks.check(check_pyrodigal)
 
-    if args.alignment is not None:
+    if reuse is None and args.alignment is not None:
         alignment = checks.check(check_file_not_empty, args.alignment, "Alignment file")
         if args.proteins is None:
             checks.add(InputError(
@@ -292,8 +343,13 @@ def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | Non
                 hint="use --proteins_fasta together with --alignment_table",
             ))
 
-    need_diamond_db = args.alignment is None and aligner == "diamond"
-    database = checks.check(validate_database, args.database, require_diamond=need_diamond_db)
+    need_diamond_db = reuse is None and args.alignment is None and aligner == "diamond"
+    need_mmseqs2_db = reuse is None and args.alignment is None and aligner == "mmseqs2"
+    database = checks.check(
+        validate_database, args.database,
+        require_diamond=need_diamond_db, require_mmseqs2=need_mmseqs2_db,
+        gpu=args.mmseqs.gpu,
+    )
 
     prefix = args.output_prefix
     checks.check(check_output_prefix, prefix)
@@ -303,11 +359,11 @@ def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | Non
     outputs = [orf_report, report]
     proteins_gff = None
     intermediate_prefix = f"{prefix}.concatenated" if is_bat else str(prefix)
-    if args.proteins is None:
+    if reuse is None and args.proteins is None:
         proteins = Path(f"{intermediate_prefix}.predicted_proteins.faa")
         proteins_gff = Path(f"{intermediate_prefix}.predicted_proteins.gff")
         outputs.extend((proteins, proteins_gff))
-    if args.alignment is None:
+    if reuse is None and args.alignment is None:
         suffix = ".gz" if args.compress else ""
         alignment = Path(f"{intermediate_prefix}.alignment.{aligner or args.aligner}{suffix}")
         outputs.append(alignment)
@@ -325,48 +381,62 @@ def validate_cat_files(args: CatOptions | BatOptions, aligner: AlignerName | Non
         names=database.names, nodes=database.nodes,
         orf_report=orf_report, report=report,
         **report_fields, diamond_database=database.diamond,
+        mmseqs2_database=database.mmseqs2,
     )
 
 
-def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
+def validate_cat(args: CatOptions | BatOptions, *, reuse: CatSettings | None = None) -> CatSettings | BatSettings:
     checks = ValErrorCollector()
     log.info(f"Validating execution arguments")
     execution = checks.check(validate_execution, args)
     log.info(f"Validating alignment parser settings")
-    parser_settings = checks.check(validate_parser, args.bit_score_column, args.diamond.tiny_out)
+    parser_settings = (reuse.alignment_parsing if reuse is not None else
+                       checks.check(validate_parser, args.bit_score_column, args.diamond.tiny_out,
+                                    args.alignment is not None))
     log.info(f"Validating classification arguments")
     classification = checks.check(validate_classification, args.range_, args.fraction, parser_settings)
     log.info(f"Validating alignment arguments")
-    aligner_name = checks.check(validate_aligner_name, args.aligner)
+    aligner_name = checks.check(validate_aligner_options, args)
     top = checks.check(check_integer, args.top, "top", 0, 100)
     log.info(f"Validating file arguments")
-    files = checks.check(validate_cat_files, args, aligner_name)
+    files = checks.check(validate_cat_files, args, aligner_name, reuse.files if reuse is not None else None)
 
     tmpdir = args.tmpdir if args.tmpdir is not None else args.output_prefix.parent / "tmp"
     diamond = None
-    if args.alignment is None:
+    mmseqs = None
+    if reuse is None and args.alignment is None:
+        if classification is not None and top is not None and top <= classification.range_:
+            checks.add(InputError("Top must be higher than range."))
         if aligner_name == "diamond":
             log.debug(f"Using diamond")
             log.info(f"Validating diamond arguments")
             diamond = checks.check(validate_diamond, args.diamond)
-            if classification is not None and top is not None and top <= classification.range_:
-                checks.add(InputError("Top must be higher than range."))
         elif aligner_name == "mmseqs2":
             log.debug(f"Using mmseqs2")
-            checks.add(InputError(
-                "MMseqs2 execution is not implemented yet.",
-                hint="Use --aligner diamond or supply an existing alignment and proteins.",
-            )) # TODO: Implement MMseqs2?
+            log.info("Validating mmseqs2 arguments")
+            mmseqs = checks.check(validate_mmseqs, args.mmseqs)
     checks.finish()
 
     aligner = None
-    if args.alignment is None:
+    if reuse is None and args.alignment is None and aligner_name == "diamond":
         aligner = DiamondSettings(
             diamond=diamond.diamond, mode=diamond.mode, no_self_hits=diamond.no_self_hits,
             block_size=diamond.block_size, index_chunks=diamond.index_chunks,
             query=files.proteins_fasta, database=files.diamond_database,
             alignment=files.alignment, tmpdir=tmpdir, threads=execution.threads,
-            top=top, compression=args.compress, verbose=execution.verbose
+            top=top, compression=args.compress, verbose=execution.verbose,
+            tiny_out=args.diamond.tiny_out,
+        )
+    elif reuse is None and args.alignment is None and aligner_name == "mmseqs2":
+        aligner = MMseqsSettings(
+            mmseqs=mmseqs, query=files.proteins_fasta,
+            database=files.mmseqs2_database, alignment=files.alignment,
+            tmpdir=tmpdir, threads=execution.threads,
+            sensitivity=args.mmseqs.sensitivity,
+            split_memory_limit=args.mmseqs.split_memory_limit,
+            top=top, compression=args.compress, verbose=execution.verbose,
+            tiny_out=args.diamond.tiny_out,
+            gpu=args.mmseqs.gpu,
         )
 
     if isinstance(args, BatOptions):
@@ -377,6 +447,7 @@ def validate_cat(args: CatOptions | BatOptions) -> CatSettings | BatSettings:
             memory=execution.memory,
             range_=classification.range_, fraction=classification.fraction,
             log_file=args.log_path, no_stars=args.no_stars,
+            alignment_parsing=classification.alignment_parsing,
         )
     elif isinstance(args, CatOptions):
         return CatSettings(
@@ -458,6 +529,9 @@ def validate_rat_files(args: RatOptions) -> RatFiles:
                     checks.check(check_fasta_file, path, "Bin FASTA")
                 bins = checks.check(parser.parse, paths)
     direct = "r" in args.mode.value
+    if direct and args.alignment_unmapped is None and args.unmapped2classification is None and not args.read_file:
+        checks.add(InputError("Original read files are required for a fresh direct search.",
+                              hint="Supply --read-file, or reuse --alignment_unmapped or --u2c."))
 
     fastaid2LCA = None
     taxids_with_multiple_offspring = None
@@ -490,7 +564,9 @@ def validate_rat_files(args: RatOptions) -> RatFiles:
         bin2classification=(args.bin2classification or Path(f"{prefix}.BAT.bin2classification.txt")) if "m" in args.mode.value else None,
         unmapped2classification=(args.unmapped2classification or Path(f"{prefix}.RAT.unmapped2classification.txt")) if direct else None,
         unclassified_fasta=Path(f"{prefix}.RAT.unclassified.fna") if direct else None,
-        alignment_unmapped=(args.alignment_unmapped or Path(f"{prefix}.RAT.unclassified.alignment.diamond")) if direct else None,
+        alignment_unmapped=(args.alignment_unmapped or Path(
+            f"{prefix}.RAT.unclassified.alignment.{args.aligner}"
+            f"{'.gz' if args.compress else ''}")) if direct else None,
         contig_abundance=Path(f"{prefix}.RAT.contig.abundance.txt"),
         complete_abundance=Path(f"{prefix}.RAT.complete.abundance.txt"),
         bin_abundance=Path(f"{prefix}.RAT.bin.reads.txt") if bins else None,
@@ -547,17 +623,22 @@ def make_bat_options(args: RatOptions) -> BatOptions:
 
 def validate_rat_args(args: RatOptions) -> RatSettings:
     checks = ValErrorCollector()
+    if args.mapper not in {"bwa", "bwa-mem2"}:
+        checks.add(InputError("Mapper must be bwa or bwa-mem2."))
+    aligner_name = checks.check(validate_aligner_options, args)
     files = checks.check(validate_rat_files, args)
     execution = checks.check(validate_execution, args)
     log.info(f"Validating alignment parser settings")
-    parser_settings = checks.check(validate_parser, args.bit_score_column, args.diamond.tiny_out)
+    parser_settings = checks.check(validate_parser, args.bit_score_column, args.diamond.tiny_out,
+                                   args.alignment_unmapped is not None)
     log.info(f"Validating classification arguments")
     classification = checks.check(validate_classification, args.range_, args.fraction, parser_settings)
     bwa = None
     if args.read_file and not args.bam_file:
-        bwa = checks.check(shutil.which, str(args.path_to_bwa))
+        bwa = checks.check(shutil.which, str(args.path_to_bwa or args.mapper))
         if bwa is None:
-            checks.add(ExternalToolError("BWA","executable not found."))
+            checks.add(ExternalToolError("BWA-MEM2" if args.mapper == "bwa-mem2" else "BWA",
+                                         "executable not found.", hint="Supply --path_to_bwa."))
 
     samtools = checks.check(shutil.which, str(args.path_to_samtools))
     if samtools is None:
@@ -569,14 +650,19 @@ def validate_rat_args(args: RatOptions) -> RatSettings:
 
     bat_settings = None
     if "m" in args.mode.value and args.bin2classification is None:
-        bat_settings = checks.check(validate_cat, make_bat_options(args))
+        bat_settings = checks.check(validate_cat, make_bat_options(args), reuse=cat_settings)
 
     aligner = None
     if "r" in args.mode.value and args.alignment_unmapped is None and args.unmapped2classification is None:
-        diamond = checks.check(validate_diamond, args.diamond)
-        database = checks.check(
-            check_db_file, args.database, ".dmnd", "DIAMOND database",
-        )
+        diamond = None
+        mmseqs = None
+        database = None
+        if aligner_name == "diamond":
+            diamond = checks.check(validate_diamond, args.diamond)
+            database = checks.check(check_db_file, args.database, ".dmnd", "DIAMOND database")
+        elif aligner_name == "mmseqs2":
+            mmseqs = checks.check(validate_mmseqs, args.mmseqs)
+            database = checks.check(validate_mmseqs_database, args.database, gpu=args.mmseqs.gpu)
         top = checks.check(check_integer, args.top, "Top", 0, 100)
 
         if classification is not None and top is not None:
@@ -585,16 +671,26 @@ def validate_rat_args(args: RatOptions) -> RatSettings:
 
         #checks.finish before the aligner arguments are loaded t
         checks.finish()
-        aligner = DiamondSettings(
-            diamond=diamond.diamond, mode=diamond.mode,
-            no_self_hits=diamond.no_self_hits, block_size=diamond.block_size,
-            index_chunks=diamond.index_chunks, query=files.unclassified_fasta,
-            database=database, alignment=files.alignment_unmapped,
-            tmpdir=(args.tmpdir or args.output_prefix.parent)
-                   / f"{args.output_prefix.name}.RAT.tmp",
-            threads=execution.threads, top=top, compression=args.compress,
-            verbose=execution.verbose, blast_flavour="blastx", tiny_out=True,
-        )
+        tmpdir = (args.tmpdir or args.output_prefix.parent) / f"{args.output_prefix.name}.RAT.tmp"
+        if aligner_name == "mmseqs2":
+            aligner = MMseqsSettings(
+                mmseqs=mmseqs, query=files.unclassified_fasta, database=database,
+                alignment=files.alignment_unmapped, tmpdir=tmpdir,
+                threads=execution.threads, sensitivity=args.mmseqs.sensitivity,
+                split_memory_limit=args.mmseqs.split_memory_limit, top=top,
+                compression=args.compress, verbose=execution.verbose,
+                tiny_out=args.diamond.tiny_out, gpu=args.mmseqs.gpu,
+                search_type=2,
+            )
+        else:
+            aligner = DiamondSettings(
+                diamond=diamond.diamond, mode=diamond.mode,
+                no_self_hits=diamond.no_self_hits, block_size=diamond.block_size,
+                index_chunks=diamond.index_chunks, query=files.unclassified_fasta,
+                database=database, alignment=files.alignment_unmapped, tmpdir=tmpdir,
+                threads=execution.threads, top=top, compression=args.compress,
+                verbose=execution.verbose, blast_flavour="blastx", tiny_out=args.diamond.tiny_out,
+            )
     else:
         checks.finish()
 
@@ -602,13 +698,14 @@ def validate_rat_args(args: RatOptions) -> RatSettings:
     return RatSettings(
         files=files, log_file=args.log_path,
         bwa=bwa, samtools=samtools,
+        mapper=args.mapper,
         sort_memory_mib=args.sort_memory_mib,
         threads=execution.threads, quiet=execution.quiet,
         verbose=execution.verbose, debug=execution.debug,
         memory=execution.memory, cat=cat_settings, bat=bat_settings,
         mapping_quality=args.mapping_quality, aligner=aligner,
         range_=classification.range_, fraction=classification.fraction,
-        no_stars=args.no_stars
+        no_stars=args.no_stars, alignment_parsing=classification.alignment_parsing,
     )
 
 

@@ -188,6 +188,8 @@ def prepare(
             ),] = PrepareOptions.common_prefix,
         build_mmseqs2: Annotated[bool, Option("--build-mmseqs2",
                     help="Also create an MMseqs2 sequence database.")] = PrepareOptions.build_mmseqs2,
+        gpu: Annotated[bool, Option("--gpu",
+                    help="Also prepare a GPU MMseqs2 database. Requires --build-mmseqs2.")] = PrepareOptions.gpu,
         path_to_mmseqs: Annotated[Path | None, Option("--path-to-mmseqs",
                     help="Path to MMseqs2, used with --build-mmseqs2.")] = PrepareOptions.path_to_mmseqs,
         *, execution: ExecutionOptions,
@@ -202,6 +204,7 @@ def prepare(
         path_to_diamond=path_to_diamond,
         common_prefix=common_prefix,
         build_mmseqs2=build_mmseqs2,
+        gpu=gpu,
         path_to_mmseqs=path_to_mmseqs,
         threads=execution.threads,
         quiet=execution.quiet,
@@ -238,6 +241,8 @@ def prepare(
             table.add_row(label, str(path))
         if args.build_mmseqs2:
             table.add_row("MMseqs2", str(files.mmseqs2_database))
+        if args.gpu:
+            table.add_row("MMseqs2 GPU", str(files.mmseqs2_gpu_database))
         console.print(table)
         console.print(f"Use -d {files.data_folder} with CAT_pack7 CAT or BAT.")
 
@@ -634,9 +639,10 @@ def rat(contigs_fasta: Annotated[
         no_stars: Annotated[bool, Option("--no-stars", "--no_stars")] = RatOptions.no_stars,
         log_file: Annotated[Path | None, Option("--log-file")] = RatOptions.log_file,
         aligner: Annotated[str, Option("--aligner", help="Protein aligner; direct nucleotide searches require DIAMOND.")] = RatOptions.aligner,
-        # TODO: Look into the use of bwa mem 2 as well
+        mapper: Annotated[str, Option("--mapper", help="Read mapper: bwa or bwa-mem2.",
+                                      metavar="<bwa|bwa-mem2>")] = RatOptions.mapper,
         path_to_bwa: Annotated[
-            Path, Option("--path_to_bwa", help="Path to bwa binaries. Supply if RAT cannot find bwa.", metavar="<EXC>")] = RatOptions.path_to_bwa,
+            Path | None, Option("--path_to_bwa", help="Path to the selected bwa or bwa-mem2 binaries. Supply if RAT cannot find bwa.", metavar="<EXC>")] = RatOptions.path_to_bwa,
         path_to_samtools: Annotated[
             Path, Option("--path_to_samtools", help="Path to Samtools binaries. Supply if RAT cannot find Samtools.", metavar="<EXC>")] = RatOptions.path_to_samtools,
         sort_memory_mib: Annotated[int | None, Option("--sort-memory-mib", min=1, help="SAMtools sort memory per thread in MiB")] = RatOptions.sort_memory_mib,
@@ -672,6 +678,7 @@ def rat(contigs_fasta: Annotated[
         no_stars=no_stars,
         log_file=log_file,
         aligner=aligner,
+        mapper=mapper,
         path_to_bwa=path_to_bwa,
         path_to_samtools=path_to_samtools,
         sort_memory_mib=sort_memory_mib,

@@ -1,5 +1,6 @@
 """Write the shared CAT/BAT classification report format."""
 from decimal import Decimal
+from itertools import groupby
 from pathlib import Path
 from typing import TextIO, IO, Literal
 
@@ -391,3 +392,23 @@ def write_summary(
                 ])
 
             outf1.write("\t".join(columns) + "\n")
+
+
+def top_tabular_alignment(f1: TextIO, outf1: TextIO, top: int, bit_score_column: int) -> None:
+    """This code manually does what DIAMOND does with the --top parameter.
+    Currently, it is used for MMseqs2 alignment output.
+    Sorts and filters one ORF at a time
+    """
+    cutoff_percent = 100 - top
+    for _, lines in groupby(f1, key=lambda line: line.split("\t", 1)[0]):
+        hits = [
+            (int(line.rstrip().split("\t")[bit_score_column]), line)
+            for line in lines
+        ]
+        hits.sort(key=lambda hit: hit[0], reverse=True)
+        cutoff = cutoff_percent * hits[0][0]
+
+        for bitscore, line in hits:
+            if bitscore * 100 < cutoff:
+                break
+            outf1.write(line.rstrip("\r\n") + "\n")

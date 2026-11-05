@@ -24,7 +24,7 @@ from .io.parsers import ClassificationParser, optionally_compressed_handle, impo
 from .io.writers import ClassificationWriter, write_names, write_summary
 from .prepare import (
     copy_taxonomy, make_diamond_database,
-    make_fastaid2LCAtaxid_file, make_mmseqs2_database,
+    make_fastaid2LCAtaxid_file, make_mmseqs2_database, make_mmseqs2_gpu_database,
     write_taxids_with_multiple_offspring_file,
 )
 from .reads import process_bam_file, load_classifications, extract_unclassified_sequences, run_rat_alignment, \
@@ -68,6 +68,9 @@ def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | Dow
             *([Step("Make MMseqs2 database",
                     supplied=files is not None and files.mmseqs2_database.is_file(),
                     runner=make_mmseqs2_database)] if args.build_mmseqs2 else []),
+            *([Step("Make MMseqs2 GPU database",
+                    supplied=files is not None and files.mmseqs2_gpu_database.is_file(),
+                    runner=make_mmseqs2_gpu_database)] if args.build_mmseqs2 and args.gpu else []),
             Step("Make fastaid2LCAtaxid",
                  supplied=files is not None and files.fastaid2LCAtaxid.is_file(),
                  runner=make_fastaid2LCAtaxid_file),
@@ -90,7 +93,7 @@ def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | Dow
                 "Alignment",
                 supplied=args.alignment is not None,
                 runner=lambda settings, report: run_aligner(settings.aligner, report),
-                citation="Please cite DIAMOND when using CAT or BAT in your publication."
+                citation=f"Please cite {args.aligner} when using CAT or BAT in your publication."
             ),
             Step("Classify", runner=run_classification,
                  unit="bins" if isinstance(args, BatOptions) else "contigs"),
@@ -106,7 +109,9 @@ def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | Dow
             *(annotation_steps(make_cat_options(args), "cat", "Contigs",
                                args.contigs2classification is not None) if "c" in mode else []),
             *(annotation_steps(make_bat_options(args), "bat", "Bins",
-                               args.bin2classification is not None) if "m" in mode else []),
+                               args.bin2classification is not None,
+                               reuse_intermediates="c" in mode and args.contigs2classification is None)
+              if "m" in mode else []),
             (proc_maps := Step("Process mappings", runner=process_bam_file)),
             (classif := Step("Load classifications", total=4,
                              runner=lambda settings, report:
@@ -295,11 +300,14 @@ def run_download(
     finally:
         locks.close()
 
-def annotation_steps(options, settings_name: str, label: str, supplied: bool) -> list[Step]:
+def annotation_steps(options, settings_name: str, label: str, supplied: bool,
+                     reuse_intermediates: bool = False) -> list[Step]:
     if supplied:
         return [Step(f"Classify {label.lower()}", supplied=True)]
 
     def adapt(step):
+        if reuse_intermediates and step.name in {"Protein prediction", "Alignment"}:
+            step = replace(step, supplied=True)
         name = f"{label}: {step.name}"
 
         def runner(settings, report):
