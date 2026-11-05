@@ -4,12 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "CAT_pack"
-version = "7.0.0.alpha"
+version = "7.0.0beta"
 description = "CAT, BAT, RAT package"
 authors = [
     {name = "F. A. Bastiaan von Meijenfeldt"},
     {name = "Nikos Pappas"},
-    {name = "Ernestina Hauptfeld"}
+    {name = "Ernestina Hauptfeld"},
+    {name = "Chloë Cornelissen"}
 ]
 requires-python = ">=3.11"
 dependencies = [
@@ -28,6 +29,7 @@ gpu = ["pycuda; sys_platform == 'linux'"]
 
 [project.scripts]
 cat_pack = "CAT_pack.cli:app"
+CAT_pack = "CAT_pack.cli:app"
 
 [tool.setuptools.packages.find]
 where = ["."]
