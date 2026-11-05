@@ -109,7 +109,9 @@ def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | Dow
             *(annotation_steps(make_cat_options(args), "cat", "Contigs",
                                args.contigs2classification is not None) if "c" in mode else []),
             *(annotation_steps(make_bat_options(args), "bat", "Bins",
-                               args.bin2classification is not None) if "m" in mode else []),
+                               args.bin2classification is not None,
+                               reuse_intermediates="c" in mode and args.contigs2classification is None)
+              if "m" in mode else []),
             (proc_maps := Step("Process mappings", runner=process_bam_file)),
             (classif := Step("Load classifications", total=4,
                              runner=lambda settings, report:
@@ -298,11 +300,14 @@ def run_download(
     finally:
         locks.close()
 
-def annotation_steps(options, settings_name: str, label: str, supplied: bool) -> list[Step]:
+def annotation_steps(options, settings_name: str, label: str, supplied: bool,
+                     reuse_intermediates: bool = False) -> list[Step]:
     if supplied:
         return [Step(f"Classify {label.lower()}", supplied=True)]
 
     def adapt(step):
+        if reuse_intermediates and step.name in {"Protein prediction", "Alignment"}:
+            step = replace(step, supplied=True)
         name = f"{label}: {step.name}"
 
         def runner(settings, report):
