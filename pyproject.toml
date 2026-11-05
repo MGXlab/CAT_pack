@@ -23,6 +23,9 @@ dependencies = [
 readme = "README.md"
 license = "MIT"
 
+[project.optional-dependencies]
+gpu = ["pycuda; sys_platform == 'linux'"]
+
 [project.scripts]
 cat_pack = "CAT_pack.cli:app"
 
