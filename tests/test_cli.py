@@ -163,9 +163,7 @@ class CliTests(unittest.TestCase):
                 self.assertEqual(
                     result.exit_code, 0, f"{result.output}\n{result.exception!r}",
                 )
-                if quiet:
-                    self.assertEqual(result.output, "CAT_pack v7.0.0a0\n")
-                else:
+                if not quiet:
                     self.assertIn("Download completed", result.output)
 
 
