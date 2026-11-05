@@ -2,24 +2,29 @@ import logging
 from contextlib import ExitStack
 from dataclasses import dataclass, replace
 from decimal import Decimal
+from pathlib import Path
 from tarfile import TarError
-from typing import Any, Callable
+from tempfile import NamedTemporaryFile
+from typing import Any, Callable, Literal
 
 from CAT_pack.io.download import (
     DownloadQueueReport, DownloadReport, multi_download,
     check_files, process_files, cleanup_downloads,
 )
 from CAT_pack.utils.typing import EntityType
+from . import tax
 from .classification import ClassificationEngine
-from .config.options import BatOptions, CatOptions, PrepareOptions, DownloadOptions, RatOptions
-from .config.settings import BatFiles, BatSettings, CatFiles, CatSettings, DownloadOutputs
+from .config.options import BatOptions, CatOptions, PrepareOptions, DownloadOptions, RatOptions, AddNamesOptions, \
+    SummariseOptions
+from .config.settings import BatFiles, BatSettings, CatFiles, CatSettings, DownloadOutputs, AddNamesSettings, \
+    SummariseSettings
 from .config.validation import check_orfs_match_contigs, get_file_names, get_validated_settings, make_prefix, \
     validate_download, get_download_file_names, make_cat_options, make_bat_options
-from .io.parsers import ClassificationParser
-from .io.writers import ClassificationWriter
+from .io.parsers import ClassificationParser, optionally_compressed_handle, import_contig_lengths
+from .io.writers import ClassificationWriter, write_names, write_summary
 from .prepare import (
     copy_taxonomy, make_diamond_database,
-    make_fastaid2LCAtaxid_file, make_mmseqs2_database,
+    make_fastaid2LCAtaxid_file, make_mmseqs2_database, make_mmseqs2_gpu_database,
     write_taxids_with_multiple_offspring_file,
 )
 from .reads import process_bam_file, load_classifications, extract_unclassified_sequences, run_rat_alignment, \
@@ -27,7 +32,7 @@ from .reads import process_bam_file, load_classifications, extract_unclassified_
 from .tools.aligner import run_aligner
 from .tools.bwa_mem import run_bwa_mem
 from .tools.pyrodigal import run_protein_prediction
-from .utils.check import check_output_prefix
+from .utils.check import check_output_prefix, check_outputs
 from .utils.errors import CatError
 from .utils.locking import lock_outputs
 from .utils.logging import Status, Report, file_logging
@@ -53,7 +58,7 @@ class Step:
         return self.name
 
 
-def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | DownloadOptions, files=None) -> list[Step]:
+def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | DownloadOptions | AddNamesOptions | SummariseOptions, files=None) -> list[Step]:
     if type(args) == PrepareOptions:
         return [
             Step("Input validation"),
@@ -63,6 +68,9 @@ def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | Dow
             *([Step("Make MMseqs2 database",
                     supplied=files is not None and files.mmseqs2_database.is_file(),
                     runner=make_mmseqs2_database)] if args.build_mmseqs2 else []),
+            *([Step("Make MMseqs2 GPU database",
+                    supplied=files is not None and files.mmseqs2_gpu_database.is_file(),
+                    runner=make_mmseqs2_gpu_database)] if args.build_mmseqs2 and args.gpu else []),
             Step("Make fastaid2LCAtaxid",
                  supplied=files is not None and files.fastaid2LCAtaxid.is_file(),
                  runner=make_fastaid2LCAtaxid_file),
@@ -85,7 +93,7 @@ def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | Dow
                 "Alignment",
                 supplied=args.alignment is not None,
                 runner=lambda settings, report: run_aligner(settings.aligner, report),
-                citation="Please cite DIAMOND when using CAT or BAT in your publication."
+                citation=f"Please cite {args.aligner} when using CAT or BAT in your publication."
             ),
             Step("Classify", runner=run_classification,
                  unit="bins" if isinstance(args, BatOptions) else "contigs"),
@@ -101,7 +109,9 @@ def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | Dow
             *(annotation_steps(make_cat_options(args), "cat", "Contigs",
                                args.contigs2classification is not None) if "c" in mode else []),
             *(annotation_steps(make_bat_options(args), "bat", "Bins",
-                               args.bin2classification is not None) if "m" in mode else []),
+                               args.bin2classification is not None,
+                               reuse_intermediates="c" in mode and args.contigs2classification is None)
+              if "m" in mode else []),
             (proc_maps := Step("Process mappings", runner=process_bam_file)),
             (classif := Step("Load classifications", total=4,
                              runner=lambda settings, report:
@@ -144,6 +154,16 @@ def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | Dow
             Step("Check files"),
             Step("Process files"),
             Step("Cleanup", supplied=not args.cleanup),
+        ]
+    if isinstance(args, AddNamesOptions):
+        return [
+            Step("Input validation"),
+            Step("Add names", total=3, runner=append_names),
+        ]
+    if isinstance(args, SummariseOptions):
+        return [
+            Step("Input validation"),
+            Step("Summarise", total=2 if args.contigs_fasta else 1, runner=summarise)
         ]
     raise CatError("I haven't figured out how to build that specific plan")
 
@@ -280,11 +300,14 @@ def run_download(
     finally:
         locks.close()
 
-def annotation_steps(options, settings_name: str, label: str, supplied: bool) -> list[Step]:
+def annotation_steps(options, settings_name: str, label: str, supplied: bool,
+                     reuse_intermediates: bool = False) -> list[Step]:
     if supplied:
         return [Step(f"Classify {label.lower()}", supplied=True)]
 
     def adapt(step):
+        if reuse_intermediates and step.name in {"Protein prediction", "Alignment"}:
+            step = replace(step, supplied=True)
         name = f"{label}: {step.name}"
 
         def runner(settings, report):
@@ -299,10 +322,12 @@ def annotation_steps(options, settings_name: str, label: str, supplied: bool) ->
     return [adapt(step) for step in build_plan(options)[1:]]
 
 
-def run(args: CatOptions | BatOptions | RatOptions | PrepareOptions, report: Report):
+def run(args: CatOptions | BatOptions | RatOptions | PrepareOptions | AddNamesOptions | SummariseOptions, report: Report):
     log = logging.getLogger("CAT_pack")
 
     is_prepare = isinstance(args, PrepareOptions)
+    is_add_names = isinstance(args, AddNamesOptions)
+    is_summarise = isinstance(args, SummariseOptions)
     if is_prepare: args = make_prefix(args)
     log_path = get_file_names(args).log_file if is_prepare else args.log_path
 
@@ -321,7 +346,10 @@ def run(args: CatOptions | BatOptions | RatOptions | PrepareOptions, report: Rep
             args.db_dir.mkdir(parents=True, exist_ok=True)
             locks.enter_context(lock_outputs([args.db_dir / ".prepare.lock"]))
         else:
-            prefixes = [args.output_prefix]
+            if is_add_names or is_summarise:
+                prefixes = [args.output_file]
+            else:
+                prefixes = [args.output_prefix]
             if isinstance(args, RatOptions):
                 if "c" in args.mode.value and args.contigs2classification is None:
                     prefixes.append(make_cat_options(args).output_prefix)
@@ -359,6 +387,13 @@ def run(args: CatOptions | BatOptions | RatOptions | PrepareOptions, report: Rep
         if is_prepare:
             log.info("Preparation complete. Use -d %s with CAT_pack7 CAT or BAT.", settings.files.data_folder)
             return 0
+        if isinstance(args, (SummariseOptions, AddNamesOptions)):
+            return {
+                "Results": completed_steps[-1].result,
+                "Steps": completed_steps,
+                "Output": settings.files.output_file,
+                "Log": settings.log_file,
+            }
         if isinstance(args, RatOptions):
             return {
                 "Steps": completed_steps,
@@ -398,7 +433,7 @@ def run(args: CatOptions | BatOptions | RatOptions | PrepareOptions, report: Rep
             report(remaining_step.name, Status.SKIPPED, 0, None)
 
         if isinstance(error, (OSError, UnicodeError, EOFError)):
-            error = CatError(str(error), path=args.db_dir if is_prepare else args.output_prefix)
+            error = CatError(str(error), path=args.db_dir if is_prepare else args.output_file if is_add_names or is_summarise else args.output_prefix)
         if isinstance(error, CatError):
             error.step = current_step.name
             error.log_file = log_path
@@ -410,5 +445,95 @@ def run(args: CatOptions | BatOptions | RatOptions | PrepareOptions, report: Rep
         locks.close()
 
 
+def append_names(settings: AddNamesSettings, report: Report) -> Path:
+    log = logging.getLogger("CAT_pack")
+    files = settings.files
 
+    taxid2rank = tax.read_nodes(files.nodes, ranks=True)
+    report.progress_next()
 
+    taxid2name = tax.import_names(files.names)
+    report.progress_next()
+
+    log.info("Appending names...")
+    temporary = None
+
+    try:
+        with NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=files.output_file.parent,
+            prefix=f".{files.output_file.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as outf1:
+            temporary = Path(outf1.name)
+
+            with optionally_compressed_handle(files.input_file) as f1:
+                write_names(
+                    f1,
+                    outf1.file,
+                    taxid2rank,
+                    taxid2name,
+                    input_file=files.input_file,
+                    only_official=settings.only_official,
+                    exclude_scores=settings.exclude_scores,
+                )
+
+        if not settings.force:
+            check_outputs([files.output_file])
+        temporary.replace(files.output_file)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+    report.progress_next()
+    log.info(f"Names written to {settings.files.output_file.name}")
+    return files.output_file
+
+def summarise(settings: SummariseSettings, report: Report) -> Path:
+    log = logging.getLogger("CAT_pack")
+    files = settings.files
+    contig2length = {}
+    entity_type: Literal[EntityType.CONTIG, EntityType.BIN]
+
+    if files.contigs_fasta is None:
+        entity_type = EntityType.BIN
+    else:
+        entity_type = EntityType.CONTIG
+        contig2length = import_contig_lengths(files.contigs_fasta)
+        report.progress_next()
+
+    log.info("Summarising...")
+    temporary = None
+
+    try:
+        with NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=files.output_file.parent,
+            prefix=f".{files.output_file.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as outf1:
+            temporary = Path(outf1.name)
+
+            with optionally_compressed_handle(files.input_file) as f1:
+                write_summary(
+                    f1,
+                    outf1.file,
+                    input_file=files.input_file,
+                    entity_type=entity_type,
+                    contig2length=contig2length,
+                    contigs_fasta=files.contigs_fasta,
+                )
+
+        if not settings.force:
+            check_outputs([files.output_file])
+        temporary.replace(files.output_file)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+    report.progress_next()
+    return files.output_file

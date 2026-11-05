@@ -1,11 +1,13 @@
 import logging
 import shutil
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from CAT_pack.io.parsers import optionally_compressed_handle
 from . import tax
 from .config.settings import PrepareSettings
 from .tools.tool_runner import run_tool
+from .utils.check import check_outputs
 from .utils.errors import InputError
 from .utils.logging import Report, Status
 
@@ -180,6 +182,21 @@ def make_mmseqs2_database(settings: PrepareSettings, report: Report) -> None:
     log.info(f"Constructing MMseqs2 database {settings.files.mmseqs2_database} "
              f"from {settings.db_fasta} using {settings.threads} cores.")
     run_tool(settings.mmseqs.get_command(), "MMseqs2")
+
+
+def make_mmseqs2_gpu_database(settings: PrepareSettings, report: Report) -> None:
+    database = settings.files.mmseqs2_gpu_database.resolve()
+    log.info("Constructing GPU MMseqs2 database %s from %s.",
+             database, settings.files.mmseqs2_database)
+    with TemporaryDirectory(prefix=".CAT_pack_MMseqs2_GPU_", dir=database.parent) as scratch:
+        temporary_database = Path(scratch) / "db"
+        run_tool(settings.mmseqs.get_gpu_command(temporary_database), "MMseqs2",
+                 operation="GPU database preparation")
+        outputs = sorted(Path(scratch).iterdir(), key=lambda path: path.name == "db.dbtype")
+        destinations = [database.with_name(database.name + path.name[2:]) for path in outputs]
+        check_outputs(destinations)
+        for source, destination in zip(outputs, destinations):
+            source.replace(destination)
 
 
 def copy_taxonomy(settings: PrepareSettings) -> None:
