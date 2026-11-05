@@ -72,7 +72,7 @@ class FastaParser:
                     yield self._parse_header(line.rstrip())
 
     def _parse_header(self, header: str) -> str:
-        name = header[1:].split(" ", 1)[0]
+        name = header[1:].split(maxsplit=1)[0] if header[1:].strip() else ""
         if not name:
             raise InputError(
                 "Fasta header is empty",
@@ -370,6 +370,9 @@ class AlignmentParser:
             below_cutoff = False
             first_line = next(source, None)
             bitscore_index = self.parser_settings.bit_score_column
+            # Recognize supplied compact tables independently of output-format flags.
+            if first_line is not None and bitscore_index == 11 and len(first_line.rstrip("\r\n").split("\t")) == 3:
+                bitscore_index = 2
 
             batches = cleanup.enter_context(closing(self._read_in_batches(source, first_line, bitscore_index))) if first_line is not None else ()
             for alignment_batch, selected_columns in batches:
