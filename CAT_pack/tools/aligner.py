@@ -7,9 +7,7 @@ from tempfile import TemporaryDirectory
 from CAT_pack.io.parsers import optionally_compressed_handle
 from CAT_pack.io.writers import top_tabular_alignment
 from .tool_runner import run_tool
-from .gpu import check_mmseqs_gpu
 from ..config.settings import DiamondSettings, MMseqsSettings
-from ..utils.errors import ExternalToolError
 
 log = logging.getLogger("CAT_pack")
 
