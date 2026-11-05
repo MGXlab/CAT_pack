@@ -36,6 +36,7 @@ class MMseqsOptions:
     sensitivity: float = 5.7
     split_memory_limit: str = "0"
     executable: Path | None = None
+    gpu: bool = False
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,18 @@ class MemoryOptions:
     low_memory: bool = False
     high_memory: bool = False
     available_memory: int | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class SummariseOptions(ExecutionOptions):
+    input_file: Path
+    output_file: Path
+    contigs_fasta: Path | None = None
+    force: bool = False
+
+    @property
+    def log_path(self) -> Path:
+        return self.output_file.with_name(f"{self.output_file.name}.log")
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -107,7 +120,8 @@ class RatOptions(AnnotationOptions):
     read2classification: bool = False
     unmapped2classification: Path | None = None
     mapping_quality: int = 2
-    path_to_bwa: Path |str = 'bwa'
+    mapper: Literal["bwa", "bwa-mem2"] = "bwa"
+    path_to_bwa: Path | str | None = None
     path_to_samtools: Path | str = 'samtools'
     sort_memory_mib: int | None = None
 
@@ -123,6 +137,7 @@ class PrepareOptions(ExecutionOptions):
     common_prefix: str | None = None
     build_mmseqs2: bool = False
     path_to_mmseqs: Path | None = None
+    gpu: bool = False
 
 @dataclass(frozen=True, kw_only=True)
 class DownloadOptions(ExecutionOptions):

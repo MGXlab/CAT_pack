@@ -18,7 +18,7 @@ from .cli_options import (
     DiamondPathOption, diamond_options, execution_options, mmseqs_options, memory_options, with_option_groups,
 )
 from .config.options import BatOptions, CatOptions, ExecutionOptions, DiamondOptions, MMseqsOptions, PrepareOptions, \
-    MemoryOptions, DownloadOptions, RatMode, RatOptions, AddNamesOptions
+    MemoryOptions, DownloadOptions, RatMode, RatOptions, AddNamesOptions, SummariseOptions
 from .config.validation import get_file_names, make_prefix
 from .pipeline import build_plan, run_download, run
 from .progress import ProgressTracker
@@ -188,6 +188,8 @@ def prepare(
             ),] = PrepareOptions.common_prefix,
         build_mmseqs2: Annotated[bool, Option("--build-mmseqs2",
                     help="Also create an MMseqs2 sequence database.")] = PrepareOptions.build_mmseqs2,
+        gpu: Annotated[bool, Option("--gpu",
+                    help="Also prepare a GPU MMseqs2 database. Requires --build-mmseqs2.")] = PrepareOptions.gpu,
         path_to_mmseqs: Annotated[Path | None, Option("--path-to-mmseqs",
                     help="Path to MMseqs2, used with --build-mmseqs2.")] = PrepareOptions.path_to_mmseqs,
         *, execution: ExecutionOptions,
@@ -202,6 +204,7 @@ def prepare(
         path_to_diamond=path_to_diamond,
         common_prefix=common_prefix,
         build_mmseqs2=build_mmseqs2,
+        gpu=gpu,
         path_to_mmseqs=path_to_mmseqs,
         threads=execution.threads,
         quiet=execution.quiet,
@@ -238,6 +241,8 @@ def prepare(
             table.add_row(label, str(path))
         if args.build_mmseqs2:
             table.add_row("MMseqs2", str(files.mmseqs2_database))
+        if args.gpu:
+            table.add_row("MMseqs2 GPU", str(files.mmseqs2_gpu_database))
         console.print(table)
         console.print(f"Use -d {files.data_folder} with CAT_pack7 CAT or BAT.")
 
@@ -634,9 +639,10 @@ def rat(contigs_fasta: Annotated[
         no_stars: Annotated[bool, Option("--no-stars", "--no_stars")] = RatOptions.no_stars,
         log_file: Annotated[Path | None, Option("--log-file")] = RatOptions.log_file,
         aligner: Annotated[str, Option("--aligner", help="Protein aligner; direct nucleotide searches require DIAMOND.")] = RatOptions.aligner,
-        # TODO: Look into the use of bwa mem 2 as well
+        mapper: Annotated[str, Option("--mapper", help="Read mapper: bwa or bwa-mem2.",
+                                      metavar="<bwa|bwa-mem2>")] = RatOptions.mapper,
         path_to_bwa: Annotated[
-            Path, Option("--path_to_bwa", help="Path to bwa binaries. Supply if RAT cannot find bwa.", metavar="<EXC>")] = RatOptions.path_to_bwa,
+            Path | None, Option("--path_to_bwa", help="Path to the selected bwa or bwa-mem2 binaries. Supply if RAT cannot find bwa.", metavar="<EXC>")] = RatOptions.path_to_bwa,
         path_to_samtools: Annotated[
             Path, Option("--path_to_samtools", help="Path to Samtools binaries. Supply if RAT cannot find Samtools.", metavar="<EXC>")] = RatOptions.path_to_samtools,
         sort_memory_mib: Annotated[int | None, Option("--sort-memory-mib", min=1, help="SAMtools sort memory per thread in MiB")] = RatOptions.sort_memory_mib,
@@ -672,6 +678,7 @@ def rat(contigs_fasta: Annotated[
         no_stars=no_stars,
         log_file=log_file,
         aligner=aligner,
+        mapper=mapper,
         path_to_bwa=path_to_bwa,
         path_to_samtools=path_to_samtools,
         sort_memory_mib=sort_memory_mib,
@@ -822,5 +829,75 @@ def add_names(
         raise typer.Exit(code=1)
 
     if not quiet:
-        output_file = outputs["Named output"]
-        console.print(Text(f"Names written to {output_file}!", style="green"))
+        console.print(Text(f"Names written to {outputs['Output']}!", style="green"))
+
+@app.command("summarise", options_metavar="-i <FILE> -o <FILE> (-c <FILE>) [options] [-h / --help]")
+def summarise(
+    input_file: Annotated[Path, Option(
+        "--input_file", "-i",
+        metavar="<FILE>",
+        help="Path to named CAT contig classification file or BAT bin "
+            "classification file. Currently only official ranks are "
+            "supported, and only classification files containing a single "
+            "classification per contig / bin. If you want to summarise a "
+            "contig classification file, you have to supply the contigs "
+            "fasta file with argument [-c / --contigs_fasta]."
+    )],
+    output_file: Annotated[Path, Option(
+        "--output_file", "-o",
+        metavar="<FILE>",
+        help="Output file."
+    )],
+    contigs_fasta: Annotated[Path | None, Option(
+        "--contigs_fasta", "-c",
+        metavar="<FILE>",
+        help="Contigs fasta file. Required if you want to "
+            "summarise a contig classification file."
+        )] = SummariseOptions.contigs_fasta,
+    force: Annotated[bool, Option(
+        "--force",
+        help="Force overwrite existing files.",
+    )] = SummariseOptions.force,
+    quiet: Annotated[bool, Option(
+        "--quiet", "-q",
+        help="Suppress verbosity.",
+    )] = SummariseOptions.quiet,
+    debug: Annotated[bool, Option(
+        "--debug",
+        help="Show unexpected-error tracebacks.",
+    )] = SummariseOptions.debug,
+):
+    """Summarise a named CAT or BAT classification file."""
+    args = SummariseOptions(
+        input_file=input_file,
+        output_file=output_file,
+        contigs_fasta=contigs_fasta,
+        force=force,
+        quiet=quiet,
+        debug=debug,
+    )
+    console = Console(stderr=True)
+    log = init_logging(debug, quiet=quiet, console=console)
+
+    try:
+        argument_print(args, "summarise", log, console)
+        tracker = ProgressTracker(build_plan(args), quiet=quiet, console=console)
+        with tracker.display():
+            outputs = run(args, tracker)
+    except KeyboardInterrupt:
+        console.print("Summarising cancelled.")
+        raise typer.Exit(code=130)
+    except CatError as error:
+        show_error(error, console)
+        raise typer.Exit(code=1)
+    except Exception:
+        log.exception(
+            "Unexpected error while summarising.",
+            exc_info=debug,
+        )
+        if debug:
+            console.print_exception()
+        raise typer.Exit(code=1)
+
+    if not quiet:
+        console.print(Text(f"{outputs['Output']} is created!", style="green"))

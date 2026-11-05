@@ -59,6 +59,24 @@ def check_fasta_file(path: Path, label: str) -> Path:
         raise InputError(f"{label} must start with a FASTA header (>).", path=path)
     return path
 
+
+def check_mmseqs_gpu_database(database: Path) -> Path:
+    hint = "Prepare the database with --build-mmseqs2 --gpu using the same --common-prefix."
+    for suffix in ("", ".index", ".dbtype", "_h", "_h.index", "_h.dbtype"):
+        path = database.with_name(database.name + suffix)
+        if not path.is_file() or path.stat().st_size == 0:
+            raise InputError("MMseqs2 GPU database is incomplete.", path=path, hint=hint)
+
+    dbtype = database.with_name(database.name + ".dbtype").read_bytes()
+    value = int.from_bytes(dbtype, "little")
+    # MMseqs2: DBTYPE_AMINO_ACIDS=0; DBTYPE_EXTENDED_GPU=8 in the upper 16 bits.
+    if (len(dbtype) != 4 or value & 0xFFFF != 0
+            or not value & (8 << 16) or value & (1 << 31)):
+        raise InputError("MMseqs2 database is not a GPU usable protein database.",
+                         path=database, hint=hint)
+    return database
+
+
 def check_db_file(folder: Path, suffix: str, label: str) -> Path:
     matches = sorted(
         path for path in folder.iterdir()
