@@ -639,9 +639,10 @@ def rat(contigs_fasta: Annotated[
         no_stars: Annotated[bool, Option("--no-stars", "--no_stars")] = RatOptions.no_stars,
         log_file: Annotated[Path | None, Option("--log-file")] = RatOptions.log_file,
         aligner: Annotated[str, Option("--aligner", help="Protein aligner; direct nucleotide searches require DIAMOND.")] = RatOptions.aligner,
-        # TODO: Look into the use of bwa mem 2 as well
+        mapper: Annotated[str, Option("--mapper", help="Read mapper: bwa or bwa-mem2.",
+                                      metavar="<bwa|bwa-mem2>")] = RatOptions.mapper,
         path_to_bwa: Annotated[
-            Path, Option("--path_to_bwa", help="Path to bwa binaries. Supply if RAT cannot find bwa.", metavar="<EXC>")] = RatOptions.path_to_bwa,
+            Path | None, Option("--path_to_bwa", help="Path to the selected bwa or bwa-mem2 binaries. Supply if RAT cannot find bwa.", metavar="<EXC>")] = RatOptions.path_to_bwa,
         path_to_samtools: Annotated[
             Path, Option("--path_to_samtools", help="Path to Samtools binaries. Supply if RAT cannot find Samtools.", metavar="<EXC>")] = RatOptions.path_to_samtools,
         sort_memory_mib: Annotated[int | None, Option("--sort-memory-mib", min=1, help="SAMtools sort memory per thread in MiB")] = RatOptions.sort_memory_mib,
@@ -677,6 +678,7 @@ def rat(contigs_fasta: Annotated[
         no_stars=no_stars,
         log_file=log_file,
         aligner=aligner,
+        mapper=mapper,
         path_to_bwa=path_to_bwa,
         path_to_samtools=path_to_samtools,
         sort_memory_mib=sort_memory_mib,

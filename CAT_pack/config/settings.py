@@ -225,6 +225,7 @@ class RatSettings(ExecutionSettings, ClassificationSettings):
     bwa: Path | str | None
     samtools: Path | str
     mapping_quality: int
+    mapper: str = "bwa"
     sort_memory_mib: int | None = None
     cat: CatSettings | None = None
     bat: BatSettings | None = None
