@@ -11,6 +11,7 @@ import typer
 from rich.console import Console, Group
 from rich.panel import Panel
 from rich.pretty import Pretty
+from rich.prompt import Confirm
 from rich.table import Table
 from rich.text import Text
 from typer import Option
@@ -23,7 +24,7 @@ from .config.options import BatOptions, CatOptions, ExecutionOptions, DiamondOpt
 from .config.validation import get_file_names, make_prefix
 from .pipeline import build_plan, run_download, run
 from .progress import ProgressTracker
-from .utils.errors import CatError, show_error
+from .utils.errors import CatError, InputError, show_error
 from .utils.logging import init_logging
 
 app = typer.Typer()
@@ -249,6 +250,63 @@ def prepare(
 
 
 
+LegacyTaxonomyOption = Annotated[Path | None, Option(
+    "-t", metavar="<DIR>",
+    help="Legacy taxonomy directory. Offers to move names.dmp and nodes.dmp into --database.",
+)]
+
+
+def migrate_taxonomy(taxonomy: Path, database: Path, console: Console) -> None:
+    """Updates the taxonomy file structure from v6 and earlier to v7 structure
+
+    Moves the files from the tax folder to the database folder
+    """
+    if not database.is_dir():
+        raise InputError(f"Database directory does not exist: {database}")
+    files = [(taxonomy / name, database / name) for name in ("names.dmp", "nodes.dmp")]
+    if all(destination.is_file() for _, destination in files):
+        raise InputError(f"Both taxonomy files are already in '{database}'. Remove -t from the command to use them.")
+    for source, destination in files:
+        if not source.is_file():
+            raise InputError(f"Taxonomy file not found: {source}")
+        if destination.exists() or destination.is_symlink():
+            raise InputError(f"Will not overwrite existing file: {destination}")
+
+    confirmed = Confirm.ask(
+        Text(f"-t is no longer needed. Do you want to move names.dmp and nodes.dmp "
+             f"from '{taxonomy}' into '{database}'?"),
+        console=console,
+        default=False
+    )
+    if not confirmed:
+        raise typer.Exit()
+
+    for source, destination in files:
+        created_destination = False
+        try:
+            with source.open("rb") as original, destination.open("xb") as copy:
+                created_destination = True
+                shutil.copyfileobj(original, copy)
+            source.unlink()
+        except OSError as error:
+            if created_destination:
+                destination.unlink(missing_ok=True)
+            raise CatError(f"Could not move taxonomy files: {error}")
+
+
+def handle_legacy_taxonomy(taxonomy: Path | None, database: Path) -> None:
+    if taxonomy is None or taxonomy.resolve() == database.resolve():
+        return
+    console = Console()
+    try:
+        migrate_taxonomy(taxonomy, database, console)
+    except InputError as error:
+        console.print(Text(str(error), style="red"), soft_wrap=True)
+        raise typer.Exit(code=2) from error
+
+
+
+
 @app.command("contig", hidden=True)
 @app.command()
 @with_option_groups(
@@ -269,10 +327,7 @@ def cat(
                    help="Directory that contains database and taxonomy files",
                    metavar="<directory>")
         ],
-        taxonomy: Annotated[Path | None, Option(
-            "-t", exists=True, file_okay=False, metavar="<DIR>",
-            help="Legacy taxonomy directory. Offer to move names.dmp and nodes.dmp into --database.",
-        )] = None,
+        taxonomy: LegacyTaxonomyOption = None,
         range_: Annotated[
             float,
             Option("--range", "-r", min=0.0, max=100,
@@ -340,25 +395,7 @@ def cat(
         memory: MemoryOptions,
 ):
 
-    if taxonomy is not None and taxonomy.resolve() != database.resolve():
-        if not database.is_dir():
-            raise typer.BadParameter("Database directory does not exist.", param_hint="-d")
-        files = [(taxonomy / name, database / name) for name in ("names.dmp", "nodes.dmp")]
-        for source, destination in files:
-            if not source.is_file():
-                raise typer.BadParameter(f"Taxonomy file not found: {source}", param_hint="-t")
-            if destination.exists() or destination.is_symlink():
-                raise typer.BadParameter(f"Will not overwrite existing file: {destination}", param_hint="-t")
-        if not typer.confirm(
-            f"-t is no longer needed. Move names.dmp and nodes.dmp from '{taxonomy}' into '{database}'?",
-            default=False,
-        ):
-            raise typer.Exit()
-        try:
-            for source, destination in files:
-                shutil.move(str(source), str(destination))
-        except OSError as error:
-            raise typer.BadParameter(f"Could not move taxonomy files: {error}", param_hint="-t") from error
+    handle_legacy_taxonomy(taxonomy, database)
 
     arguments = CatOptions(
         contigs=contigs,
@@ -405,6 +442,7 @@ def bat(
                    help="Directory that contains database and taxonomy files",
                    metavar="<directory>")
         ],
+        taxonomy: LegacyTaxonomyOption = None,
         bin_suffix: Annotated[str, Option(
             "--bin_suffix", "--bin-suffix", "-s",
             help="Suffix of bins in bin directory.",
@@ -477,6 +515,7 @@ def bat(
         memory: MemoryOptions,
 ):
     """Run Bin Annotation Tool (BAT)."""
+    handle_legacy_taxonomy(taxonomy, database)
     arguments = BatOptions(
         bins=bins,
         bin_suffix=bin_suffix,
@@ -606,7 +645,7 @@ def run_annotation_cli(arguments: CatOptions | BatOptions):
         ))
 
 @app.command("reads", hidden=True, deprecated=True)
-@app.command(options_metavar="-m [mode] -c [contigs] -t [database] [options]",
+@app.command(options_metavar="-m [mode] -c [contigs] -d [database] [options]",
              epilog="""Classification modes:
     - 'mcr': integrate annotations from MAGs, contigs, and reads.
     - 'cr': integrate annotations from contigs and reads.
@@ -623,6 +662,7 @@ def rat(contigs_fasta: Annotated[
                          help="Directory that contains database and taxonomy files", metavar="<DIR>")],
         mode: Annotated[RatMode,
                         Option("--mode", "-m", help="Classification mode")],
+        taxonomy: LegacyTaxonomyOption = None,
         output_prefix: Annotated[
             Path,
             Option("--output-prefix", "--out_prefix", "-o", metavar="<prefix>", help="Prefix for output files.")
@@ -677,6 +717,7 @@ def rat(contigs_fasta: Annotated[
         memory: MemoryOptions):
     """Read Annotation Tool"""
 
+    handle_legacy_taxonomy(taxonomy, database)
     arguments = RatOptions(
         contigs_fasta=contigs_fasta,
         database=database,
