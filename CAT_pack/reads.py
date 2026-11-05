@@ -13,7 +13,7 @@ from CAT_pack.io.parsers import FastaParser, FastqParser, optionally_compressed_
 from CAT_pack.io.writers import ClassificationWriter
 from CAT_pack.tools.aligner import run_aligner
 from CAT_pack.tools.tool_runner import tool_output
-from CAT_pack.utils.errors import ExternalToolError
+from CAT_pack.utils.errors import ExternalToolError, InputError
 from CAT_pack.utils.logging import Report
 from CAT_pack.utils.typing import EntityType
 
@@ -140,8 +140,14 @@ def make_contig_dict(map_result: MappingResult, settings: RatSettings, contig2bi
     max_primary = 2 if len(settings.files.bam_files) > 1 or map_result.paired else 1
     contig_dict = {"*": 0}
 
-    for read in map_result.read_dict.values():
+    for read_id, read in map_result.read_dict.items():
         contigs = read["contig"]
+        if len(contigs) > max_primary:
+            raise InputError(
+                f"Too many primary mappings for read {read_id}: "
+                f"found {len(contigs)}, expected at most {max_primary}.",
+                hint="Check your alignment file or map your reads using RAT.",
+            )
         contig_dict["*"] += max_primary - len(contigs)
 
         for contig in contigs:
