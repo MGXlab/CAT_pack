@@ -9,7 +9,8 @@ from typing import Iterator
 from CAT_pack import tax
 from CAT_pack.classification import ClassificationEngine
 from CAT_pack.config.settings import RatSettings
-from CAT_pack.io.parsers import FastaParser, FastqParser, optionally_compressed_handle, AlignmentParser
+from CAT_pack.io.parsers import FastaParser, FastqParser, optionally_compressed_handle, AlignmentParser, import_contig_lengths
+from CAT_pack.io.reference_mapping import read_fastaid2LCAtaxid
 from CAT_pack.io.writers import ClassificationWriter
 from CAT_pack.tools.aligner import run_aligner
 from CAT_pack.tools.tool_runner import tool_output
@@ -214,7 +215,7 @@ def get_contig_lengths(contig_file: Path) -> tuple[dict[str, int], int]:
     of contig IDs, as long as it is a proper file with unique headers, because
     it checks the length of the strings.
     """
-    contig_lengths = {contig.name: len(contig.sequence) for contig in FastaParser(contig_file)}
+    contig_lengths = import_contig_lengths(contig_file)
     return contig_lengths, sum(contig_lengths.values())
 
 def invert_bin_dict(bin_dict):
@@ -301,7 +302,7 @@ def write_unmapped2classification(settings: RatSettings, report: Report, result:
     report.progress_next()
 
     taxonomy = tax.Taxonomy.import_nodes(files.nodes)
-    fastaid2LCAtaxid = tax.import_fastaid2LCAtaxid(files.fastaid2LCA, set(alignment.hit_names), workers=settings.threads)
+    fastaid2LCAtaxid = read_fastaid2LCAtaxid(files.fastaid2LCA, set(alignment.hit_names), workers=settings.threads)
     taxids_with_multiple_offspring = tax.import_taxids_with_multiple_offspring(files.taxids_with_multiple_offspring)
     report.progress_next()
 

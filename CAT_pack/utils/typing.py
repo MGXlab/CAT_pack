@@ -1,7 +1,5 @@
 """Shared type definitions for CAT_pack."""
 
-from __future__ import absolute_import
-
 from enum import StrEnum
 from typing import Hashable, TypeVar
 

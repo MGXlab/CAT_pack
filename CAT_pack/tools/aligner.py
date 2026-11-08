@@ -54,10 +54,9 @@ def run_mmseqs2(mmseqs: MMseqsSettings, report) -> None:
     log.info("MMseqs2 finished. Alignment written to %s\n", mmseqs.alignment)
 
 
-def run_aligner(arguments: DiamondSettings | MMseqsSettings, report, *, _=None):
+def run_aligner(arguments: DiamondSettings | MMseqsSettings, report):
     if type(arguments) == DiamondSettings:
         log.info(f"Aligning {arguments.query} to {arguments.alignment} with DIAMOND")
         run_diamond(arguments, report)
     elif type(arguments) == MMseqsSettings:
         run_mmseqs2(arguments, report)
-        pass

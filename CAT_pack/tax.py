@@ -14,7 +14,6 @@ from numpy import dtype, ndarray
 from numpy.typing import ArrayLike, NDArray
 
 from CAT_pack.utils.typing import Taxid
-from .io.reference_mapping import read_fastaid2LCAtaxid
 from .utils.errors import InputError
 
 log = logging.getLogger("CAT_pack")
@@ -33,7 +32,6 @@ class Taxonomy:
         self.parents: NDArray[np.int32] = parents
         self.taxid_index: dict[str, int] = taxid_index
         self.taxids: list[str] = taxids
-        self.no_rank: int = 1
         self.no_taxid: int = ORF.NO_TAXID
         self.prepare_LCA()
 
@@ -100,23 +98,6 @@ class Taxonomy:
             taxid = parent
 
         return np.array(lineage, dtype=np.int32)
-
-    def find_lca(self, taxids: Iterable[int | np.integer[Any]]) -> int:
-        taxids = [int(taxid) for taxid in taxids if taxid != self.no_taxid]
-
-        if not taxids:
-            return self.no_taxid
-
-        lineages = [self.find_lineage(taxid) for taxid in taxids]
-
-        overlap = set.intersection(*map(set, lineages))
-
-        for taxid in lineages[0]:
-            if taxid in overlap:
-                return int(taxid)
-
-        return self.no_taxid
-
 
     def find_LCA(self, taxids_a: ArrayLike, taxids_b: ArrayLike) -> NDArray[np.int32]:
         taxids_a = np.asarray(taxids_a, dtype=np.int32)
@@ -231,12 +212,6 @@ class WeightedLCA:
             taxonomy, entity_of_orf, orf_lca,
             bitscore, fraction, n_entities,
         )
-
-    # TODO: Continue
-    def lineage_support_of(self, assignment: int | np.integer[Any]) -> list[int]:
-        start, end = self.lineage_offsets[assignment:assignment + 2]
-        return self.lineage_bitscores[start:end].tolist()
-
 
 def sum_bitscores(
     orf_type: NDArray[np.int64], lca_per_orf: NDArray[np.int32],
@@ -437,34 +412,11 @@ def read_nodes(path: Path, ranks: bool = False) -> dict[str, str]:
     return nodes
 
 
-def import_fastaid2LCAtaxid(fastaid2LCAtaxid_file: Path, all_hits: set[str], *, workers: int=1) -> dict[str, str]:
-    log.info(f"Loading file {fastaid2LCAtaxid_file}.")
-    return read_fastaid2LCAtaxid(fastaid2LCAtaxid_file, all_hits, workers)
-
-
 def import_taxids_with_multiple_offspring(taxids_with_multiple_offspring_file: str | Path) -> set[str]:
     log.info(f"Loading file {taxids_with_multiple_offspring_file}.")
 
     with open(taxids_with_multiple_offspring_file, encoding="utf-8") as f1:
         return {taxid for line in f1 if (taxid := line.strip())}
-
-
-def find_lineage(
-    taxid: int | str | np.integer[Any],
-    parents: Sequence[int | str] | NDArray[np.integer[Any]],
-) -> NDArray[np.int32]:
-    lineage = []
-    taxid = int(taxid)
-
-    while True:
-        lineage.append(taxid)
-
-        parent = int(parents[taxid])
-        if parent == taxid:
-            break
-        taxid = parent
-
-    return np.array(lineage, dtype=np.int32)
 
 
 # noinspection PyTypeChecker
