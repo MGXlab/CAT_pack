@@ -157,7 +157,7 @@ def write_names(
 
     f1.seek(0)
 
-    for line_number, line in enumerate(f1, 1):
+    for line in f1:
         line = line.rstrip()
 
         if line.startswith("#"):
@@ -214,7 +214,6 @@ def write_summary(
     contigs_fasta: Path | None,
 ) -> None:
     is_contig = entity_type == EntityType.CONTIG
-    entity_name = entity_type.value
     tool = "CAT" if is_contig else "BAT"
     line: str | list[str]
 

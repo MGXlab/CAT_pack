@@ -3,8 +3,6 @@ import bz2
 import gzip
 import logging
 import os
-import pathlib
-import tarfile
 from array import array
 from contextlib import ExitStack, closing
 from dataclasses import dataclass
@@ -113,8 +111,7 @@ def import_contig_lengths(contigs_fasta: Path) -> dict[str, int]:
     contig2length = {}
 
     for record in FastaParser(contigs_fasta):
-        contig = record.name.split()[0]
-        contig2length[contig] = len(record.sequence)
+        contig2length[record.name] = len(record.sequence)
 
     return contig2length
 
@@ -213,11 +210,6 @@ class BinParser:
                 path=self.path,
             )
         return tuple(paths)
-
-
-def parse_bitscore(text: str) -> int:
-    whole_number, _, decimal = text.strip().partition(".")
-    return int(whole_number) * parser_settings.bit_score_multiplier + int(decimal[:1] or "0")
 
 
 def format_bitscore(bitscore: int) -> str:
@@ -497,13 +489,6 @@ class ClassificationParser:
         return bin2ORFs
 
 
-def is_gz(file_path):
-    """Check if given file_path is gzipped based on suffix."""
-    if isinstance(file_path, Path):
-        file_path = file_path.name
-    return file_path.endswith(".gz") or file_path.endswith(".z")
-
-
 def optionally_compressed_handle(
     file_path: str | Path,
     mode: Literal["r", "rb", "rt", "w", "wb", "wt", "a", "ab", "at"] = 'r',
@@ -525,20 +510,3 @@ def optionally_compressed_handle(
         else open
     )
     return opener(path, mode[0] + "t", encoding="utf-8")
-
-
-def tar_extraction(file: pathlib.Path, output_dir: pathlib.Path, prefix: str = "", files_to_extract: list[str] = None):
-    files = {}
-    with tarfile.open(file, "r:gz") as tar:
-        for dmp in files_to_extract:
-            log.info("Extracting {0} from taxdump.tar.gz".format(dmp))
-
-            tar.extract(dmp, path=output_dir)
-
-            # Timestamp the extracted dmp file
-            outf1 = output_dir / pathlib.Path(dmp)
-            timestamped_fname = "{0}.{1}".format(prefix, dmp)
-            timestamped_outf1 = output_dir / pathlib.Path(timestamped_fname)
-            outf1.rename(timestamped_outf1)
-            files[dmp] = timestamped_fname
-    return files
