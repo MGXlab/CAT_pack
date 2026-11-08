@@ -146,7 +146,7 @@ def download(
         if args.quiet:
             return
 
-        command = ["cat_pack7", "prepare", "--db_fasta", str(files.db_fasta.resolve()),
+        command = ["CAT_pack", "prepare", "--db_fasta", str(files.db_fasta.resolve()),
                    "--names", str(files.names.resolve()),
                    "--nodes", str(files.nodes.resolve()),
                    "--acc2tax", str(files.acc2tax.resolve()),
@@ -307,7 +307,7 @@ def handle_legacy_taxonomy(taxonomy: Path | None, database: Path) -> None:
 
 
 
-@app.command("contig", hidden=True)
+@app.command("contigs", hidden=True)
 @app.command()
 @with_option_groups(
     execution=execution_options,

@@ -261,8 +261,8 @@ Prepare the database protein FASTA and taxonomy inputs:
 
 ```bash
 CAT_pack prepare --db_fasta reference.faa --names names.dmp --nodes nodes.dmp \
-  --acc2tax accession2taxid.tsv --db_dir prepared_db --common-prefix reference \
-  --build-mmseqs2 --gpu
+  --acc2tax accession2taxid.tsv --db_dir prepared_db --common_prefix reference \
+  --build_mmseqs2 --gpu
 ```
 
 Then run classification on the GPU machine:
@@ -476,6 +476,9 @@ $ CAT_pack rat --mode mcr -b bin_folder/ -c contigs.fasta -r forward_reads.fq.gz
 ```
 
 Currently, RAT supports single read files as well as paired-end read files. Interlaced read files are currently not supported. RAT will run CAT and BAT on the contigs and MAGs, will map the reads back to the contigs, and then try to annotate any unmapped reads separately.
+
+RAT defaults to a classification fraction (`-f` / `--fraction`) of **0.5** and allows you to change it for its CAT, BAT, and direct sequence classification steps. RAT requires one classification per sequence in tables supplied with `--c2c`, `--b2c`, or `--u2c`. If a lower fraction produces multiple assignments for the same sequence, RAT reports an error; regenerate those classifications with `--fraction 0.5` to obtain a single assignment.
+
 If you already have a sorted mapping file, you can supply it and RAT will skip the mapping step:
 
 ```
@@ -524,3 +527,7 @@ The RAT output consists of:
 - A fasta containing the sequences of all unmapped reads and contigs that could not be annotated by CAT (when the mode contains `r`).
 - The DIAMOND or MMseqs2 alignment of unmapped reads and unannotated contigs (when the mode contains `r`).
 - A table that contains the annotations for unmapped reads and (previously) unannotated contigs (`<prefix>.RAT.unmapped2classification.txt`, when the mode contains `r`).
+
+In abundance tables, **fraction of reads** is the number of reads assigned to a row divided by the total number of reads, including unmapped reads. In the contig and bin tables, **corrected fraction** divides each row's read count by its sequence length, then normalizes these values to sum to one across rows with a nonzero length. Unmapped reads have a corrected fraction of zero.
+
+The contig table also includes **Average Coverage** as its final column: the total aligned read bases on a contig divided by its full length, including uncovered positions. For example, 15,000 aligned bases on a 1,000-base contig give a depth of 15 (15× coverage). This uses the same primary alignments and mapping-quality threshold as RAT's read counts, with no additional base-quality or duplicate-read filtering. Both mates contribute independently, including overlapping portions. Only the `M`, `=`, and `X` operations in the [SAM CIGAR specification](https://samtools.github.io/hts-specs/SAMv1.pdf) contribute aligned bases; clipping, insertions, deletions, skipped regions, and padding do not. Coverage is `NA` for the unmapped row, zero-length contigs, or a contig with any accepted mapping whose CIGAR is unavailable (`*`). The previous column labelled **Average Coverage** is now called **corrected fraction**; its calculation is unchanged.

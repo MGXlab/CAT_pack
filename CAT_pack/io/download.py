@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import codecs
 import gzip
 import hashlib
 import logging
@@ -304,14 +305,16 @@ def concatenate_trees(bac_tree_fp, ar_tree_fp, all_tree_fp):
     """Concatenate the newick trees under a common root in a new file."""
 
     # Load the Bacteria tree as a string and make it a subtree.
-    bac_tree = bac_tree_fp.read_text()
-    bac_tree = bac_tree.rstrip().replace(
-        "d__Bacteria;", "'100.0:d__Bacteria':1.0"
-    )
+    # Accept both the old bare roots and current GTDB quoted support labels
+    bac_tree = bac_tree_fp.read_text(encoding="utf-8").strip().removesuffix(";")
+    bac_branches, _, bac_root = bac_tree.rpartition(")")
+    if bac_root in ("d__Bacteria", "'d__Bacteria'", "'100:d__Bacteria'", "'100.0:d__Bacteria'"):
+        bac_tree = bac_branches + ")'100.0:d__Bacteria':1.0"
 
-    # Load the Archaea tree as a string and make it a subtree.
-    ar_tree = ar_tree_fp.read_text()
-    ar_tree = ar_tree.rstrip().replace("d__Archaea;", "'100.0:d__Archaea':1.0")
+    ar_tree = ar_tree_fp.read_text(encoding="utf-8").strip().removesuffix(";")
+    ar_branches, _, ar_root = ar_tree.rpartition(")")
+    if ar_root in ("d__Archaea", "'d__Archaea'", "'100:d__Archaea'", "'100.0:d__Archaea'"):
+        ar_tree = ar_branches + ")'100.0:d__Archaea':1.0"
 
     # Concatenate the subtrees under a node named root.
     all_tree = "({0},{1})root;\n".format(ar_tree, bac_tree)
@@ -364,8 +367,11 @@ def iter_gtdb_proteins(proteins_tar: pathlib.Path, gid2taxid: dict[str, str]):
                 continue
             with ExitStack() as stack:
                 raw = stack.enter_context(archive.extractfile(member))
-                source = stack.enter_context(gzip.GzipFile(fileobj=raw)) if name.endswith(".gz") else raw
-                handle = stack.enter_context(io.TextIOWrapper(source, encoding="utf-8"))
+                if name.endswith(".gz"):
+                    source = stack.enter_context(gzip.GzipFile(fileobj=raw))
+                    handle = stack.enter_context(io.TextIOWrapper(source, encoding="utf-8"))
+                else:
+                    handle = stack.enter_context(codecs.getreader("utf-8")(raw))
                 yield from fastaIterator_gz(pathlib.Path(name), gid2taxid, handle=handle)
 
 # FIXME: move to writers.py and or parsers.py?
