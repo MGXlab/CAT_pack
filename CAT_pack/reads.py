@@ -9,7 +9,8 @@ from typing import Iterator
 from CAT_pack import tax
 from CAT_pack.classification import ClassificationEngine
 from CAT_pack.config.settings import RatSettings
-from CAT_pack.io.parsers import FastaParser, FastqParser, optionally_compressed_handle, AlignmentParser, import_contig_lengths
+from CAT_pack.io.parsers import FastaParser, FastqParser, optionally_compressed_handle, AlignmentParser, \
+    import_contig_lengths
 from CAT_pack.io.reference_mapping import read_fastaid2LCAtaxid
 from CAT_pack.io.writers import ClassificationWriter
 from CAT_pack.tools.aligner import run_aligner

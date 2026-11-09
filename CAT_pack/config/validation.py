@@ -62,7 +62,7 @@ def validate_classification(range_, fraction, parser_settings) -> Classification
 def validate_memory(options: MemoryOptions) -> MemorySettings:
     if sum((options.low_memory, options.high_memory, options.available_memory is not None)) > 1:
         raise InputError("Woah, too many memories",
-                         hint="Choose only one of --low-memory, --high-memory, --available-memory.")
+                         hint="Choose only one of --low_memory, --high_memory, --available_memory.")
     budget = None
     if options.available_memory is not None:
         budget = check_integer(options.available_memory, "Available memory (GiB)", 1, sys.maxsize) * GIB
@@ -111,9 +111,9 @@ def validate_mmseqs(options: MMseqsOptions) -> Path:
     if executable is None:
         raise ExternalToolError(
             "MMseqs2", "executable not found.",
-            hint=("Supply --path-to-mmseqs. When using --gpu the MMseqs2 must be a GPU enabled build"
+            hint=("Supply --path_to_mmseqs. When using --gpu the MMseqs2 must be a GPU enabled build"
                   if options.gpu else
-                  "Supply --path-to-mmseqs. Or activate an environment containing MMseqs(2)"),
+                  "Supply --path_to_mmseqs. Or activate an environment containing MMseqs(2)"),
         )
 
     return Path(executable)
@@ -130,8 +130,8 @@ def validate_mmseqs_database(folder: Path, gpu: bool = False) -> Path:
         database = check_db_file(folder, suffix, label)
     except InputError as error:
         if gpu:
-            error.hint = ("Prepare a GPU copy with --build-mmseqs2 --gpu "
-                          "using the same --common-prefix as the existing database.")
+            error.hint = ("Prepare a GPU copy with --build_mmseqs2 --gpu "
+                          "using the same --common_prefix as the existing database.")
         raise
     return check_mmseqs_gpu_database(database) if gpu else database
 
@@ -265,7 +265,7 @@ def validate_prepare(args: PrepareOptions, files: PrepareOutputs | None = None) 
     acc2tax = checks.check(check_file_not_empty, args.acc2tax, "Accession-to-taxid file")
     files = files or get_file_names(args)
     if args.gpu and not args.build_mmseqs2:
-        checks.add(InputError("--gpu requires --build-mmseqs2 when preparing a database."))
+        checks.add(InputError("--gpu requires --build_mmseqs2 when preparing a database."))
     threads = checks.check(check_integer, args.threads, "Threads", 1, sys.maxsize)
     if not files.prefix or files.prefix in {".", ".."} or any(c in files.prefix for c in '/\\:'):
         checks.add(InputError("The prefix contains directory separators",
@@ -292,7 +292,7 @@ def validate_prepare(args: PrepareOptions, files: PrepareOutputs | None = None) 
         command = str(args.path_to_mmseqs.resolve()) if args.path_to_mmseqs else "mmseqs"
         found = shutil.which(command)
         if found is None:
-            checks.add(ExternalToolError("MMseqs2", "was not found", hint="Supply --path-to-mmseqs."))
+            checks.add(ExternalToolError("MMseqs2", "was not found", hint="Supply --path_to_mmseqs."))
         else:
             mmseqs = Path(found)
 
@@ -520,7 +520,7 @@ def validate_rat_files(args: RatOptions) -> RatFiles:
     bins = None
     if "m" in args.mode.value:
         if args.bin_fasta_or_folder is None:
-            checks.add(InputError("No bins supplied", hint="Add the require bins (--bin_fasta or --bin-folder)."))
+            checks.add(InputError("No bins supplied", hint="Add the require bins (--bin_fasta or --bin_folder)."))
         else:
             parser = BinParser(args.bin_fasta_or_folder, args.bin_suffix)
             paths = checks.check(parser.find_bin_paths)
@@ -531,7 +531,7 @@ def validate_rat_files(args: RatOptions) -> RatFiles:
     direct = "r" in args.mode.value
     if direct and args.alignment_unmapped is None and args.unmapped2classification is None and not args.read_file:
         checks.add(InputError("Original read files are required for a fresh direct search.",
-                              hint="Supply --read-file, or reuse --alignment_unmapped or --u2c."))
+                              hint="Supply --read_file, or reuse --alignment_unmapped or --u2c."))
 
     fastaid2LCA = None
     taxids_with_multiple_offspring = None

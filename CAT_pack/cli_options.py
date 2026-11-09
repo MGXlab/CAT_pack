@@ -8,7 +8,7 @@ from typer import Option
 from .config.options import DiamondOptions, ExecutionOptions, MMseqsOptions, MemoryOptions
 
 DiamondPathOption = Annotated[Path | None, Option(
-    "--path-to-diamond", rich_help_panel="DIAMOND",
+    "--path_to_diamond", rich_help_panel="DIAMOND",
     help="Path to DIAMOND. Supply if it is not on PATH.",
 )]
 
@@ -24,20 +24,20 @@ def execution_options(
 
 def diamond_options(
     diamond_mode: Annotated[str, Option(
-        "--diamond-mode", rich_help_panel="DIAMOND",
+        "--diamond_mode", rich_help_panel="DIAMOND",
         help="default, faster, fast, mid-sensitive, sensitive, "
              "more-sensitive, very-sensitive, ultra-sensitive",
     )] = DiamondOptions.mode,
     block_size: Annotated[float, Option(
-        "--block-size", rich_help_panel="DIAMOND",
+        "--block_size", rich_help_panel="DIAMOND",
         help="DIAMOND block-size. Lower uses less RAM/tmp.",
     )] = DiamondOptions.block_size,
     index_chunks: Annotated[int, Option(
-        "--index-chunks", min=1, rich_help_panel="DIAMOND",
+        "--index_chunks", min=1, rich_help_panel="DIAMOND",
         help="Set to 4 on low-memory machines.",
     )] = DiamondOptions.index_chunks,
     no_self_hits: Annotated[bool, Option(
-        "--no-self-hits", rich_help_panel="DIAMOND",
+        "--no_self_hits", rich_help_panel="DIAMOND",
         help="Do not report identical self hits by DIAMOND.",
     )] = DiamondOptions.no_self_hits,
     no_tiny_out: Annotated[bool, Option("--blast6_out", help="Save the default blast6 twelve column alignment table instead of the default compact table.", show_default=False)] = not DiamondOptions.tiny_out,
@@ -55,16 +55,16 @@ def mmseqs_options(
         help="MMseqs2 CPU sensitivity (-s). GPU searches always use maximum sensitivity.",
     )] = MMseqsOptions.sensitivity,
     split_memory_limit: Annotated[str, Option(
-        "--split-memory-limit", rich_help_panel="MMseqs2",
+        "--split_memory_limit", rich_help_panel="MMseqs2",
         help="MMseqs2 max memory per split, e.g. 10M, 1G. 0 uses all available memory.",
     )] = MMseqsOptions.split_memory_limit,
     path_to_mmseqs: Annotated[Path | None, Option(
-        "--path-to-mmseqs", rich_help_panel="MMseqs2",
+        "--path_to_mmseqs", rich_help_panel="MMseqs2",
         help="Path to MMseqs2. Supply if it is not on PATH.",
     )] = MMseqsOptions.executable,
     gpu: Annotated[bool, Option(
         "--gpu", rich_help_panel="MMseqs2",
-        help="Use MMseqs2 GPU search. Requires a database prepared with --build-mmseqs2 --gpu.",
+        help="Use MMseqs2 GPU search. Requires a database prepared with --build_mmseqs2 --gpu.",
     )] = MMseqsOptions.gpu,
 ) -> MMseqsOptions:
     return MMseqsOptions(
@@ -78,15 +78,15 @@ def mmseqs_options(
 
 def memory_options(
     low_memory: Annotated[bool, Option(
-        "--low-memory", rich_help_panel="Memory",
+        "--low_memory", rich_help_panel="Memory",
         help="Use an estimated memory budget of up to 1 GiB.",
     )] = MemoryOptions.low_memory,
     high_memory: Annotated[bool, Option(
-        "--high-memory", rich_help_panel="Memory",
+        "--high_memory", rich_help_panel="Memory",
         help="Use all detected available memory (also the default).",
     )] = MemoryOptions.high_memory,
     available_memory: Annotated[int | None, Option(
-        "--available-memory", "-available-memory", min=1, rich_help_panel="Memory",
+        "--available_memory", min=1, rich_help_panel="Memory",
         help="Estimated available memory in GiB, e.g. 4.",
     )] = MemoryOptions.available_memory,
 ) -> MemoryOptions:

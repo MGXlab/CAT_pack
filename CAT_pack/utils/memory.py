@@ -26,7 +26,7 @@ def get_memory_budget(settings: MemorySettings, workers: int) -> MemoryBudget:
     if workers < 1:
         raise InputError(
             "Too little available memory for the estimated process overhead.",
-            hint="CAT pack does not have enough memory to start. Free up some memory, or raise --available-memory if you set a limit below the memory available.",
+            hint="CAT pack does not have enough memory to start. Free up some memory, or raise --available_memory if you set a limit below the memory available.",
         )
     batch_bytes = total - parent_reserve - workers * PROCESS_RESERVE
     return MemoryBudget(total, workers, batch_bytes)

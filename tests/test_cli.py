@@ -1,4 +1,5 @@
 import unittest
+from importlib.metadata import PackageNotFoundError
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -6,7 +7,7 @@ from unittest.mock import patch
 from rich.text import Text
 from typer.testing import CliRunner
 
-from CAT_pack.cli import app
+from CAT_pack.cli import app, package_details
 from CAT_pack.config.options import DiamondOptions, MMseqsOptions
 from CAT_pack.progress import ProgressTracker
 from CAT_pack.utils.logging import Status
@@ -17,6 +18,26 @@ ANNOTATION_COMMANDS = (("cat", "-c"), ("bat", "-b"), ("bins", "-b"))
 class CliTests(unittest.TestCase):
     def setUp(self):
         self.runner = CliRunner()
+
+    def test_source_checkout_works_without_installed_package_metadata(self):
+        package_details.cache_clear()
+        self.addCleanup(package_details.cache_clear)
+        source_cli = Path(__file__).resolve().parents[1] / "CAT_pack" / "cli.py"
+        with patch("CAT_pack.cli.__file__", str(source_cli)), patch(
+            "importlib.metadata.Distribution.from_name", side_effect=PackageNotFoundError("CAT_pack"),
+        ):
+            for args, expected in (
+                (["--version"], "CAT_pack v"),
+                (["--about"], "CAT and BAT"),
+                (["cat", "--help"], "--fraction"),
+            ):
+                with self.subTest(args=args):
+                    result = self.runner.invoke(app, args)
+                    self.assertEqual(result.exit_code, 0, result.output)
+                    self.assertIn(expected, result.output)
+                    self.assertNotIn("version unknown", result.output)
+                    if args == ["--about"]:
+                        self.assertRegex(result.output, r"Released \d{4}-\d{2}-\d{2}")
 
     def test_command_help_lists_execution_flags(self):
         for command in ("prepare", "cat", "bat", "bins"):
@@ -60,11 +81,11 @@ class CliTests(unittest.TestCase):
                 arguments = [
                     command, input_flag, "input.fna",
                     "-d", "database",
-                    "--diamond-mode", "sensitive",
-                    "--block-size", "4",
-                    "--index-chunks", "2",
-                    "--no-self-hits",
-                    "--path-to-diamond", "diamond.exe",
+                    "--diamond_mode", "sensitive",
+                    "--block_size", "4",
+                    "--index_chunks", "2",
+                    "--no_self_hits",
+                    "--path_to_diamond", "diamond.exe",
                 ]
 
                 result = self.runner.invoke(app, arguments)
@@ -86,8 +107,8 @@ class CliTests(unittest.TestCase):
                     "-d", "database",
                     "--aligner", "mmseqs2",
                     "--sensitivity", "6.5",
-                    "--split-memory-limit", "1G",
-                    "--path-to-mmseqs", "mmseqs.exe",
+                    "--split_memory_limit", "1G",
+                    "--path_to_mmseqs", "mmseqs.exe",
                 ]
 
                 result = self.runner.invoke(app, arguments)
@@ -114,7 +135,7 @@ class CliTests(unittest.TestCase):
                 self.assertEqual(options.mmseqs, MMseqsOptions())
 
     def test_zero_index_chunks_is_rejected_before_annotation(self):
-        arguments = ["cat", "-c", "input.fna", "-d", "database", "--index-chunks", "0"]
+        arguments = ["cat", "-c", "input.fna", "-d", "database", "--index_chunks", "0"]
 
         with patch("CAT_pack.cli.run_annotation_cli") as run_annotation:
             result = self.runner.invoke(app, arguments)
@@ -156,7 +177,7 @@ class CliTests(unittest.TestCase):
 
         for quiet in (False, True):
             with self.subTest(quiet=quiet), patch("CAT_pack.cli.run_download", side_effect=download):
-                args = ["download", "--db", "nr", "--out-dir", "example-db"]
+                args = ["download", "--db", "nr", "--out_dir", "example-db"]
                 if quiet:
                     args.append("--quiet")
                 result = self.runner.invoke(app, args)
