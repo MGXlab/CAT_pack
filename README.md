@@ -34,7 +34,7 @@ A paper describing the algorithm together with extensive benchmarks can be found
 To cite the code itself: 
 
 <a href="https://zenodo.org/doi/10.5281/zenodo.10809238"><img src="https://zenodo.org/badge/67035910.svg" alt="DOI"></a>
-[![tests](https://github.com/MGXlab/CAT_pack/actions/workflows/tests.yml/badge.svg)](https://github.com/MGXlab/CAT_pack/actions/workflows/tests.yml)
+![tests](https://github.com/MGXlab/CAT_pack/actions/workflows/tests.yml/badge.svg)
 ![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FMGXlab%2FCAT_pack%2Fdev%2Fmaster%2Fpyproject.toml)
 ![GitHub Release](https://img.shields.io/github/v/release/MGXlab/CAT_pack)
 ![PyPI Version](https://img.shields.io/pypi/v/cat-pack)
