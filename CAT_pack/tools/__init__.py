@@ -3,11 +3,14 @@
 This module consist of four files `aligner.py`. `bwa_mem.py`, `pyrodigal.py`, `tool_runner.py`
 
 aligner.py
-This python script runs the protein aligner DIAMOND, with future versions MMseqs2 as well.
+This python script runs the protein aligner DIAMOND, or MMseqs2.
 
-bwa_mem.py
-This python script runs creates a sorted bam file. It uses bwa mem and pipes the
-output into samtools directly
+gpu.py
+This python script checks for CUDA and MMseqs2 compatibility.
+
+mapper.py
+This python script runs creates a sorted bam file. It uses bwa mem or bwa-mem2
+and pipes the output into samtools directly
 
 pyrodigal.py
 runs protein prediction (with now only pyrodigal being supported).

@@ -30,7 +30,7 @@ from .prepare import (
 from .reads import process_bam_file, load_classifications, extract_unclassified_sequences, run_rat_alignment, \
     write_unmapped2classification, calculate_abundances, classify_reads, write_reports
 from .tools.aligner import run_aligner
-from .tools.bwa_mem import run_bwa_mem
+from .tools.mapper import run_bwa_mem
 from .tools.pyrodigal import run_protein_prediction
 from .utils.check import check_output_prefix, check_outputs
 from .utils.errors import CatError
