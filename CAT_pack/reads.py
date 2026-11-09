@@ -227,7 +227,7 @@ def invert_bin_dict(bin_dict):
     return d
 
     It's shorter, but of course you should make an extra check to see if the
-    values of the first dictionary are unique. I do like unversal functions (e.g.
+    values of the first dictionary are unique. I do like universal functions (e.g.
     invert_dict as opposed to invert_bin_dict.
     """
     

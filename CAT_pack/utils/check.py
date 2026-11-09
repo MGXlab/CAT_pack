@@ -135,7 +135,7 @@ def check_number(value, label: str, minimum=None, maximum=None) -> Decimal:
         raise InputError(f"{label} must be a number between {minimum} and {maximum}.")
     else:
         # DEVNOTE: Yes this is indeed already checked by typer. But typer
-        #  checking is now set to "strict" and in the feature is may be an option
+        #  checking is now set to "strict" and in the future is may be an option
         #  to set that lower so all errors can be aggregated here instead of only the
         #  cli input errors first and then the more rigorous checking
         raise InputError(f"{label} must be a number or decimal")

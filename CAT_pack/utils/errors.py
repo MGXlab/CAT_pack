@@ -68,7 +68,7 @@ class ValErrorCollector:
         diamond_path = checks.check(check_if_diamond_exists_function, the_path_to_diamond_given by the user)
         Optionally:
             checks.add(SomeError("With other text can be added to the error list"))
-        check.finish() # this will raise the ValidationError if any errors where stored
+        check.finish() # this will raise the ValidationError if any errors were stored
 
     It can be used nested, that's where the: if isinstance(error, ValidationError)
     comes in to play. That unpacks the "sub" errors of sub-checks.

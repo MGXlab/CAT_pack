@@ -44,7 +44,7 @@ class ClassificationEngine:
         ORF2alignment_index, ORF_has_hits, LCA_per_ORF, n_hits_per_ORF, n_w_tax, top_bitscore_per_ORF = (self.per_ORF_stats(ORF_names, alignment))
 
         # Combine the ORF lowest common ancestors per contig (or bin)
-        # and weighted by their tob bit score(s)
+        # and weighted by their top bit score(s)
         weighted_LCAs = tax.WeightedLCA.find(
             self.taxonomy, ORF2contig_or_bin, LCA_per_ORF,
             top_bitscore_per_ORF, self.fraction, n_entities)

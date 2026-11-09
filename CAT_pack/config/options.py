@@ -1,5 +1,5 @@
 """
-Here will al the user configurable (with default) classes live, default values can be set here,
+Here will all the user configurable (with default) classes live, default values can be set here,
 and within cli.py classname.value can be called to set the default value correctly
 for the argument parser. So that you only have to change the defaults here.
 And can easily build or extend classes.

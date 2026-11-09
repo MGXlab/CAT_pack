@@ -712,7 +712,7 @@ def validate_rat_args(args: RatOptions) -> RatSettings:
 def validate_add_names(args: AddNamesOptions) -> AddNamesSettings:
     checks = ValErrorCollector()
     execution = checks.check(validate_execution, args)
-    # @bastiaan shall we validate here if the input is non corrupt and is formated in a CAT_pack fashion?
+    # @bastiaan shall we validate here if the input is non corrupt and is formatted in a CAT_pack fashion?
     input_file = checks.check(check_file_not_empty, args.input_file, "Input file")
     taxonomy = checks.check(validate_taxonomy, args.database / "names.dmp", args.database / "nodes.dmp")
     checks.check(check_output_prefix, args.output_file)
