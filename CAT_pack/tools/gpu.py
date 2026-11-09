@@ -17,7 +17,7 @@ def check_mmseqs_gpu(database: Path) -> None:
         import pycuda.driver as cuda
     except ImportError as error:
         raise ExternalToolError("CUDA", f"PyCUDA is unavailable: {error}",
-                                hint="Please Install CAT_pack's GPU extra: pip install '.[gpu]'.")
+                                hint="CAT pack can't start a GPU search because PyCUDA, a GPU package required for GPU runs, is missing or could not be loaded. Check the GPU installation, or run without --gpu using a CPU database. Install CAT pack's GPU extra via: pip install '.[gpu]' when installed locally or pip install cat-pack[gpu]")
 
     try:
         cuda.init()

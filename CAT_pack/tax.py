@@ -226,7 +226,7 @@ def sum_taxid_bitscores(
     taxonomy: Taxonomy, orf_type: NDArray[np.int64],
     lca_per_orf: NDArray[np.int32], top_bitscores: NDArray[np.int64],
 ) -> tuple[NDArray[np.int64], NDArray[np.int64], NDArray[np.int64]]:
-    log.info("Starting support expansion.")
+    log.info("Evaluating the evidence for taxonomic assignment")
     stage_started: float = perf_counter()
     orf_pos = np.flatnonzero(lca_per_orf != ORF.NO_TAXID)
     known_orfs = len(orf_pos)

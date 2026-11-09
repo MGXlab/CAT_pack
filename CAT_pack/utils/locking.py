@@ -88,5 +88,5 @@ def lock_outputs(resources: Iterable[Path]) -> Iterator[None]:
                         hint="Wait for that run to finish or choose a different output location.",
                     )
                 else:
-                    raise InputError("Could not lock the output location.", path=path)
+                    raise InputError("Could not lock the output location.", path=path, hint="CAT pack couldn't reserve this output location. Check that you can write to the folder, the folder isn't used by another process, or choose a different output folder/location")
         yield
