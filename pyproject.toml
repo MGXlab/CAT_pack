@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "CAT_pack"
-version = "7.0.0beta"
+version = "7.0.0b0"
 description = "CAT, BAT, RAT package"
 authors = [
     {name = "F. A. Bastiaan von Meijenfeldt"},
@@ -35,6 +35,9 @@ CAT_pack = "CAT_pack.cli:app"
 where = ["."]
 include = ["CAT_pack", "CAT_pack.*"]
 namespaces = true
+
+[tool.cat_pack]
+release_date = 2026-11-09
 
 [project.urls]
 Repository = "https://github.com/MGXlab/CAT_pack.git"

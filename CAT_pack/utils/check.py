@@ -61,7 +61,7 @@ def check_fasta_file(path: Path, label: str) -> Path:
 
 
 def check_mmseqs_gpu_database(database: Path) -> Path:
-    hint = "Prepare the database with --build-mmseqs2 --gpu using the same --common-prefix."
+    hint = "Prepare the database with --build_mmseqs2 --gpu using the same --common_prefix."
     for suffix in ("", ".index", ".dbtype", "_h", "_h.index", "_h.dbtype"):
         path = database.with_name(database.name + suffix)
         if not path.is_file() or path.stat().st_size == 0:

@@ -120,7 +120,7 @@ Currently, two databases are supported, NCBI's nr and the Genome Taxonomy Databa
 #### NCBI non-redundant protein database (nr)
 
 ```
-$ CAT_pack download --db nr --out-dir path/to/nr_data_dir
+$ CAT_pack download --db nr --out_dir path/to/nr_data_dir
 ```
 
 Will download the fasta file with the protein sequences, their mapping to a taxid, and the taxonomy information from NCBI over HTTPS.
@@ -128,7 +128,7 @@ Will download the fasta file with the protein sequences, their mapping to a taxi
 #### [Genome Taxonomy Database (GTDB)](https://gtdb.ecogenomic.org/) proteins
 
 ```
-$ CAT_pack download --db gtdb --out-dir path/to/gtdb_data_dir
+$ CAT_pack download --db gtdb --out_dir path/to/gtdb_data_dir
 ```
 
 The files required to build a CAT pack database are provided by the [GTDB downloads page](https://gtdb.ecogenomic.org/downloads).
@@ -255,7 +255,7 @@ $ CAT_pack rat       # Runs RAT.
 
 CAT, BAT, and RAT accept `--aligner mmseqs2 --gpu` to run their MMseqs2 searches
 on a supported GPU on Linux. Run CAT_pack on the GPU machine, with a GPU-enabled MMseqs2
-binary on `PATH`, or supply `--path-to-mmseqs /path/to/gpu/mmseqs`.
+binary on `PATH`, or supply `--path_to_mmseqs /path/to/gpu/mmseqs`.
 
 Prepare the database protein FASTA and taxonomy inputs:
 
@@ -396,9 +396,9 @@ If you do not want the asterisks in your output files, you can add the `--no_sta
 CAT and BAT may take a while to run, and may use quite a lot of RAM and disk space. Depending on what you value most, you can tune CAT and BAT to maximize one and minimize others. The classification algorithm itself is fast and is friendly on memory and disk space. The most expensive step is alignment with DIAMOND, hence tuning alignment parameters will have the highest impact:
 
 - The `-n / --threads` argument allows you to choose the number of cores to deploy.
-- You can choose to run DIAMOND in sensitive mode with the `--diamond-mode sensitive` flag. This will increase sensitivity but will make alignment considerably slower.
-- Setting the `--block-size` parameter lower will decrease memory and temporary disk space usage. Setting it higher will increase performance.
-- For high memory machines, it is advised to set `--index-chunks` to 1 (currently the default). This parameter has no effect on temporary disk space usage.
+- You can choose to run DIAMOND in sensitive mode with the `--diamond_mode sensitive` flag. This will increase sensitivity but will make alignment considerably slower.
+- Setting the `--block_size` parameter lower will decrease memory and temporary disk space usage. Setting it higher will increase performance.
+- For high memory machines, it is advised to set `--index_chunks` to 1 (currently the default). This parameter has no effect on temporary disk space usage.
 - You can specify the location of temporary DIAMOND files with the `--tmpdir` argument.
 
 ### Examples
@@ -412,7 +412,7 @@ Run CAT on a contig set with default parameter settings deploying 16 cores for D
 
 ```
 
-$ CAT_pack cat -c contigs.fasta -d db/ -n 16 --output-prefix first_CAT_run
+$ CAT_pack cat -c contigs.fasta -d db/ -n 16 --output_prefix first_CAT_run
 
 $ CAT_pack add_names -i first_CAT_run.contig2classification.txt -o first_CAT_run.contig2classification.official_names.txt -d db/ --only_official
 
@@ -483,7 +483,7 @@ If you already have a sorted mapping file, you can supply it and RAT will skip t
 
 ```
 
-$ CAT_pack rat --mode mcr -b bin_folder/ -c contigs.fasta --bam-file mapping_file_sorted.bam -r forward_reads.fq.gz -r reverse_reads.fq.gz -d db/
+$ CAT_pack rat --mode mcr -b bin_folder/ -c contigs.fasta --bam_file mapping_file_sorted.bam -r forward_reads.fq.gz -r reverse_reads.fq.gz -d db/
 ```
 
 If CAT and/or BAT have already been run on your data, you can supply the output files to RAT to skip the CAT and BAT runs:
@@ -511,7 +511,7 @@ Similar to CAT and BAT, the paths to all dependencies can be supplied via an arg
 
 ```
 
-$ CAT_pack rat --mode mcr -b bin_folder/ -c contigs.fasta --read-file forward_reads.fq.gz --read-file reverse_reads.fq.gz -d db/ --path_to_samtools /path/to/samtools
+$ CAT_pack rat --mode mcr -b bin_folder/ -c contigs.fasta --read_file forward_reads.fq.gz --read_file reverse_reads.fq.gz -d db/ --path_to_samtools /path/to/samtools
 ```
 
 ### Output files
