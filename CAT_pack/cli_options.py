@@ -40,7 +40,7 @@ def diamond_options(
         "--no-self-hits", rich_help_panel="DIAMOND",
         help="Do not report identical self hits by DIAMOND.",
     )] = DiamondOptions.no_self_hits,
-    no_tiny_out: Annotated[bool, Option("--blast6_out", help="This flag disables the minified alignment output CAT pack uses by default", show_default=False)] = not DiamondOptions.tiny_out,
+    no_tiny_out: Annotated[bool, Option("--blast6_out", help="Save the default blast6 twelve column alignment table instead of the default compact table.", show_default=False)] = not DiamondOptions.tiny_out,
     path_to_diamond: DiamondPathOption = DiamondOptions.path_to_diamond,
 ) -> DiamondOptions:
     return DiamondOptions(
