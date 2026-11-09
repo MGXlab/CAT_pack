@@ -35,7 +35,7 @@ To cite the code itself:
 
 <a href="https://zenodo.org/doi/10.5281/zenodo.10809238"><img src="https://zenodo.org/badge/67035910.svg" alt="DOI"></a>
 ![tests](https://github.com/MGXlab/CAT_pack/actions/workflows/tests.yml/badge.svg)
-![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FMGXlab%2FCAT_pack%2Fdev%2Fmaster%2Fpyproject.toml)
+![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FMGXlab%2FCAT_pack%2Fmaster%2Fpyproject.toml)
 ![GitHub Release](https://img.shields.io/github/v/release/MGXlab/CAT_pack)
 ![PyPI Version](https://img.shields.io/pypi/v/cat-pack)
 ![Conda Version](https://img.shields.io/conda/vn/bioconda/cat)
@@ -527,7 +527,3 @@ The RAT output consists of:
 - A fasta containing the sequences of all unmapped reads and contigs that could not be annotated by CAT (when the mode contains `r`).
 - The DIAMOND or MMseqs2 alignment of unmapped reads and unannotated contigs (when the mode contains `r`).
 - A table that contains the annotations for unmapped reads and (previously) unannotated contigs (`<prefix>.RAT.unmapped2classification.txt`, when the mode contains `r`).
-
-In abundance tables, **fraction of reads** is the number of reads assigned to a row divided by the total number of reads, including unmapped reads. In the contig and bin tables, **corrected fraction** divides each row's read count by its sequence length, then normalizes these values to sum to one across rows with a nonzero length. Unmapped reads have a corrected fraction of zero.
-
-The contig table also includes **Average Coverage** as its final column: the total aligned read bases on a contig divided by its full length, including uncovered positions. For example, 15,000 aligned bases on a 1,000-base contig give a depth of 15 (15× coverage). This uses the same primary alignments and mapping-quality threshold as RAT's read counts, with no additional base-quality or duplicate-read filtering. Both mates contribute independently, including overlapping portions. Only the `M`, `=`, and `X` operations in the [SAM CIGAR specification](https://samtools.github.io/hts-specs/SAMv1.pdf) contribute aligned bases; clipping, insertions, deletions, skipped regions, and padding do not. Coverage is `NA` for the unmapped row, zero-length contigs, or a contig with any accepted mapping whose CIGAR is unavailable (`*`). The previous column labelled **Average Coverage** is now called **corrected fraction**; its calculation is unchanged.
