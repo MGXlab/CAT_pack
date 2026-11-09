@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "CAT_pack"
+version = "7.0.0b0"
+description = "CAT, BAT, RAT package"
+authors = [
+    {name = "F. A. Bastiaan von Meijenfeldt"},
+    {name = "Nikos Pappas"},
+    {name = "Ernestina Hauptfeld"},
+    {name = "Chloë Cornelissen"}
+]
+requires-python = ">=3.11"
+dependencies = [
+    "typer",
+    "rich",
+    "pyrodigal",
+    "numpy",
+    "polars==2.0.0",
+    "psutil"
+]
+readme = "README.md"
+license = "MIT"
+
+[project.optional-dependencies]
+gpu = ["pycuda; sys_platform == 'linux'"]
+
+[project.scripts]
+cat_pack = "CAT_pack.cli:app"
+CAT_pack = "CAT_pack.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["CAT_pack", "CAT_pack.*"]
+namespaces = true
+
+[tool.cat_pack]
+release_date = 2026-11-09
+
+[project.urls]
+Repository = "https://github.com/MGXlab/CAT_pack.git"
+Issues = "https://github.com/MGXlab/CAT_pack/issues"
+Changelog = "https://github.com/MGXlab/CAT_pack/blob/master/CHANGELOG.md"

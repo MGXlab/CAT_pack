@@ -1,0 +1,209 @@
+#!/usr/bin/env python3
+import bz2
+import gzip
+import importlib
+import os
+import shutil
+from decimal import Decimal, InvalidOperation
+from pathlib import Path
+
+from .errors import InputError, ExternalToolError, ValErrorCollector, CheckSumError
+
+
+def check_folder(path: Path, label: str, make: bool=False) -> Path:
+    if not path.is_dir() and not make:
+        raise InputError(
+            f"{label} was not found.",
+            hint="Double check if the folder exists.",
+            path=path,
+        )
+    # Make/create the folder if it does not exist yet :)
+    if make and not path.exists():
+        path.mkdir(parents=True)
+    return path
+
+
+def check_file(path: Path, label: str, exist=True) -> Path:
+    if not path.is_file():
+        if not exist:
+            return path
+        raise InputError(
+            f"{label} was not found.",
+            hint="Double check if the file exists.",
+            path=path,
+        )
+    if not exist:
+        raise InputError(
+            f"{label} was found.",
+            hint="Please remove the file, or choose another out folder",
+            path=path,
+        )
+    return path
+
+def check_file_not_empty(path: Path, label: str) -> Path:
+    path = check_file(path, label)
+    if os.path.getsize(path) == 0:
+        raise InputError(f"{label} is empty",
+                         hint=f"Please make sure the {label} is not empty.",
+                         path=path)
+    return path
+
+def check_fasta_file(path: Path, label: str) -> Path:
+    path = check_file(path, label)
+    opener = gzip.open if path.suffix == ".gz" else bz2.open if path.suffix == ".bz2" else open
+    with opener(path, "rb") as fasta_file:
+        first_character = fasta_file.read(1)
+    if not first_character:
+        raise InputError(f"{label} is empty.", path=path)
+    if first_character != b">":
+        raise InputError(f"{label} must start with a FASTA header (>).", path=path)
+    return path
+
+
+def check_mmseqs_gpu_database(database: Path) -> Path:
+    hint = "Prepare the database with --build_mmseqs2 --gpu using the same --common_prefix."
+    for suffix in ("", ".index", ".dbtype", "_h", "_h.index", "_h.dbtype"):
+        path = database.with_name(database.name + suffix)
+        if not path.is_file() or path.stat().st_size == 0:
+            raise InputError("MMseqs2 GPU database is incomplete.", path=path, hint=hint)
+
+    dbtype = database.with_name(database.name + ".dbtype").read_bytes()
+    value = int.from_bytes(dbtype, "little")
+    # MMseqs2: DBTYPE_AMINO_ACIDS=0; DBTYPE_EXTENDED_GPU=8 in the upper 16 bits.
+    if (len(dbtype) != 4 or value & 0xFFFF != 0
+            or not value & (8 << 16) or value & (1 << 31)):
+        raise InputError("MMseqs2 database is not a GPU usable protein database.",
+                         path=database, hint=hint)
+    return database
+
+
+def check_db_file(folder: Path, suffix: str, label: str) -> Path:
+    matches = sorted(
+        path for path in folder.iterdir()
+        if path.is_file() and path.name.endswith(suffix)
+    )
+
+    if not matches:
+        raise InputError(
+            f"{label} was not found.",
+            path=folder,
+            hint=f"Expected a file ending in '{suffix}'.",
+        )
+
+    if len(matches) > 1:
+        names = ", ".join(path.name for path in matches)
+
+        raise InputError(
+            f"Multiple files found for {label.lower()}: {names}",
+            path=folder,
+            hint="Use a folder containing one prepared database.",
+        )
+    return matches[0]
+
+
+def check_pyrodigal():
+    try:
+        importlib.import_module("pyrodigal")
+    except ImportError:
+        raise ExternalToolError(
+            "pyrodigal",
+            "Package was not found",
+            hint="Please check whether it is installed and if the correct environment is active",
+        )
+
+
+def check_diamond(path: Path | None = None) -> Path:
+    command = str(path.resolve()) if path is not None else "diamond"
+    found = shutil.which(command)
+    if found is None:
+        raise ExternalToolError(
+            "DIAMOND",
+            "was not found on PATH",
+            hint="Activate the environment containing DIAMOND",
+        )
+    return Path(found)
+
+
+def check_number(value, label: str, minimum=None, maximum=None) -> Decimal:
+    try:
+        number = Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        number = None
+    if number is not None and number.is_finite() and minimum <= number <= maximum:
+        return number
+    if minimum is not None and maximum is not None:
+        raise InputError(f"{label} must be a number between {minimum} and {maximum}.")
+    else:
+        # DEVNOTE: Yes this is indeed already checked by typer. But typer
+        #  checking is now set to "strict" and in the future is may be an option
+        #  to set that lower so all errors can be aggregated here instead of only the
+        #  cli input errors first and then the more rigorous checking
+        raise InputError(f"{label} must be a number or decimal")
+
+
+def check_integer(value, label: str, minimum=None, maximum=None) -> int:
+    number = check_number(value, label, minimum, maximum)
+    if number != number.to_integral_value():
+        if minimum is not None and maximum is not None:
+            raise InputError(f"{label} must be an integer between {minimum} and {maximum}.")
+        else:
+            # DEVNOTE: See note in check_number
+            raise InputError(f"{label} must be a integer or decimal")
+    return int(number)
+
+
+def check_output_prefix(prefix: Path) -> Path:
+    if prefix.is_dir():
+        raise InputError(
+            "prefix for output files is a directory.",
+            path=prefix,
+            hint="Include a filename prefix, for example results/CAT",
+        )
+    if not prefix.parent.is_dir():
+        raise InputError(
+            f"cannot find output directory {prefix.parent} "
+                    f"to which output files should be written.",
+            path=prefix.parent,
+        )
+    return prefix
+
+
+def check_outputs(paths: list[Path]) -> None:
+    checks = ValErrorCollector()
+    for path in paths:
+        if path.is_file():
+            checks.add(InputError(
+                "Output already exists!",
+                path=path,
+                hint="Choose a different output location",
+            ))
+    checks.finish()
+
+
+def check_md5_gz(gz_file, md5_file):
+    checks = ValErrorCollector()
+    with open(md5_file) as f1:
+        md5_exp = f1.read().strip().split(" ")[0]
+
+    if md5_exp == "":
+
+        checks.add(CheckSumError("no MD5 found in {0}. Integrity of {1} cannot be "
+                "established.".format(md5_file, gz_file)))
+    else:
+        md5 = gz_md5(gz_file)
+
+        if md5 != md5_exp:
+            checks.add(CheckSumError("MD5 of {0} does not check out.".format(gz_file)))
+
+    checks.finish()
+    return
+
+
+def gz_md5(input_gz, block_size=4096):
+    import hashlib
+    md5 = hashlib.md5()
+    with open(input_gz, "rb") as f1:
+        for chunk in iter(lambda: f1.read(block_size), b""):
+            md5.update(chunk)
+
+    return md5.hexdigest()

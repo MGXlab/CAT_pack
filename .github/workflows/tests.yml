@@ -1,0 +1,42 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unittest:
+    name: ${{ matrix.suite.name }} · Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+        suite:
+          - name: CLI
+            file: test_cli.py
+          - name: Options
+            file: test_options.py
+          - name: Classification
+            file: test_basic_classification.py
+          - name: Hit counts
+            file: test_hit_counts.py
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package
+        run: python -m pip install .
+
+      - name: Run ${{ matrix.suite.name }} tests
+        run: python -m unittest discover -s tests -p "${{ matrix.suite.file }}" -v

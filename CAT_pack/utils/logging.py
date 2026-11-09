@@ -1,0 +1,78 @@
+import logging
+from contextlib import contextmanager
+from enum import Enum
+from pathlib import Path
+from typing import Iterator, Protocol
+
+from rich.console import Console
+from rich.logging import RichHandler
+
+
+class Status(Enum):
+    WAITING = "Waiting"
+    RUNNING = "Running"
+    COMPLETE = "Completed"
+    SUPPLIED = "Supplied"
+    SKIPPED = "Skipped"
+    FAILED = "Failed"
+    CANCELLED = "Cancelled"
+
+    def __str__(self) -> str:
+        return self.value
+
+class Report(Protocol):
+    """Reports back to cli.py with the current progress.
+    Call it with a step name, the current status, how much is completed,
+    how much total work there must be done (including completed) Leave None if
+    the amount of work is not known (yet).
+
+    Within status make the choice: Running, complete, reused, skipped or failed
+    Cancelled can also be used if user canceled the run
+    """
+
+    def __call__(self, step: str, status: Status, completed: int,
+                 total: int | None) -> None: ...
+
+    def progress_next(self) -> None: ...
+
+def add_handler(
+    logger: logging.Logger, log_file: Path, debug: bool = False,
+) -> logging.FileHandler:
+    handler = logging.FileHandler(log_file, encoding="utf-8")
+    handler.setLevel(logging.NOTSET if debug else logging.INFO)
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s\t%(message)s"))
+    logger.setLevel(logging.DEBUG)
+    logger.addHandler(handler)
+    return handler
+
+
+@contextmanager
+def file_logging(logger: logging.Logger, log_file: Path, debug: bool = False) -> Iterator[None]:
+    handler = add_handler(logger, log_file, debug)
+    try:
+        yield
+    finally:
+        logger.removeHandler(handler)
+        handler.close()
+
+
+def init_logging(debug: bool = False,quiet: bool = False,
+                 log_file: Path | None = None,
+                 console: Console | None = None) -> logging.Logger:
+
+    logger = logging.getLogger("CAT_pack")
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+
+    console = console or Console(stderr=True)
+
+    if not quiet:
+        rich_handler = RichHandler(console=console, show_path=debug, rich_tracebacks=debug, markup=True)
+        rich_handler.setLevel(logging.DEBUG if debug else logging.WARNING)
+        logger.addHandler(rich_handler)
+
+    if log_file is not None:
+        add_handler(logger, log_file, debug)
+
+    return logger
+
