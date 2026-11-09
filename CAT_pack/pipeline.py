@@ -42,7 +42,7 @@ from .utils.logging import Status, Report, file_logging
 class Step:
     """
     A simple dataclass currently acting like a dictionary that stores the
-    name of the step and reuse, if reuse is true it will use userprovided data
+    name of the step and reuse, if reuse is true it will use user provided data
     """
     name: str
     supplied: bool = False

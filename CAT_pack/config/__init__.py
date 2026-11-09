@@ -11,5 +11,5 @@ the CLI can be declared here. As well as commands to run certain external tools.
 
 Validation.py
 This script validates user input. Checks if the user needs to change values, files exist, files are empty or correct non corrupt input is supplies. 
-and gives back guided errors with custom erros from `utils/errors.py' if input isn't as expected. This script depends on the python script `checks.py` to perfrom checks
+and gives back guided errors with custom errors from `utils/errors.py' if input isn't as expected. This script depends on the python script `checks.py` to perform checks
 """

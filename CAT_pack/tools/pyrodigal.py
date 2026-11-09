@@ -91,7 +91,7 @@ def run_pyrodigal(settings, files, report):
 
                     n_contigs += len(contig_names)
                     report("Protein prediction", Status.RUNNING, n_contigs, None)
-                    # explicid release, to prevent memory growth
+                    # explicit release, to prevent memory growth
                     del predictions, protein_text, gff_text, contig_names, sequences
 
         proteins_fasta.replace(files.proteins_fasta)

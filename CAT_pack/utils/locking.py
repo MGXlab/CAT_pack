@@ -9,10 +9,10 @@ from .errors import InputError
 
 @contextmanager
 def _lock_windows(path: Path) -> Iterator[None]:
-    # O_TEMPORARY: Windows wil delete the lockfile itself once the last handle has been closed
+    # O_TEMPORARY: Windows will delete the lockfile itself once the last handle has been closed
     flags = os.O_RDWR | os.O_CREAT | os.O_TEMPORARY | os.O_BINARY
 
-    # DEVNOE: python versions 3.15, 3.12, 3.14 do not have module msvcrt on Linux, so only import after _lock_windows has been selected
+    # DEVNOTE: python versions 3.15, 3.12, 3.14 do not have module msvcrt on Linux, so only import after _lock_windows has been selected
     import msvcrt
 
     file = os.fdopen(os.open(path, flags, 0o600), "r+b")

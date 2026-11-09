@@ -83,7 +83,7 @@ def _make_hit_filter(all_hits: set[str]) -> tuple[shared_memory.SharedMemory, in
         hit_filter.buf[bit >> 3] |= 1 << (bit & 7)
     return hit_filter, hit_mask
 
-# Yay, snared memory between workers :)
+# Yay, shared memory between workers :)
 def open_hit_filter(name: str, hit_mask: int) -> None:
     global _hit_filter, _hit_mask
     _hit_filter = shared_memory.SharedMemory(name=name)

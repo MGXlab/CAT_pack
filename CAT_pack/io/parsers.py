@@ -342,7 +342,7 @@ class AlignmentParser:
     def parse(self) -> AlignmentInput:
         log.info(f"Parsing alignment file {self.path}.")
         # https://docs.pola.rs/api/python/stable/reference/api/polars.thread_pool_size.html
-        # DEVNOTE: During testing the sweetspot was 16 cores at 76 seconds and 8 cores around 77 seconds
+        # DEVNOTE: During testing the sweet spot was 16 cores at 76 seconds and 8 cores around 77 seconds
         #  10-12 cores need to be tested
         os.environ.setdefault("POLARS_MAX_THREADS", str(min(self.workers, os.cpu_count() or 1)))
 
