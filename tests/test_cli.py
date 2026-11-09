@@ -34,10 +34,11 @@ class CliTests(unittest.TestCase):
                 with self.subTest(args=args):
                     result = self.runner.invoke(app, args)
                     self.assertEqual(result.exit_code, 0, result.output)
-                    self.assertIn(expected, result.output)
-                    self.assertNotIn("version unknown", result.output)
+                    output = Text.from_ansi(result.output).plain
+                    self.assertIn(expected, output)
+                    self.assertNotIn("version unknown", output)
                     if args == ["--about"]:
-                        self.assertRegex(result.output, r"Released \d{4}-\d{2}-\d{2}")
+                        self.assertRegex(output, r"Released \d{4}-\d{2}-\d{2}")
 
     def test_command_help_lists_execution_flags(self):
         for command in ("prepare", "cat", "bat", "bins"):
