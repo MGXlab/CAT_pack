@@ -53,6 +53,10 @@ $ wget tbb.bio.uu.nl/tina/CAT_pack_prepare/20231120_CAT_gtdb.tar.gz     # releas
 $ tar -xvzf 20231120_CAT_gtdb.tar.gz
 ```
 
+Follow the [build a reference database guide](https://github.com/MGXlab/CAT_pack/wiki/Build-a-reference-database) to build a new database if you need a newer snapshot.
+
+Want to create a custom database? Then follow this [guide](https://github.com/MGXlab/CAT_pack/wiki/Build-a-reference-database)
+
 
 ### Running CAT/BAT/RAT.
 The database files are needed in subsequent CAT/BAT/RAT runs. They only need to be generated/downloaded once or whenever you want to update the database.
@@ -65,6 +69,8 @@ $ CAT_pack bat       # Runs BAT.
 
 $ CAT_pack rat       # Runs RAT.
 ```
+
+See the [quick start](https://github.com/MGXlab/CAT_pack/wiki#quick-start) on how to use CAT pack
 
 ## License
 This project is licensed under the terms of the MIT license.
