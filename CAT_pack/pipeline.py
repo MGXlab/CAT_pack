@@ -207,6 +207,7 @@ def run_classification(settings: CatSettings | BatSettings, report: Report) -> t
             range_=settings.range_,
             branches=inputs.branches,
             no_stars=settings.no_stars,
+            fasta_path=files.proteins_fasta,
         )
         for entity in range(len(result)):
             writer.write(result, entity)
