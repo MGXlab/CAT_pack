@@ -42,10 +42,14 @@ def diamond_options(
     )] = DiamondOptions.no_self_hits,
     no_tiny_out: Annotated[bool, Option("--blast6_out", help="Save the default blast6 twelve column alignment table instead of the default compact table.", show_default=False)] = not DiamondOptions.tiny_out,
     path_to_diamond: DiamondPathOption = DiamondOptions.path_to_diamond,
+    comp_based_stats: Annotated[int, Option(
+        "--comp_based_stats", min=0, max=1, rich_help_panel="DIAMOND",
+    )] = DiamondOptions.comp_based_stats,
 ) -> DiamondOptions:
     return DiamondOptions(
         mode=diamond_mode, block_size=block_size, index_chunks=index_chunks,
-        no_self_hits=no_self_hits, path_to_diamond=path_to_diamond, tiny_out=not no_tiny_out
+        no_self_hits=no_self_hits, path_to_diamond=path_to_diamond, tiny_out=not no_tiny_out,
+        comp_based_stats=comp_based_stats,
     )
 
 
@@ -66,10 +70,13 @@ def mmseqs_options(
         "--gpu", rich_help_panel="MMseqs2",
         help="Use MMseqs2 GPU search. Requires a database prepared with --build_mmseqs2 --gpu.",
     )] = MMseqsOptions.gpu,
+    comp_bias_corr: Annotated[int, Option(
+        "--comp_bias_corr", min=0, max=1, rich_help_panel="MMseqs2",
+    )] = MMseqsOptions.comp_bias_corr,
 ) -> MMseqsOptions:
     return MMseqsOptions(
         sensitivity=sensitivity, split_memory_limit=split_memory_limit,
-        executable=path_to_mmseqs, gpu=gpu,
+        executable=path_to_mmseqs, gpu=gpu, comp_bias_corr=comp_bias_corr,
     )
 
 

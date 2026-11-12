@@ -96,15 +96,18 @@ def validate_aligner_options(args: AnnotationOptions) -> AlignerName:
 def validate_diamond(options: DiamondOptions) -> DiamondParameters:
     checks = ValErrorCollector()
     executable = checks.check(check_diamond, options.path_to_diamond)
+    correction = checks.check(check_integer, options.comp_based_stats, "DIAMOND comp_based_stats", 0, 1)
     if options.mode not in DIAMOND_MODES:
         checks.add(InputError("Unknown DIAMOND mode.", hint=", ".join(DIAMOND_MODES)))
     checks.finish()
     return DiamondParameters(
         executable, options.mode, options.no_self_hits,
         options.block_size, options.index_chunks,
+        comp_based_stats=correction,
     )
 
 def validate_mmseqs(options: MMseqsOptions) -> Path:
+    check_integer(options.comp_bias_corr, "MMseqs2 comp_bias_corr", 0, 1)
     command = str(options.executable.resolve()) if options.executable else "mmseqs"
     executable = shutil.which(command)
 
@@ -422,6 +425,7 @@ def validate_cat(args: CatOptions | BatOptions, *, reuse: CatSettings | None = N
         aligner = DiamondSettings(
             diamond=diamond.diamond, mode=diamond.mode, no_self_hits=diamond.no_self_hits,
             block_size=diamond.block_size, index_chunks=diamond.index_chunks,
+            comp_based_stats=diamond.comp_based_stats,
             query=files.proteins_fasta, database=files.diamond_database,
             alignment=files.alignment, tmpdir=tmpdir, threads=execution.threads,
             top=top, compression=args.compress, verbose=execution.verbose,
@@ -437,6 +441,7 @@ def validate_cat(args: CatOptions | BatOptions, *, reuse: CatSettings | None = N
             top=top, compression=args.compress, verbose=execution.verbose,
             tiny_out=args.diamond.tiny_out,
             gpu=args.mmseqs.gpu,
+            comp_bias_corr=args.mmseqs.comp_bias_corr,
         )
 
     if isinstance(args, BatOptions):
@@ -681,12 +686,14 @@ def validate_rat_args(args: RatOptions) -> RatSettings:
                 compression=args.compress, verbose=execution.verbose,
                 tiny_out=args.diamond.tiny_out, gpu=args.mmseqs.gpu,
                 search_type=2,
+                comp_bias_corr=args.mmseqs.comp_bias_corr,
             )
         else:
             aligner = DiamondSettings(
                 diamond=diamond.diamond, mode=diamond.mode,
                 no_self_hits=diamond.no_self_hits, block_size=diamond.block_size,
                 index_chunks=diamond.index_chunks, query=files.unclassified_fasta,
+                comp_based_stats=diamond.comp_based_stats,
                 database=database, alignment=files.alignment_unmapped, tmpdir=tmpdir,
                 threads=execution.threads, top=top, compression=args.compress,
                 verbose=execution.verbose, blast_flavour="blastx", tiny_out=args.diamond.tiny_out,

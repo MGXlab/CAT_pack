@@ -68,6 +68,7 @@ class DiamondParameters:
     no_self_hits: bool
     block_size: float
     index_chunks: int
+    comp_based_stats: int = field(default=1, kw_only=True)
 
 
 @dataclass(frozen=True)
@@ -97,6 +98,7 @@ class DiamondSettings(DiamondParameters):
             "-p", self.threads,
             "--block-size", self.block_size,
             "--index-chunks", self.index_chunks,
+            "--comp-based-stats", self.comp_based_stats,
             "--tmpdir", self.tmpdir,
             "--compress", int(self.compression),
             f"--{self.mode}" if self.mode != 'default' else "",
@@ -124,6 +126,7 @@ class MMseqsSettings:
     tiny_out: bool = True
     gpu: bool = False
     search_type: int | None = None
+    comp_bias_corr: int = 1
 
     def get_command(self) -> list[str]:
         command = [
@@ -133,6 +136,7 @@ class MMseqsSettings:
             "--threads", self.threads,
             "--compressed", int(self.compression),
             "--split-memory-limit", self.split_memory_limit,
+            "--comp-bias-corr", self.comp_bias_corr,
         ]
 
         if self.gpu:

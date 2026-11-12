@@ -29,6 +29,7 @@ class DiamondOptions:
     index_chunks: int = 1
     tiny_out: bool = True
     path_to_diamond: Path | None = None
+    comp_based_stats: int = 1
 
 
 @dataclass(frozen=True)
@@ -37,6 +38,7 @@ class MMseqsOptions:
     split_memory_limit: str = "0"
     executable: Path | None = None
     gpu: bool = False
+    comp_bias_corr: int = 1
 
 
 @dataclass(frozen=True)
