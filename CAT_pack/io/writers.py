@@ -1,10 +1,12 @@
 """Write the shared CAT/BAT classification report format."""
+import math
 from decimal import Decimal
+from importlib.resources import files
 from itertools import groupby
 from pathlib import Path
 from typing import TextIO, IO, Literal
 
-from CAT_pack.io.parsers import format_bitscore
+from CAT_pack.io.parsers import format_bitscore, FastaParser
 from CAT_pack.results import Classification, ClassificationStatus, Lineage
 from CAT_pack.tax import Taxonomy, ORF, convert_to_names, convert_to_official_names
 from CAT_pack.utils.errors import InputError
@@ -17,7 +19,7 @@ class ClassificationWriter:
     def __init__(
         self, classification_out: TextIO, orf_out: TextIO | None = None, *,
         entity_type: EntityType, fraction: Decimal, range_: Decimal,
-        branches: set[str], no_stars: bool = False,
+        branches: set[str], no_stars: bool = False, fasta_path: Path
     ) -> None:
         self.classification_out = classification_out
         self.orf_out = orf_out
@@ -27,19 +29,45 @@ class ClassificationWriter:
         self.range_ = range_
         self.branches = branches
         self.no_stars = no_stars
+        self.self_scores = self.calculate_self_bitscores(fasta_path)
         self._lineage_taxonomy: Taxonomy | None = None
         self._lineages: dict[int, str] = {}
         self._write_headers()
 
+    def load_self_scores(self) -> dict[str, int]:
+        """Read only the scores of a self-hit"""
+        self_scores = {}
+        with files("CAT_pack").joinpath("assets/BLOSUM62").open() as f1:
+            col_index = 0
+            for line in f1:
+                if not line.strip() or line.startswith("#") or '*' in line:
+                    continue
+                scores = line.split()
+                self_scores[scores[0]] = int(scores[1 + col_index])
+                col_index += 1
+        return self_scores
+
+    def calculate_self_bitscores(self, proteins_fasta: Path) -> dict[str, float]:
+        self_scores = self.load_self_scores()
+        orf_self_bitscores = {}
+        for record in FastaParser(proteins_fasta):
+            score = sum(self_scores[residue] for residue in record.sequence.upper().rstrip("*"))
+            # B = (lambda * S - ln K) / ln 2. BLOSUM62, gap 11/1 table:
+            # https://github.com/ncbi/ncbi-cxx-toolkit-public/blob/master/src/algo/blast/core/blast_stat.c
+            orf_self_bitscores[record.name] = (0.267 * score - math.log(0.041)) / math.log(2)
+        return orf_self_bitscores
+
     def _write_headers(self) -> None:
+        comparison_columns = "\ttotal bitscore\tselfhit bitscore" if self.self_scores is not None else ""
         self.classification_out.write(
             f"# {self.entity_type}\tclassification\treason\tlineage\t"
-            f"lineage scores (f: {float(self.fraction)})\n"
+            f"lineage scores (f: {float(self.fraction)}){comparison_columns}\n"
         )
         if self.orf_out:
             bin_column = "bin\t" if self.is_bin else ""
+            comparison_columns = "\tselfhit bitscore" if self.self_scores is not None else ""
             self.orf_out.write(
-                f"# ORF\t{bin_column}number of hits (r: {self.range_})\tlineage\ttop bit-score\n"
+                f"# ORF\t{bin_column}number of hits (r: {self.range_})\tlineage\ttop bit-score{comparison_columns}\n"
             )
 
     def write(self, result: Classification, entity: int) -> None:
@@ -50,9 +78,15 @@ class ClassificationWriter:
                 self.write_orf(result, orf, entity)
 
         status = result.get_status(entity)
+        comparison = ""
+        if self.self_scores is not None:
+            actual = format_bitscore(int(result.weighted.total[entity]))
+            self_score = sum(self.self_scores[ORF] for ORF in result.orf_names[orfs])
+            comparison = f"\t{actual}\t{self_score:.1f}"
         if status != ClassificationStatus.ASSIGNED:
+            empty_lineage = "\t\t" if self.self_scores is not None else ""
             self.classification_out.write(
-                f"{entity_id}\tno taxid assigned\t{status.reason}\n"
+                f"{entity_id}\tno taxid assigned\t{status.reason}{empty_lineage}{comparison}\n"
             )
             return
         if self.entity_type == EntityType.SEQUENCE:
@@ -85,7 +119,7 @@ class ClassificationWriter:
                 score_parts.append(text)
             scores = ";".join(score_parts)
             self.classification_out.write(
-                f"{entity_id}\t{label}\t{reason}\t{lineage}\t{scores}\n"
+                f"{entity_id}\t{label}\t{reason}\t{lineage}\t{scores}{comparison}\n"
             )
 
     def write_orf(self, result: Classification, orf: int, entity: int) -> None:
@@ -94,8 +128,12 @@ class ClassificationWriter:
             prefix += f"\t{result.entities[entity]}"
 
         row = int(result.orf_row[orf])
+        comparison = ""
+        if self.self_scores is not None:
+            comparison = f"\t{self.self_scores[result.orf_names[orf]]:.1f}"
         if row == ORF.NO_HIT:
-            self.orf_out.write(f"{prefix}\tORF has no hit to database\n")
+            empty_hit = "\t\t0" if self.self_scores is not None else ""
+            self.orf_out.write(f"{prefix}\tORF has no hit to database{empty_hit}{comparison}\n")
             return
 
         taxid = int(result.orf_lca[orf])
@@ -107,7 +145,7 @@ class ClassificationWriter:
 
         bitscore = format_bitscore(int(result.orf_top_bitscore[orf]))
         self.orf_out.write(
-            f"{prefix}\t{result.orf_n_hits[orf]}\t{lineage}\t{bitscore}\n"
+            f"{prefix}\t{result.orf_n_hits[orf]}\t{lineage}\t{bitscore}{comparison}\n"
         )
 
     def format_lineage(self, lineage: tuple[str, ...]) -> str:
