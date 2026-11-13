@@ -1,5 +1,4 @@
 """Write the shared CAT/BAT classification report format."""
-import math
 from decimal import Decimal
 from importlib.resources import files
 from itertools import groupby
@@ -19,7 +18,8 @@ class ClassificationWriter:
     def __init__(
         self, classification_out: TextIO, orf_out: TextIO | None = None, *,
         entity_type: EntityType, fraction: Decimal, range_: Decimal,
-        branches: set[str], no_stars: bool = False, fasta_path: Path
+        branches: set[str], no_stars: bool = False, fasta_path: Path,
+        comp_bias_corr: bool = True,
     ) -> None:
         self.classification_out = classification_out
         self.orf_out = orf_out
@@ -29,32 +29,60 @@ class ClassificationWriter:
         self.range_ = range_
         self.branches = branches
         self.no_stars = no_stars
-        self.self_scores = self.calculate_self_bitscores(fasta_path)
+        self.self_scores = self.calculate_self_bitscores(fasta_path, comp_bias_corr)
         self._lineage_taxonomy: Taxonomy | None = None
         self._lineages: dict[int, str] = {}
         self._write_headers()
 
-    def load_self_scores(self) -> dict[str, int]:
+    def load_self_scores(self):
         """Read only the scores of a self-hit"""
         self_scores = {}
         with files("CAT_pack").joinpath("assets/BLOSUM62").open() as f1:
             col_index = 0
             for line in f1:
-                if not line.strip() or line.startswith("#") or '*' in line:
+                if not line.strip() or line.startswith("#"):
                     continue
                 scores = line.split()
-                self_scores[scores[0]] = int(scores[1 + col_index])
+                if col_index == 0:
+                    columns = scores
+                else:
+                    self_scores[scores[0]] = dict(zip(columns, map(int, scores[1:])))
                 col_index += 1
         return self_scores
 
-    def calculate_self_bitscores(self, proteins_fasta: Path) -> dict[str, float]:
+    def calculate_self_bitscores(self, proteins_fasta: Path, comp_bias_corr: bool = True) -> dict[str, Decimal]:
         self_scores = self.load_self_scores()
+        background = {}
+        with files("CAT_pack").joinpath("assets/BLOSUM62_background.tsv").open() as f1:
+            for line in f1:
+                if line.startswith("#"):
+                    continue
+                residue, frequency = line.split()
+                background[residue] = Decimal(frequency)
+        background_scores = {
+            residue: sum(frequency * scores[amino_acid] for amino_acid, frequency in background.items())
+            for residue, scores in self_scores.items()
+        }
+        log_K = Decimal("0.041").ln()
+        log_2 = Decimal(2).ln()
         orf_self_bitscores = {}
         for record in FastaParser(proteins_fasta):
-            score = sum(self_scores[residue] for residue in record.sequence.upper().rstrip("*"))
+            sequence = record.sequence.upper().rstrip("*")
+            score = Decimal(0)
+            best_score = Decimal(0)
+            for i, residue in enumerate(sequence):
+                scores = self_scores[residue]
+                correction = Decimal(0)
+                if comp_bias_corr:
+                    # Hauser 2016: +/-20 residues, excluding itself.
+                    neighbours = sequence[max(0, i - 20):i] + sequence[i + 1:i + 21]
+                    if neighbours:
+                        correction = background_scores[residue] - Decimal(sum(scores[amino_acid] for amino_acid in neighbours)) / len(neighbours)
+                score = max(Decimal(0), score + scores[residue] + correction)
+                best_score = max(best_score, score)
             # B = (lambda * S - ln K) / ln 2. BLOSUM62, gap 11/1 table:
             # https://github.com/ncbi/ncbi-cxx-toolkit-public/blob/master/src/algo/blast/core/blast_stat.c
-            orf_self_bitscores[record.name] = (0.267 * score - math.log(0.041)) / math.log(2)
+            orf_self_bitscores[record.name] = (Decimal("0.267") * best_score - log_K) / log_2
         return orf_self_bitscores
 
     def _write_headers(self) -> None:
@@ -81,7 +109,7 @@ class ClassificationWriter:
         comparison = ""
         if self.self_scores is not None:
             actual = format_bitscore(int(result.weighted.total[entity]))
-            self_score = sum(self.self_scores[ORF] for ORF in result.orf_names[orfs])
+            self_score = sum((self.self_scores[ORF] for ORF in result.orf_names[orfs]), Decimal(0))
             comparison = f"\t{actual}\t{self_score:.1f}"
         if status != ClassificationStatus.ASSIGNED:
             empty_lineage = "\t\t" if self.self_scores is not None else ""
