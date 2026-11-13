@@ -2,6 +2,7 @@
 from decimal import Decimal
 from importlib.resources import files
 from itertools import groupby
+from math import log
 from pathlib import Path
 from typing import TextIO, IO, Literal
 
@@ -50,7 +51,7 @@ class ClassificationWriter:
                 col_index += 1
         return self_scores
 
-    def calculate_self_bitscores(self, proteins_fasta: Path, comp_bias_corr: bool = True) -> dict[str, Decimal]:
+    def calculate_self_bitscores(self, proteins_fasta: Path, comp_bias_corr: bool = True) -> dict[str, float]:
         self_scores = self.load_self_scores()
         background = {}
         with files("CAT_pack").joinpath("assets/BLOSUM62_background.tsv").open() as f1:
@@ -58,31 +59,34 @@ class ClassificationWriter:
                 if line.startswith("#"):
                     continue
                 residue, frequency = line.split()
-                background[residue] = Decimal(frequency)
+                background[residue] = float(frequency)
         background_scores = {
             residue: sum(frequency * scores[amino_acid] for amino_acid, frequency in background.items())
             for residue, scores in self_scores.items()
         }
-        log_K = Decimal("0.041").ln()
-        log_2 = Decimal(2).ln()
+        log_K = log(0.041)
+        log_2 = log(2)
         orf_self_bitscores = {}
         for record in FastaParser(proteins_fasta):
             sequence = record.sequence.upper().rstrip("*")
-            score = Decimal(0)
-            best_score = Decimal(0)
+            score = 0
+            best_score = 0
             for i, residue in enumerate(sequence):
                 scores = self_scores[residue]
-                correction = Decimal(0)
-                if comp_bias_corr:
+                correction = 0
+                if comp_bias_corr and residue in background:
                     # Hauser 2016: +/-20 residues, excluding itself.
                     neighbours = sequence[max(0, i - 20):i] + sequence[i + 1:i + 21]
                     if neighbours:
-                        correction = background_scores[residue] - Decimal(sum(scores[amino_acid] for amino_acid in neighbours)) / len(neighbours)
-                score = max(Decimal(0), score + scores[residue] + correction)
+                        correction = background_scores[residue] - sum(scores[amino_acid] for amino_acid in neighbours) / len(neighbours)
+                        # DIAMOND 2.2.8 rounds each correction to an integer,
+                        # with half values rounded from zero.
+                        correction = int(correction - 0.5 if correction < 0 else correction + 0.5)
+                score = max(0, score + scores[residue] + correction)
                 best_score = max(best_score, score)
             # B = (lambda * S - ln K) / ln 2. BLOSUM62, gap 11/1 table:
             # https://github.com/ncbi/ncbi-cxx-toolkit-public/blob/master/src/algo/blast/core/blast_stat.c
-            orf_self_bitscores[record.name] = (Decimal("0.267") * best_score - log_K) / log_2
+            orf_self_bitscores[record.name] = (0.267 * best_score - log_K) / log_2
         return orf_self_bitscores
 
     def _write_headers(self) -> None:
@@ -109,7 +113,7 @@ class ClassificationWriter:
         comparison = ""
         if self.self_scores is not None:
             actual = format_bitscore(int(result.weighted.total[entity]))
-            self_score = sum((self.self_scores[ORF] for ORF in result.orf_names[orfs]), Decimal(0))
+            self_score = sum((self.self_scores[ORF] for ORF in result.orf_names[orfs]), 0.0)
             comparison = f"\t{actual}\t{self_score:.1f}"
         if status != ClassificationStatus.ASSIGNED:
             empty_lineage = "\t\t" if self.self_scores is not None else ""
