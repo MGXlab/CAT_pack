@@ -17,7 +17,7 @@ from .classification import ClassificationEngine
 from .config.options import BatOptions, CatOptions, PrepareOptions, DownloadOptions, RatOptions, AddNamesOptions, \
     SummariseOptions
 from .config.settings import BatFiles, BatSettings, CatFiles, CatSettings, DownloadOutputs, AddNamesSettings, \
-    SummariseSettings
+    SummariseSettings, DiamondSettings
 from .config.validation import check_orfs_match_contigs, get_file_names, get_validated_settings, make_prefix, \
     validate_download, get_download_file_names, make_cat_options, make_bat_options
 from .io.parsers import ClassificationParser, optionally_compressed_handle, import_contig_lengths
@@ -195,6 +195,10 @@ def run_classification(settings: CatSettings | BatSettings, report: Report) -> t
         "Writing classifications to %s and %s.",
         files.report, files.orf_report,
     )
+    comp_bias_corr = True
+    if settings.aligner is not None:
+        comp_bias_corr = bool(settings.aligner.comp_based_stats if isinstance(settings.aligner, DiamondSettings)
+                              else settings.aligner.comp_bias_corr)
     with (
         files.report.open("w", encoding="utf-8") as classification_out,
         files.orf_report.open("w", encoding="utf-8") as orf_out,
@@ -208,6 +212,7 @@ def run_classification(settings: CatSettings | BatSettings, report: Report) -> t
             branches=inputs.branches,
             no_stars=settings.no_stars,
             fasta_path=files.proteins_fasta,
+            comp_bias_corr=comp_bias_corr,
         )
         for entity in range(len(result)):
             writer.write(result, entity)
