@@ -37,7 +37,7 @@ include = ["CAT_pack", "CAT_pack.*"]
 namespaces = true
 
 [tool.setuptools.package-data]
-CAT_pack = ["assets/BLOSUM62"]
+CAT_pack = ["assets/BLOSUM62", "assets/BLOSUM62_background.tsv"]
 
 [tool.cat_pack]
 release_date = 2026-11-09
