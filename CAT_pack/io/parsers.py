@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from itertools import chain, islice
 from pathlib import Path
-from typing import Iterator, Literal, TextIO
+from typing import BinaryIO, Iterator, Literal, TextIO
 
 import numpy as np
 
@@ -27,7 +27,7 @@ parser_settings = ParserSettings()
 class FastaRecord:
     name: str
     sequence: str
-
+    accessions: tuple[str, ...] = ()
 
 
 class FastaParser:
@@ -40,6 +40,7 @@ class FastaParser:
         # Fasta (yield) logic Adopted from:
         # https://github.com/idptools/sparrow/blob/03aa232abcbe191d96daf55ee28e1f7881979a68/sparrow/sequence_analysis/plaac/plaac.py#L318-L350
         record_name = None
+        record_accessions: tuple[str, ...] = ()
         sequence_lines: list[str] = []
         seen: set[str] = set()
         with optionally_compressed_handle(self.path, "rt") as source:
@@ -48,36 +49,58 @@ class FastaParser:
                 if not line:
                     continue
                 if line.startswith(">"):
-                    next_name = self._parse_header(line)
+                    accessions = self.parse_accessions(line)
+                    next_name = accessions[0]
                     if next_name in seen:
                         raise InputError(f"Found a duplicate FASTA header: {next_name}.", path=self.path)
                     seen.add(next_name)
                     if record_name is not None:
-                        yield FastaRecord(record_name, "".join(sequence_lines))
+                        yield FastaRecord(record_name, "".join(sequence_lines), record_accessions)
                     record_name = next_name
+                    record_accessions = tuple(accessions)
                     sequence_lines = []
                 else:
                     sequence_lines.append(line)
 
         if record_name is not None:
-            yield FastaRecord(record_name, "".join(sequence_lines))
+            yield FastaRecord(record_name, "".join(sequence_lines), record_accessions)
 
     def iter_headers(self) -> Iterator[str]:
-        with optionally_compressed_handle(self.path, "rt") as source:
-            for line in source:
-                line = line.lstrip()
-                if line.startswith(">"):
-                    yield self._parse_header(line.rstrip())
+        for accessions in self.iter_header_accessions():
+            yield accessions[0]
 
-    def _parse_header(self, header: str) -> str:
-        name = header[1:].split(maxsplit=1)[0] if header[1:].strip() else ""
-        if not name:
+    def iter_header_accessions(self) -> Iterator[list[str]]:
+        """Yield the accession lists from headers only (during a binary scan,
+           this skips the sequence lines)."""
+        with optionally_compressed_handle(self.path, "rb") as source:
+            for raw in source:
+                if not raw.startswith(b">"):
+                    continue
+                yield self.parse_accessions(raw[1:].decode("utf-8").strip())
+
+    def parse_accessions(self, header: str) -> list[str]:
+        body = header[1:] if header.startswith(">") else header
+        body = body.strip()
+        if not body:
             raise InputError(
                 "Fasta header is empty",
                 path=self.path,
                 hint="Please provide a non-empty name immediately after '>'.",
             )
-        return name
+        accessions: list[str] = []
+        for part in body.split("\x01"):
+            fields = part.split()
+            if not fields:
+                raise InputError(
+                    "Fasta header is empty",
+                    path=self.path,
+                    hint="Please provide a non-empty name immediately after '>'.",
+                )
+            accessions.append(fields[0])
+        return accessions
+
+    def _parse_header(self, header: str) -> str:
+        return self.parse_accessions(header)[0]
 
     def parse_contig_names(self) -> set[str]:
         """Read unique contig identifiers. Checks also for duplicate contig names"""
@@ -344,9 +367,8 @@ class AlignmentParser:
         # https://docs.pola.rs/api/python/stable/reference/api/polars.thread_pool_size.html
         # DEVNOTE: During testing the sweet spot was 16 cores at 76 seconds and 8 cores around 77 seconds
         #  10-12 cores need to be tested
-        os.environ.setdefault("POLARS_MAX_THREADS", str(min(self.workers, os.cpu_count() or 1)))
-
         # Import AFTER threads setting, so Polars initializes with the correct core count!
+        configure_polars_threads(self.workers)
         import polars as pl
 
         source_file = optionally_compressed_handle(self.path, mode="rt")
@@ -489,10 +511,15 @@ class ClassificationParser:
         return bin2ORFs
 
 
+def configure_polars_threads(workers: int) -> None:
+    """Set POLARS_MAX_THREADS before the first polars import in this process."""
+    os.environ.setdefault("POLARS_MAX_THREADS", str(min(workers, os.cpu_count() or 1)))
+
+
 def optionally_compressed_handle(
     file_path: str | Path,
     mode: Literal["r", "rb", "rt", "w", "wb", "wt", "a", "ab", "at"] = 'r',
-) -> TextIO:
+) -> TextIO | BinaryIO:
     """Return an appropriate file handle to operate on.
 
     Arguments:
@@ -501,7 +528,8 @@ def optionally_compressed_handle(
 
     Return:
         A file handle either gzip opened or plainly opened for
-        reading/writing/appending in text mode.
+        reading/writing/appending. in either Binary or text mode. Text mode
+        uses UTF-8 encoding.
     """
     path = Path(file_path)
     opener = (
@@ -509,4 +537,6 @@ def optionally_compressed_handle(
         else bz2.open if path.suffix == ".bz2"
         else open
     )
+    if "b" in mode:
+        return opener(path, mode[0] + "b")
     return opener(path, mode[0] + "t", encoding="utf-8")
