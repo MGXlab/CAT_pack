@@ -96,7 +96,7 @@ def validate_aligner_options(args: AnnotationOptions) -> AlignerName:
 def validate_diamond(options: DiamondOptions) -> DiamondParameters:
     checks = ValErrorCollector()
     executable = checks.check(check_diamond, options.path_to_diamond)
-    correction = checks.check(check_integer, options.comp_based_stats, "DIAMOND comp_based_stats", 0, 1)
+    correction = checks.check(check_integer, options.comp_based_stats, "DIAMOND comp_based_stats", 0, 6)
     if options.mode not in DIAMOND_MODES:
         checks.add(InputError("Unknown DIAMOND mode.", hint=", ".join(DIAMOND_MODES)))
     checks.finish()
@@ -107,7 +107,7 @@ def validate_diamond(options: DiamondOptions) -> DiamondParameters:
     )
 
 def validate_mmseqs(options: MMseqsOptions) -> Path:
-    check_integer(options.comp_bias_corr, "MMseqs2 comp_bias_corr", 0, 1)
+    check_integer(options.comp_bias_corr, "MMseqs2 comp_bias_corr", 0, 6)
     command = str(options.executable.resolve()) if options.executable else "mmseqs"
     executable = shutil.which(command)
 

@@ -43,7 +43,7 @@ def diamond_options(
     no_tiny_out: Annotated[bool, Option("--blast6_out", help="Save the default blast6 twelve column alignment table instead of the default compact table.", show_default=False)] = not DiamondOptions.tiny_out,
     path_to_diamond: DiamondPathOption = DiamondOptions.path_to_diamond,
     comp_based_stats: Annotated[int, Option(
-        "--comp_based_stats", min=0, max=1, rich_help_panel="DIAMOND",
+        "--comp_based_stats", min=0, max=6, rich_help_panel="DIAMOND",
     )] = DiamondOptions.comp_based_stats,
 ) -> DiamondOptions:
     return DiamondOptions(

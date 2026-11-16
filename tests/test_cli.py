@@ -86,6 +86,7 @@ class CliTests(unittest.TestCase):
                     "--block_size", "4",
                     "--index_chunks", "2",
                     "--no_self_hits",
+                    "--comp_based_stats", "0",
                     "--path_to_diamond", "diamond.exe",
                 ]
 
@@ -98,6 +99,7 @@ class CliTests(unittest.TestCase):
                 self.assertEqual(options.diamond.block_size, 4)
                 self.assertEqual(options.diamond.index_chunks, 2)
                 self.assertTrue(options.diamond.no_self_hits)
+                self.assertEqual(options.diamond.comp_based_stats, 0)
                 self.assertEqual(options.diamond.path_to_diamond, Path("diamond.exe"))
 
     def test_annotation_commands_forward_mmseqs_options(self):
@@ -109,6 +111,7 @@ class CliTests(unittest.TestCase):
                     "--aligner", "mmseqs2",
                     "--sensitivity", "6.5",
                     "--split_memory_limit", "1G",
+                    "--comp_bias_corr", "0",
                     "--path_to_mmseqs", "mmseqs.exe",
                 ]
 
@@ -120,6 +123,7 @@ class CliTests(unittest.TestCase):
                 self.assertEqual(options.aligner, "mmseqs2")
                 self.assertEqual(options.mmseqs.sensitivity, 6.5)
                 self.assertEqual(options.mmseqs.split_memory_limit, "1G")
+                self.assertEqual(options.mmseqs.comp_bias_corr, 0)
                 self.assertEqual(options.mmseqs.executable, Path("mmseqs.exe"))
 
     def test_annotation_commands_use_default_aligner_options(self):
@@ -143,6 +147,14 @@ class CliTests(unittest.TestCase):
 
         self.assertEqual(result.exit_code, 2, result.output)
         run_annotation.assert_not_called()
+
+    def test_composition_correction_outside_zero_or_siz_is_rejected(self):
+        for flag in ("--comp_based_stats", "--comp_bias_corr"):
+            for value in ("-1", "8"):
+                with self.subTest(flag=flag, value=value), patch("CAT_pack.cli.run_annotation_cli") as run_annotation:
+                    result = self.runner.invoke(app, ["cat", "-c", "input.fna", "-d", "database", flag, value])
+                    self.assertEqual(result.exit_code, 2, result.output)
+                    run_annotation.assert_not_called()
 
     def test_mmseqs_sensitivity_above_the_limit_is_rejected(self):
         arguments = ["cat", "-c", "input.fna", "-d", "database", "--sensitivity", "8"]
