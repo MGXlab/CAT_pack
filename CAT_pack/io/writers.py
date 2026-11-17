@@ -19,7 +19,7 @@ class ClassificationWriter:
     def __init__(
         self, classification_out: TextIO, orf_out: TextIO | None = None, *,
         entity_type: EntityType, fraction: Decimal, range_: Decimal,
-        branches: set[str], no_stars: bool = False, fasta_path: Path,
+        branches: set[str], no_stars: bool = False, fasta_path: Path | None = None,
         comp_bias_corr: bool = True,
     ) -> None:
         self.classification_out = classification_out
@@ -30,7 +30,7 @@ class ClassificationWriter:
         self.range_ = range_
         self.branches = branches
         self.no_stars = no_stars
-        self.self_scores = self.calculate_self_bitscores(fasta_path, comp_bias_corr)
+        self.self_scores = self.calculate_self_bitscores(fasta_path, comp_bias_corr) if fasta_path is not None else None
         self._lineage_taxonomy: Taxonomy | None = None
         self._lineages: dict[int, str] = {}
         self._write_headers()
