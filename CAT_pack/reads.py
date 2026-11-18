@@ -56,6 +56,10 @@ def process_annotation_table(settings: RatSettings, output_table: Path)-> dict[s
             # Build a list of tuples for the lineage:
             # (tax_id1,tax_id2...), (rank1,rank2,...), (score1,score2...)]
             if contig_cols[1].startswith("taxid assigned") and len(contig_cols)>3:
+
+                # check if lineage is not empty, if it is, skip it.
+                if not contig_cols[3].strip():
+                    continue
                 tax_ids=contig_cols[3].strip().split(';')
                 scores=contig_cols[4].strip().split(';')
                 c2c[contig_id]=[tuple([t for t in tax_ids]),
