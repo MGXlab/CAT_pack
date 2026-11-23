@@ -28,8 +28,8 @@ Install via CONDA
 You need a conda-compatible package manager (currently either pixi, conda, or micromamba) and the Bioconda channel already activated (see Usage). Below is shown how how to install with conda (for micromamba and mamba, commands are the same as with conda, just replace 'conda' with e.g. 'mamba').
 
 With conda installed and the Bioconda channel set up (see Usage), to install into an existing and activated environment, run:
-```
-conda install cat_pack -c bioconda
+```bash
+conda install cat_pack -c bioconda -c conda-forge
 ```
 
 For alternative installation methods please see the wiki on [installation](https://github.com/MGXlab/CAT_pack/wiki/Installation)
@@ -37,20 +37,20 @@ For alternative installation methods please see the wiki on [installation](https
 ## Getting started
 ### Downloading preconstructed database files
 
-To download the database files, find the most recent version on [tbb.bio.uu.nl/tina/CAT\_pack\_prepare/](https://tbb.bio.uu.nl/tina/CAT_pack_prepare/), download and extract, and you are ready to go!
+To download the database files, find the most recent preconstructed database on [tbb.bio.uu.nl/tina/CAT\_pack\_prepare/](https://tbb.bio.uu.nl/tina/CAT_pack_prepare/), download and extract, and you are ready to go!
 
 For NCBI nr:
 ```
-$ wget tbb.bio.uu.nl/tina/CAT_pack_prepare/20240422_CAT_nr.tar.gz
+$ wget https://tbb.bio.uu.nl/tina/CAT_pack_prepare/20261111_CAT_nr.tar.gz
 
-$ tar -xvzf 20240422_CAT_nr.tar.gz
+$ tar -xvzf 20261111_CAT_nr.tar.gz
 ```
 
 For GTDB:
 ```
-$ wget tbb.bio.uu.nl/tina/CAT_pack_prepare/20231120_CAT_gtdb.tar.gz     # release 214
+$ wget tbb.bio.uu.nl/tina/CAT_pack_prepare/20260701_CAT_gtdb.tar.gz     # release 226
 
-$ tar -xvzf 20231120_CAT_gtdb.tar.gz
+$ tar -xvzf 20260701_CAT_gtdb.tar.gz
 ```
 
 Follow the [build a reference database guide](https://github.com/MGXlab/CAT_pack/wiki/Build-a-reference-database) to build a new database if you need a newer snapshot.
