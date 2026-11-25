@@ -22,7 +22,7 @@ class ORF(IntEnum):
     # Missing values must stay outside valid, nonnegative array positions.
     NO_HIT = -1
     NO_TAXID = -2
-
+r
 class Taxonomy:
     def __init__(
         self, parents: NDArray[np.int32], taxid_index: dict[str, int], taxids: list[str],
