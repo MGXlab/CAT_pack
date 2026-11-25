@@ -1,9 +1,11 @@
 # CAT, BAT, and RAT
-
-<a href="https://zenodo.org/doi/10.5281/zenodo.10809238"><img src="https://zenodo.org/badge/67035910.svg" alt="DOI"></a>
+![Static Badge](https://img.shields.io/badge/10.5281%2Fzenodo.24088475-blue?label=DOI&link=https%3A%2F%2Fzenodo.org%2Fdoi%2F10.5281%2Fzenodo.10809238)
+![Static Badge](https://img.shields.io/badge/CAT%20and%20BAT-gold?label=paper&link=https%3A%2F%2Fdoi.org%2F10.1186%2Fs13059-019-1817-x)
+![Static Badge](https://img.shields.io/badge/RAT-cyan?label=paper&link=https%3A%2F%2Fdoi.org%2F10.1038%2Fs41467-024-47155-1)
 ![tests](https://github.com/MGXlab/CAT_pack/actions/workflows/tests.yml/badge.svg)
 ![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FMGXlab%2FCAT_pack%2Fmaster%2Fpyproject.toml)
 ![PyPI Version](https://img.shields.io/pypi/v/cat-pack)
+![Conda Version](https://img.shields.io/conda/vn/bioconda/cat)
 ![Conda Downloads](https://img.shields.io/conda/dn/bioconda/cat?label=BioConda%20Downloads)
 ![GitHub License](https://img.shields.io/github/license/MGXlab/CAT_pack?color=blue)
 ## Introduction
