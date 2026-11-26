@@ -1,10 +1,10 @@
-"""Write the shared CAT/BAT classification report format."""
+"""Write classification reports and taxonomy files."""
 from decimal import Decimal
 from itertools import groupby
 from pathlib import Path
 from typing import TextIO, IO, Literal
 
-from CAT_pack.io.parsers import format_bitscore
+from CAT_pack.io.parsers import Taxon, format_bitscore
 from CAT_pack.results import Classification, ClassificationStatus, Lineage
 from CAT_pack.tax import Taxonomy, ORF, convert_to_names, convert_to_official_names
 from CAT_pack.utils.errors import InputError
@@ -411,3 +411,12 @@ def top_tabular_alignment(f1: TextIO, outf1: TextIO, top: int, bit_score_column:
             if bitscore * 100 < cutoff:
                 break
             outf1.write(line.rstrip("\r\n") + "\n")
+
+
+def write_taxonomy(taxa: dict[str, Taxon], nodes: Path, names: Path) -> None:
+    with nodes.open("w", encoding="utf-8", newline="\n") as node_output, \
+            names.open("w", encoding="utf-8", newline="\n") as name_output:
+        for taxid in sorted(taxa):
+            taxon = taxa[taxid]
+            node_output.write(f"{taxid}\t|\t{taxon.parent}\t|\t{taxon.rank}\t|\n")
+            name_output.write(f"{taxid}\t|\t{taxon.name}\t|\t\t|\tscientific name\t|\n")

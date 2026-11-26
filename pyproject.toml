@@ -26,6 +26,7 @@ license = "MIT"
 
 [project.optional-dependencies]
 gpu = ["pycuda; sys_platform == 'linux'"]
+ictv = ["openpyxl>=3.1"]
 
 [project.scripts]
 cat_pack = "CAT_pack.cli:app"

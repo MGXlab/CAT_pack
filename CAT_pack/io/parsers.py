@@ -3,13 +3,17 @@ import bz2
 import gzip
 import logging
 import os
+import re
 from array import array
-from contextlib import ExitStack, closing
+from contextlib import ExitStack, closing, contextmanager
 from dataclasses import dataclass
 from decimal import Decimal
-from itertools import chain, islice
+from itertools import chain, groupby, islice, takewhile
 from pathlib import Path
 from typing import Iterator, Literal, TextIO
+from urllib.parse import quote
+from xml.etree.ElementTree import ParseError
+from zipfile import BadZipFile
 
 import numpy as np
 
@@ -510,3 +514,197 @@ def optionally_compressed_handle(
         else open
     )
     return opener(path, mode[0] + "t", encoding="utf-8")
+
+
+ICTV_RANKS = (
+    "realm", "subrealm", "kingdom", "subkingdom", "phylum", "subphylum",
+    "class", "subclass", "order", "suborder", "family", "subfamily",
+    "genus", "subgenus", "species",
+)
+VMR_REQUIRED_COLUMNS = {"isolate id", "ictv_id", "species"}
+ICTV_ROOT = "ictv_root"
+GENBANK_COLUMN = "virus genbank accession"
+NUCLEOTIDE_ACCESSIONS = re.compile(
+    r"(?<![A-Za-z0-9_])(?:[A-Z][0-9]{5}|[A-Z]{2}[0-9]{6,8}|[A-Z]{4}[0-9]{8,10}|"
+    r"[A-Z]{6}[0-9]{9,11}|(?:AC|NC|NG|NT|NW|NZ)_[A-Z0-9]*[0-9]{5,12})"
+    r"(?:\.[0-9]+)?(?![A-Za-z0-9_])"
+)
+PROTEIN_ID = re.compile(r'^/protein_id="([A-Z0-9_]+\.[0-9]+)"$', re.MULTILINE)
+TRANSLATION = re.compile(r'^/translation="([A-Z*\s]+)"$', re.MULTILINE)
+
+
+@dataclass(frozen=True)
+class Taxon:
+    parent: str
+    rank: str
+    name: str
+
+
+def read_vmr(path: Path) -> tuple[dict[str, Taxon], dict[str, str]]:
+    """Read the ICTV taxonomy and isolate-to-species IDs from a VMR workbook."""
+    with open_vmr_sheet(path, VMR_REQUIRED_COLUMNS) as (sheet_name, columns, rows):
+        return _read_vmr_rows(sheet_name, columns, rows, path)
+
+
+@contextmanager
+def open_vmr_sheet(path: Path, required_columns: set[str]):
+    try:
+        from openpyxl import load_workbook
+        from openpyxl.utils.exceptions import InvalidFileException
+    except ImportError as error:
+        raise InputError("Reading an ICTV VMR workbook requires openpyxl.",
+                         hint="Install CAT_pack with the ictv extra: pip install '.[ictv]'.") from error
+
+    try:
+        with path.open("rb") as workbook_file:
+            workbook = load_workbook(workbook_file, read_only=True, data_only=True)
+            try:
+                candidates = []
+                for sheet in workbook.worksheets:
+                    rows = sheet.iter_rows(values_only=True)
+                    columns = {_vmr_cell_text(value).casefold(): i for i, value in enumerate(next(rows, ()))}
+                    if required_columns <= columns.keys():
+                        candidates.append((sheet.title, columns, rows))
+                if len(candidates) != 1:
+                    expected = ", ".join(sorted(required_columns))
+                    raise InputError(f"Expected exactly one VMR sheet with columns {expected}.", path=path)
+                yield candidates[0]
+            finally:
+                workbook.close()
+    except (BadZipFile, InvalidFileException, KeyError, ParseError) as error:
+        raise InputError("Could not read the ICTV VMR workbook.", path=path) from error
+
+
+def _read_vmr_rows(sheet_name, columns, rows, path: Path) -> tuple[dict[str, Taxon], dict[str, str]]:
+    rank_columns = [(rank, columns[rank]) for rank in ICTV_RANKS if rank in columns]
+    taxa = {ICTV_ROOT: Taxon(ICTV_ROOT, "no rank", "Viruses")}
+    species_ids: dict[str, str] = {}
+    isolates: dict[str, str] = {}
+    for row_number, row in enumerate(rows, start=2):
+        if not any(value is not None for value in row):
+            continue
+        isolate = _vmr_cell_text(row[columns["isolate id"]])
+        species_id = _vmr_cell_text(row[columns["ictv_id"]])
+        species = _vmr_cell_text(row[columns["species"]])
+        if not re.fullmatch(r"VMR[0-9]+", isolate) or not re.fullmatch(r"ICTV[0-9]+", species_id) or not species:
+            raise InputError(f"Invalid isolate or species at VMR row {row_number}.", path=path)
+        if isolate in isolates:
+            raise InputError(f"Duplicate isolate ID {isolate} at VMR row {row_number}.", path=path)
+        if species_ids.setdefault(species, species_id) != species_id:
+            raise InputError(f"Conflicting IDs for species {species} at VMR row {row_number}.", path=path)
+        parent = ICTV_ROOT
+        for rank, column in rank_columns:
+            name = _vmr_cell_text(row[column])
+            if not name:
+                continue
+            if any(char in name for char in "\t\r\n;"):
+                raise InputError(f"Invalid taxon name at VMR row {row_number}.", path=path)
+            taxid = species_id if rank == "species" else f"ictv_{rank}_{quote(name, safe='')}"
+            taxon = Taxon(parent, rank, name)
+            if taxa.setdefault(taxid, taxon) != taxon:
+                raise InputError(f"Conflicting taxonomy for {name} at VMR row {row_number}.", path=path)
+            parent = taxid
+        isolates[isolate] = species_id
+    if not isolates:
+        raise InputError("The ICTV VMR sheet contains no isolate records.", path=path)
+
+    log.info("Loaded %s from %s with %s species and %s isolates.",
+             sheet_name, path, f"{len(species_ids):,}", f"{len(isolates):,}")
+    return taxa, isolates
+
+
+def _vmr_cell_text(value: object) -> str:
+    return "" if value is None else str(value).strip()
+
+
+def read_vmr_accessions(path: Path) -> tuple[dict[str, set[str]], set[str]]:
+    """Read GenBank accessions and their VMR isolate IDs."""
+    accession2isolates: dict[str, set[str]] = {}
+    isolates: set[str] = set()
+    with open_vmr_sheet(path, {"isolate id", GENBANK_COLUMN}) as (_, columns, rows):
+        for number, row in enumerate(rows, start=2):
+            if all(value is None for value in row):
+                continue
+            isolate = _vmr_cell_text(row[columns["isolate id"]])
+            if not re.fullmatch(r"VMR[0-9]+", isolate) or isolate in isolates:
+                raise InputError(f"Invalid or duplicate isolate ID at VMR row {number}.", path=path)
+            isolates.add(isolate)
+            for accession in NUCLEOTIDE_ACCESSIONS.findall(_vmr_cell_text(row[columns[GENBANK_COLUMN]])):
+                accession2isolates.setdefault(accession, set()).add(isolate)
+
+    if not accession2isolates:
+        raise InputError("The VMR contains no GenBank nucleotide accessions.", path=path)
+    log.info(f"Loaded {len(accession2isolates):,} GenBank nucleotide accessions from {path}.")
+    return accession2isolates, isolates
+
+
+def iter_genbank_annotations(
+    source: TextIO, wanted: set[str],
+) -> Iterator[tuple[str, set[str], list[tuple[str, str]]]]:
+    """Read the IDs and CDS annotations of selected GenBank flat-file records."""
+    for end_of_record, lines in groupby(source, lambda line: line.startswith("//")):
+        if end_of_record:
+            continue
+        accessions: set[str] = set()
+        versioned = ""
+        field = ""
+        for line in lines:
+            label = line[:12].strip()
+            field = label or field
+            if field == "ACCESSION":
+                accessions.update(line[12:].split())
+            elif label == "VERSION":
+                versioned = line[12:].strip().partition(" ")[0]
+            elif field == "FEATURES":
+                break
+        matches = wanted.intersection(accessions | {versioned})
+        if matches:
+            yield versioned, matches, list(iter_cds_translations(lines))
+
+
+def iter_cds_translations(lines: Iterator[str]) -> Iterator[tuple[str, str]]:
+    feature_lines = takewhile(lambda line: line.startswith("     "), lines)
+    feature = ""
+    for is_header, entries in groupby(feature_lines, lambda line: bool(line[5:21].strip())):
+        if is_header:
+            for line in entries:
+                feature = line[5:21].strip()
+        elif feature == "CDS":
+            qualifiers = "\n".join(line[21:].strip() for line in entries)
+            protein = PROTEIN_ID.search(qualifiers)
+            translation = TRANSLATION.search(qualifiers)
+            if protein and translation:
+                sequence = "".join(translation[1].split()).rstrip("*")
+                if sequence:
+                    yield protein[1], sequence
+
+
+def read_protein_species(
+    path: Path, isolates: dict[str, str], accessions: set[str],
+) -> dict[str, set[str]]:
+    """Collect all species linked to each reference protein accession."""
+    log.info("Loading protein-to-isolate links from %s.", path)
+    protein_species: dict[str, set[str]] = {}
+    with optionally_compressed_handle(path) as source:
+        columns = source.readline().lstrip("\ufeff").rstrip("\r\n").split("\t")
+        try:
+            accession_column = columns.index("accession.version")
+            isolate_column = columns.index("isolate_id")
+        except ValueError as error:
+            raise InputError("Protein-to-isolate table needs accession.version and isolate_id columns.",
+                             path=path) from error
+        last_column = max(accession_column, isolate_column)
+        for number, line in enumerate(source, start=2):
+            if not line.strip():
+                continue
+            fields = line.rstrip("\r\n").split("\t")
+            if len(fields) <= last_column or not fields[accession_column].strip():
+                raise InputError(f"Incomplete protein-to-isolate row {number}.", path=path)
+            accession = fields[accession_column].strip()
+            if accession not in accessions:
+                continue
+            isolate = fields[isolate_column].strip()
+            if isolate not in isolates:
+                raise InputError(f"Unknown VMR isolate ID {isolate!r} at row {number}.", path=path)
+            protein_species.setdefault(accession, set()).add(isolates[isolate])
+    return protein_species

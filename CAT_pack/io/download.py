@@ -13,13 +13,15 @@ from collections import namedtuple
 from contextlib import ExitStack, contextmanager, nullcontext
 from functools import singledispatch
 from itertools import chain
+from time import sleep
 from typing import Callable
+from urllib.parse import urlencode
 
 import io
-from CAT_pack.config.settings import DownloadOutputs, DownloadSettings, GTDBDownloadOutputs
-from CAT_pack.io.parsers import optionally_compressed_handle
+from CAT_pack.config.settings import DownloadOutputs, DownloadSettings, GTDBDownloadOutputs, ICTVDownloadSettings
+from CAT_pack.io.parsers import iter_genbank_annotations, optionally_compressed_handle, read_vmr_accessions
 from CAT_pack.utils import check
-from CAT_pack.utils.errors import CheckSumError
+from CAT_pack.utils.errors import CatError, CheckSumError
 from CAT_pack.utils.logging import Report, Status
 
 log = logging.getLogger("CAT_pack")
@@ -128,16 +130,122 @@ prefixes_to_rank_names = {
 
 
 @contextmanager
-def staged_outputs(paths: list[pathlib.Path]):
+def staged_outputs(paths: list[pathlib.Path], *, new_outputs: bool = False):
     """Publish completed outputs only after every writer has closed successfully."""
     partials = [path.with_name(f"{path.name}.part") for path in paths]
+    published = []
     try:
         yield partials
         for partial, target in zip(partials, paths):
             partial.replace(target)
+            published.append(target)
+    except BaseException:
+        if new_outputs:
+            for target in published:
+                target.unlink(missing_ok=True)
+        raise
     finally:
         for partial in partials:
             partial.unlink(missing_ok=True)
+
+
+class ICTVDownloader:
+    """Use GenBank CDS annotations to build the ICTV inputs for prepare."""
+
+    vmr_url = "https://ictv.global/vmr/current"
+    efetch_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+    batch_size = 100
+
+    def __init__(self, settings: ICTVDownloadSettings):
+        self.settings = settings
+
+    def run(self, report: Report) -> None:
+        accession2isolates, isolates = self.read_vmr()
+        matches = {}
+        for versioned, accessions, proteins in self.read_annotations(list(accession2isolates), report):
+            primary, _, version = versioned.partition(".")
+            for accession in accessions:
+                # Prefer the primary accession and select the latest supplied unversioned match.
+                rank = accession in (primary, versioned), int(version or 0)
+                if accession not in matches or rank > matches[accession][0]:
+                    matches[accession] = rank, proteins
+
+        references = {accession: proteins for accession, (_, proteins) in matches.items()}
+        self.write_references(references, accession2isolates, isolates)
+
+    def read_vmr(self) -> tuple[dict[str, set[str]], set[str]]:
+        vmr = self.settings.files.ictv_vmr
+        if self.settings.fetch_vmr:
+            log.info(f"Downloading the current ICTV VMR workbook from {self.vmr_url}.")
+            with staged_outputs([vmr], new_outputs=True) as (workbook,):
+                download_singleton(self.vmr_url, workbook)
+                return read_vmr_accessions(workbook)
+        return read_vmr_accessions(vmr)
+
+    def read_annotations(self, accessions: list[str], report: Report):
+        if self.settings.genbank:
+            wanted = set(accessions)
+            total = len(self.settings.genbank)
+            for index, path in enumerate(self.settings.genbank, 1):
+                log.info(f"Reading GenBank annotations from {path}.")
+                with optionally_compressed_handle(path) as source:
+                    yield from iter_genbank_annotations(source, wanted)
+                report("Process files", Status.RUNNING, index, total)
+            return
+
+        report("Downloading", Status.RUNNING, 0, len(accessions))
+        for start in range(0, len(accessions), self.batch_size):
+            batch = accessions[start:start + self.batch_size]
+            params = {"db": "nuccore", "id": ",".join(batch), "rettype": "gb", "retmode": "text",
+                      "tool": "CAT_pack"}
+            if self.settings.ncbi_email:
+                params["email"] = self.settings.ncbi_email
+            request = urllib.request.Request(self.efetch_url, data=urlencode(params).encode("ascii"))
+            sleep(0.5)
+            with urllib.request.urlopen(request, timeout=90) as response, \
+                    io.TextIOWrapper(response, encoding="utf-8") as source:
+                yield from iter_genbank_annotations(source, set(batch))
+            report("Downloading", Status.RUNNING, start + len(batch), len(accessions))
+
+    def write_references(self, references, accession2isolates: dict[str, set[str]], isolates: set[str]) -> None:
+        files = self.settings.files
+        protein2sequence: dict[str, str] = {}
+        covered_isolates: set[str] = set()
+        links: set[tuple[str, str]] = set()
+        missing = without_proteins = 0
+        with staged_outputs([files.protein2isolate, files.db_fasta], new_outputs=True) as (mapping, fasta), \
+                mapping.open("w", encoding="ascii", newline="\n") as links_out, \
+                fasta.open("w", encoding="ascii", newline="\n") as fasta_out:
+            links_out.write("accession.version\tisolate_id\n")
+            for accession, linked_isolates in accession2isolates.items():
+                proteins = references.get(accession)
+                if proteins is None:
+                    missing += 1
+                    log.info(f"No GenBank record found for {accession}.")
+                elif not proteins:
+                    without_proteins += 1
+                    log.info(f"No annotated proteins with accessions for {accession}.")
+                else:
+                    covered_isolates.update(linked_isolates)
+                    for protein, sequence in proteins:
+                        if protein not in protein2sequence:
+                            protein2sequence[protein] = sequence
+                            fasta_out.write(f">{protein}\n{sequence}\n")
+                        elif protein2sequence[protein] != sequence:
+                            raise CatError(f"Conflicting translations for GenBank protein {protein}.")
+                        for isolate in sorted(linked_isolates):
+                            link = protein, isolate
+                            if link not in links:
+                                links.add(link)
+                                links_out.write(f"{protein}\t{isolate}\n")
+            if not protein2sequence:
+                raise CatError("No annotated proteins were found for any VMR accession.")
+
+        log.log(logging.WARNING if missing or without_proteins or covered_isolates != isolates else logging.INFO,
+                f"Prepared {len(protein2sequence):,} proteins and {len(links):,} links "
+                f"for {len(covered_isolates):,} of {len(isolates):,} VMR isolates. "
+                f"{missing:,} GenBank accessions were unresolved and {without_proteins:,} had no annotated proteins.")
+
 
 # FIXME: move to parsers.py
 def load_gtdb_md5sums(md5sums_file: pathlib.Path) -> dict[str, str]:

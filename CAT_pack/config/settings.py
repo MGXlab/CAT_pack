@@ -384,13 +384,30 @@ class GTDBDownloadOutputs(DownloadOutputs):
 
 
 @dataclass(frozen=True)
+class ICTVDownloadOutputs:
+    data_folder: Path
+    log_file: Path
+    ictv_vmr: Path
+    db_fasta: Path
+    protein2isolate: Path
+
+
+@dataclass(frozen=True)
 class DownloadSettings:
     db_type: str
-    files: DownloadOutputs
+    files: DownloadOutputs | ICTVDownloadOutputs
     cleanup: bool
     quiet: bool
     no_log: bool
     debug: bool
+
+
+@dataclass(frozen=True)
+class ICTVDownloadSettings(DownloadSettings):
+    files: ICTVDownloadOutputs
+    fetch_vmr: bool
+    genbank: tuple[Path, ...]
+    ncbi_email: str | None
 
 @dataclass(frozen=True)
 class AddNamesFiles(TaxonomyFiles):

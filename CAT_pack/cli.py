@@ -24,6 +24,7 @@ from .cli_options import (
 )
 from .config.options import BatOptions, CatOptions, ExecutionOptions, DiamondOptions, MMseqsOptions, PrepareOptions, \
     MemoryOptions, DownloadOptions, RatMode, RatOptions, AddNamesOptions, SummariseOptions
+from .config.settings import ICTVDownloadOutputs
 from .config.validation import get_file_names, make_prefix
 from .pipeline import build_plan, run_download, run
 from .progress import ProgressTracker
@@ -187,16 +188,23 @@ def main(
     pass
 
 
-@app.command(options_metavar="--db <nr|gtdb> --out_dir <DIR> [options]")
+@app.command(options_metavar="--db <nr|gtdb|ictv> --out_dir <DIR> [options]")
 @with_option_groups(execution=execution_options)
 def download(
-        db: Annotated[str, Option("--db", metavar="<nr|GTDB>")],
+        db: Annotated[str, Option("--db", metavar="<nr|GTDB|ictv>")],
         out_dir: Annotated[Path, Option("--out_dir", metavar="<DIR>", help="Directory where data will be stored.")],
         cleanup: Annotated[bool, Option("--cleanup")] = DownloadOptions.cleanup,
         no_log: Annotated[bool, Option("--no_log")] = DownloadOptions.no_log,
+        ictv_vmr: Annotated[Path | None, Option(
+            "--ictv_vmr", help="Use a local ICTV VMR exel file.",
+        )] = None,
+        genbank: Annotated[list[Path] | None, Option(
+            "--genbank", help="Use a local GenBank file for ICTV. Repeat for multiple files.",
+        )] = None,
+        ncbi_email: Annotated[str | None, Option("--ncbi_email", help="")] = None,
         *, execution: ExecutionOptions,
 ):
-    """Download and preprocess data from NCBI nr or GTDB."""
+    """Download and preprocess references for NCBI nr, GTDB, or ICTV."""
     args = DownloadOptions(
         db_type=db,
         out_dir=out_dir,
@@ -205,6 +213,9 @@ def download(
         verbose=execution.verbose,
         debug=execution.debug,
         no_log=no_log,
+        ictv_vmr=ictv_vmr,
+        genbank=tuple(genbank or ()),
+        ncbi_email=ncbi_email,
     )
     console = Console(stderr=True)
     log = init_logging(args.debug, quiet=args.quiet, console=console)
@@ -230,11 +241,14 @@ def download(
         if args.quiet:
             return
 
-        command = ["CAT_pack", "prepare", "--db_fasta", str(files.db_fasta.resolve()),
-                   "--names", str(files.names.resolve()),
-                   "--nodes", str(files.nodes.resolve()),
-                   "--acc2tax", str(files.acc2tax.resolve()),
-                   "--db_dir", "path/to/prepare_output"]
+        command = ["CAT_pack", "prepare", "--db_fasta", str(files.db_fasta.resolve())]
+        if isinstance(files, ICTVDownloadOutputs):
+            command.extend(["--ictv_vmr", str(files.ictv_vmr.resolve()),
+                            "--protein2isolate", str(files.protein2isolate.resolve())])
+        else:
+            command.extend(["--names", str(files.names.resolve()), "--nodes", str(files.nodes.resolve()),
+                            "--acc2tax", str(files.acc2tax.resolve())])
+        command.extend(["--db_dir", "path/to/prepare_output"])
         prepare_command = Group(
             Text("A CAT_pack database can be build with:", style="bold"),
             Text(f"$ {shlex.join(command)}", style="cyan")
