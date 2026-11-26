@@ -14,6 +14,7 @@ from .settings import (
     PrepareOutputs, PrepareSettings, TaxonomyFiles, MemorySettings,
     DownloadFile, DownloadOutputs, DownloadSettings, NRUrls, GTDBUrls, GTDBDownloadOutputs, RatFiles, RatSettings,
     AddNamesSettings, AddNamesFiles, ParserSettings, SummariseSettings, SummariseFiles,
+    ICTVDownloadOutputs, ICTVDownloadSettings,
 )
 from ..io.parsers import BinParser
 from ..utils.check import (
@@ -170,7 +171,8 @@ def validate_database(folder: Path, *, require_diamond=False, require_mmseqs2=Fa
 def make_prefix(args: PrepareOptions) -> PrepareOptions:
     if args.common_prefix is not None:
         return args
-    return replace(args, common_prefix=f"{datetime.now():%Y-%m-%d}_CAT_pack")
+    suffix = "CAT_pack_ICTV" if args.ictv_vmr is not None else "CAT_pack"
+    return replace(args, common_prefix=f"{datetime.now():%Y-%m-%d}_{suffix}")
 
 def get_file_names(args: PrepareOptions) -> PrepareOutputs:
     prefix = make_prefix(args).common_prefix
@@ -188,12 +190,18 @@ def get_file_names(args: PrepareOptions) -> PrepareOutputs:
     )
 
 
-def get_download_file_names(args: DownloadOptions) -> DownloadOutputs:
+def get_download_file_names(args: DownloadOptions) -> DownloadOutputs | ICTVDownloadOutputs:
     prefix = f"{datetime.now():%Y-%m-%d}"
     folder = args.out_dir
     db_type = args.db_type.lower().strip()
+    if db_type == "ictv":
+        return ICTVDownloadOutputs(
+            data_folder=folder, log_file=folder / "ictv.download.log",
+            ictv_vmr=args.ictv_vmr or folder / "ictv_vmr.xlsx",
+            db_fasta=folder / "ictv_proteins.faa", protein2isolate=folder / "protein2isolate.tsv",
+        )
     if db_type not in {"nr", "gtdb"}:
-        raise InputError("Incorrect database selected. Please select nr or gtdb.")
+        raise InputError("Incorrect database selected. Please select nr, gtdb, or ictv.")
     if db_type == "gtdb":
         urls = {url.rsplit("/", 1)[-1]: url for url in GTDBUrls().urls}
         paths = {name: folder / f"{prefix}.{name}" for name in urls}
@@ -229,18 +237,35 @@ def get_download_file_names(args: DownloadOptions) -> DownloadOutputs:
     )
 
 
-def validate_download(args: DownloadOptions, files: DownloadOutputs | None = None) -> DownloadSettings:
-    match args.db_type.lower().strip():
-        case "nr":
-            db_type = "nr"
-        case "gtdb":
-            db_type = "gtdb"
-        case _:
-            raise InputError("Incorrect database selected. Please select nr or gtdb.")
+def validate_download(
+    args: DownloadOptions, files: DownloadOutputs | ICTVDownloadOutputs | None = None,
+) -> DownloadSettings:
+    db_type = args.db_type.lower().strip()
     files = files or get_download_file_names(args)
     checks = ValErrorCollector()
     if files.data_folder.exists() and not files.data_folder.is_dir():
         checks.add(InputError("Download output location must be a directory.", path=files.data_folder))
+    if isinstance(files, ICTVDownloadOutputs):
+        vmr = files.ictv_vmr
+        fetch_vmr = args.ictv_vmr is None and not (vmr.exists() or vmr.is_symlink())
+        if vmr.suffix.lower() != ".xlsx":
+            checks.add(InputError("The ICTV VMR workbook must be an .xlsx file.", path=vmr))
+        elif not fetch_vmr:
+            checks.check(check_file_not_empty, vmr, "ICTV VMR workbook")
+        for path in args.genbank:
+            checks.check(check_file_not_empty, path, "GenBank flat file")
+        for path in (files.db_fasta, files.protein2isolate):
+            if path.exists() or path.is_symlink():
+                checks.add(InputError("An ICTV download output already exists.", path=path))
+        if not args.no_log and (files.log_file.is_symlink() or files.log_file.is_dir()):
+            checks.add(InputError("The ICTV download log must be a regular file.", path=files.log_file))
+        checks.finish()
+        return ICTVDownloadSettings(db_type=db_type, files=files, cleanup=args.cleanup,
+                                    quiet=args.quiet, no_log=args.no_log, debug=args.debug,
+                                    fetch_vmr=fetch_vmr, genbank=args.genbank, ncbi_email=args.ncbi_email)
+
+    if args.ictv_vmr is not None or args.genbank or args.ncbi_email is not None:
+        checks.add(InputError("--ictv_vmr, --genbank, and --ncbi_email are for --db ictv."))
     outputs = {item.path for item in files.downloads} | {
         files.names, files.nodes, files.db_fasta, files.acc2tax,
     }
@@ -261,8 +286,25 @@ def validate_prepare(args: PrepareOptions, files: PrepareOutputs | None = None) 
     checks = ValErrorCollector()
     execution = checks.check(validate_execution, args)
     db_fasta = checks.check(check_fasta_file, args.db_fasta, "Database FASTA")
-    taxonomy = checks.check(validate_taxonomy, args.names, args.nodes)
-    acc2tax = checks.check(check_file_not_empty, args.acc2tax, "Accession-to-taxid file")
+    taxonomy = acc2tax = ictv_vmr = protein2isolate = None
+    if args.ictv_vmr is not None:
+        if any(path is not None for path in (args.names, args.nodes, args.acc2tax)):
+            checks.add(InputError("--ictv_vmr generates the taxonomy. Remove --names, --nodes, and --acc2tax."))
+        ictv_vmr = checks.check(check_file_not_empty, args.ictv_vmr, "ICTV VMR exel")
+        if args.ictv_vmr.suffix.lower() != ".xlsx":
+            checks.add(InputError("The ICTV VMR exel must be an .xlsx file.", path=args.ictv_vmr))
+        if args.protein2isolate is None:
+            checks.add(InputError("--ictv_vmr requires --protein2isolate."))
+        else:
+            protein2isolate = checks.check(check_file_not_empty, args.protein2isolate, "Protein2isolate file")
+    else:
+        if args.protein2isolate is not None:
+            checks.add(InputError("--protein2isolate requires --ictv_vmr."))
+        if args.names is None or args.nodes is None or args.acc2tax is None:
+            checks.add(InputError("Supply --names, --nodes, and --acc2tax, or use --ictv_vmr with --protein2isolate."))
+        else:
+            taxonomy = checks.check(validate_taxonomy, args.names, args.nodes)
+            acc2tax = checks.check(check_file_not_empty, args.acc2tax, "Accession2taxid file")
     files = files or get_file_names(args)
     if args.gpu and not args.build_mmseqs2:
         checks.add(InputError("--gpu requires --build_mmseqs2 when preparing a database."))
@@ -272,6 +314,14 @@ def validate_prepare(args: PrepareOptions, files: PrepareOutputs | None = None) 
                               hint="The prefix must be a filename without directory separators."))
     if files.data_folder.exists() and not files.data_folder.is_dir():
         checks.add(InputError("Database output location must be a directory.", path=files.data_folder))
+    if args.ictv_vmr is not None and files.data_folder.is_dir():
+        for path in files.data_folder.iterdir():
+            if path.name in {"names.dmp", "nodes.dmp"} or path.name.endswith(
+                (".dmnd", ".mmseqs2", ".mmseqs2_gpu", ".fastaid2LCAtaxid", ".taxids_with_multiple_offspring")
+            ):
+                checks.add(InputError("ICTV preparation requires a directory without existing database files.",
+                                      path=path, hint="Choose a separate database directory."))
+                break
     for output in (files.names, files.nodes, files.log_file, files.diamond_database,
                    files.mmseqs2_database, files.fastaid2LCAtaxid,
                    files.taxids_with_multiple_offspring,
@@ -300,8 +350,9 @@ def validate_prepare(args: PrepareOptions, files: PrepareOutputs | None = None) 
     return PrepareSettings(
         threads=threads, quiet=execution.quiet,
         verbose=execution.verbose, debug=execution.debug,
-        files=files, db_fasta=db_fasta, names=taxonomy.names,
-        nodes=taxonomy.nodes, acc2tax=acc2tax,
+        files=files, db_fasta=db_fasta, names=taxonomy.names if taxonomy else None,
+        nodes=taxonomy.nodes if taxonomy else None, acc2tax=acc2tax,
+        ictv_vmr=ictv_vmr, protein2isolate=protein2isolate,
         diamond=(DiamondPrepareSettings(diamond, db_fasta, files.diamond_database,
                                        threads, execution.verbose) if diamond is not None else None),
         mmseqs=(MMseqsPrepareSettings(mmseqs, db_fasta, files.mmseqs2_database,
