@@ -145,6 +145,9 @@ class DownloadOptions(ExecutionOptions):
     out_dir: Path
     cleanup: bool = False
     no_log: bool = False
+    ictv_vmr: Path | None = None
+    genbank: tuple[Path, ...] = ()
+    ncbi_email: str | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
