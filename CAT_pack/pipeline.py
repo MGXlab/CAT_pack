@@ -148,6 +148,9 @@ def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | Dow
             ),
         ]
     if isinstance(args, DownloadOptions):
+        if args.db_type.lower().strip() == "ictv":
+            name = "Process files" if args.genbank else "Downloading"
+            return [Step("Input validation"), Step(name, runner=lambda settings, report: ICTVDownloader(settings).run(report))]
         return [
             Step("Input validation"),
             Step("Downloading"),
@@ -240,7 +243,7 @@ def run_download(
     args: DownloadOptions, report: Report,
     download_report: DownloadReport,
     queue_report: DownloadQueueReport
-) -> DownloadOutputs:
+) -> DownloadOutputs | ICTVDownloadOutputs:
     files = get_download_file_names(args)
     plan = build_plan(args)
     step_index = 0
@@ -262,6 +265,8 @@ def run_download(
                 settings = validate_download(args, files)
                 if not settings.no_log:
                     locks.enter_context(file_logging(log, files.log_file, settings.debug))
+            elif current_step.runner is not None:
+                current_step.runner(settings, report)
             elif current_step.name == "Downloading":
                 multi_download(settings, report, download_report, queue_report)
             elif current_step.name == "Check files":
