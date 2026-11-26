@@ -4,11 +4,11 @@ from dataclasses import dataclass, replace
 from decimal import Decimal
 from pathlib import Path
 from tarfile import TarError
-from tempfile import NamedTemporaryFile
+from tempfile import NamedTemporaryFile, TemporaryDirectory
 from typing import Any, Callable, Literal
 
 from CAT_pack.io.download import (
-    DownloadQueueReport, DownloadReport, multi_download,
+    DownloadQueueReport, DownloadReport, ICTVDownloader, multi_download,
     check_files, process_files, cleanup_downloads,
 )
 from CAT_pack.utils.typing import EntityType
@@ -17,14 +17,15 @@ from .classification import ClassificationEngine
 from .config.options import BatOptions, CatOptions, PrepareOptions, DownloadOptions, RatOptions, AddNamesOptions, \
     SummariseOptions
 from .config.settings import BatFiles, BatSettings, CatFiles, CatSettings, DownloadOutputs, AddNamesSettings, \
-    SummariseSettings
+    SummariseSettings, ICTVDownloadOutputs
 from .config.validation import check_orfs_match_contigs, get_file_names, get_validated_settings, make_prefix, \
     validate_download, get_download_file_names, make_cat_options, make_bat_options
 from .io.parsers import ClassificationParser, optionally_compressed_handle, import_contig_lengths
 from .io.writers import ClassificationWriter, write_names, write_summary
 from .prepare import (
     copy_taxonomy, make_diamond_database,
-    make_fastaid2LCAtaxid_file, make_mmseqs2_database, make_mmseqs2_gpu_database,
+    make_fastaid2LCAtaxid_file, make_ictv_reference_mapping,
+    make_mmseqs2_database, make_mmseqs2_gpu_database, copy_ictv_database,
     write_taxids_with_multiple_offspring_file,
 )
 from .reads import process_bam_file, load_classifications, extract_unclassified_sequences, run_rat_alignment, \
