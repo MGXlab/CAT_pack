@@ -129,10 +129,12 @@ class RatOptions(AnnotationOptions):
 @dataclass(frozen=True, kw_only=True)
 class PrepareOptions(ExecutionOptions):
     db_fasta: Path
-    names: Path
-    nodes: Path
-    acc2tax: Path
     db_dir: Path
+    names: Path | None = None
+    nodes: Path | None = None
+    acc2tax: Path | None = None
+    ictv_vmr: Path | None = None
+    protein2isolate: Path | None = None
     path_to_diamond: Path | None = DiamondOptions.path_to_diamond
     common_prefix: str | None = None
     build_mmseqs2: bool = False

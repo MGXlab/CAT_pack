@@ -272,21 +272,26 @@ def prepare(
             Path, Option("--db_fasta", help="Fasta file containing "
                                             "all sequences.", metavar="<FastaFile>")
         ],
-        names_dmp: Annotated[Path, Option("--names",
-                                          help="Names.dmp", metavar="<FILE>")],
-        nodes_dmp: Annotated[Path, Option("--nodes",
-                                          help="Nodes.dmp", metavar="<FILE>")],
-        acc2tax: Annotated[Path, Option("--acc2tax", help="Accession2taxid.txt file. Can be gzipped.",
-                                        metavar="<FILE[.gz|.bz2]>")],
         # Added --database here but kept db_dir for now too
         db_dir: Annotated[Path,
-            Option("--database", "--db_dir", "-d", help="Directory where CAT/BAT/RAT "
-                        "database and taxonomy files will be created", metavar="<DIR>")],
+        Option("--database", "--db_dir", "-d", help="Directory where CAT/BAT/RAT "
+                                                    "database and taxonomy files will be created", metavar="<DIR>")],
+        names_dmp: Annotated[Path | None, Option("--names",
+                                          help="Names.dmp", metavar="<FILE>")] = None,
+        nodes_dmp: Annotated[Path | None, Option("--nodes",
+                                          help="Nodes.dmp", metavar="<FILE>")] = None,
+        acc2tax: Annotated[Path | None, Option("--acc2tax", help="Accession2taxid.txt file. Can be gzipped.",
+                                        metavar="<FILE[.gz|.bz2]>")] = None,
+
+        ictv_vmr: Annotated[Path | None, Option("--ictv_vmr",
+                    help="ICTV Virus Metadata Resource exel sheet")] = None,
+        protein2isolate: Annotated[Path | None, Option("--protein2isolate",
+                    help="protein2isolate.txt")] = None,
         path_to_diamond: DiamondPathOption = PrepareOptions.path_to_diamond,
         common_prefix: Annotated[str | None, Option(
                 "--common_prefix",
                 help="Prefix for all files that will be created",
-                show_default="<date>_CAT_pack",
+                show_default="<date>_CAT_pack_(ICTV)",
             ),] = PrepareOptions.common_prefix,
         build_mmseqs2: Annotated[bool, Option("--build_mmseqs2",
                     help="Also create an MMseqs2 sequence database.")] = PrepareOptions.build_mmseqs2,
@@ -303,6 +308,8 @@ def prepare(
         names=names_dmp,
         nodes=nodes_dmp,
         acc2tax=acc2tax,
+        ictv_vmr=ictv_vmr,
+        protein2isolate=protein2isolate,
         db_dir=db_dir,
         path_to_diamond=path_to_diamond,
         common_prefix=common_prefix,

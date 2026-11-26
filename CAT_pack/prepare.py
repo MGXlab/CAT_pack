@@ -3,9 +3,10 @@ import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from CAT_pack.io.parsers import optionally_compressed_handle
 from . import tax
-from .config.settings import PrepareSettings
+from .config.settings import PrepareOutputs, PrepareSettings
+from .io.parsers import optionally_compressed_handle, read_protein_species, read_vmr
+from .io.writers import write_taxonomy
 from .tools.tool_runner import run_tool
 from .utils.check import check_outputs
 from .utils.errors import InputError
@@ -91,6 +92,40 @@ def make_fastaid2LCAtaxid_file(
     prot_accession2taxid = import_prot_accession2taxid(
         settings.acc2tax, prot_accessions_whitelist, report,
     )
+    write_fastaid2LCAtaxid(settings, fastaid2prot_accessions,
+                           prot_accession2taxid, taxid2parent, report)
+
+
+def make_ictv_reference_mapping(settings: PrepareSettings, report: Report) -> None:
+    taxa, isolates = read_vmr(settings.ictv_vmr)
+    taxid2parent = {taxid: taxon.parent for taxid, taxon in taxa.items()}
+    headers, accessions = import_fasta_headers(settings.db_fasta, report)
+    protein_species = read_protein_species(settings.protein2isolate, isolates, accessions)
+    missing = accessions.difference(protein_species)
+    if missing:
+        examples = ", ".join(sorted(missing)[:5])
+        raise InputError(f"Missing isolate links for {len(missing):,} FASTA accessions, including {examples}.",
+                         path=settings.protein2isolate)
+    prot_accession2taxid = {}
+    for accession, species in protein_species.items():
+        if len(species) == 1:
+            prot_accession2taxid[accession] = next(iter(species))
+        else:
+            lineages = [find_lineage(taxid, taxid2parent) for taxid in species]
+            prot_accession2taxid[accession] = tax.find_LCA(lineages)
+
+    write_taxonomy(taxa, settings.files.nodes, settings.files.names)
+    write_fastaid2LCAtaxid(settings, headers,
+                           prot_accession2taxid, taxid2parent, report)
+
+
+def write_fastaid2LCAtaxid(
+    settings: PrepareSettings,
+    fastaid2prot_accessions: dict[str, list[str]],
+    prot_accession2taxid: dict[str, str],
+    taxid2parent: dict[str, str],
+    report: Report,
+) -> None:
     log.info("Finding LCA of all protein accession numbers in fasta headers.")
     no_taxid = 0
     corrected = 0
@@ -204,5 +239,19 @@ def copy_taxonomy(settings: PrepareSettings) -> None:
         if target.is_file():
             continue
         shutil.copyfile(source, target)
+
+
+def copy_ictv_database(files: PrepareOutputs, destination: Path) -> None:
+    outputs = sorted(files.data_folder.iterdir(), key=lambda path: path == files.diamond_database)
+    targets = [destination / source.name for source in outputs]
+    published = []
+    try:
+        for source, target in zip(outputs, targets):
+            source.rename(target)
+            published.append(target)
+    except BaseException:
+        for target in reversed(published):
+            target.unlink()
+        raise
 
 

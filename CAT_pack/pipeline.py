@@ -61,8 +61,15 @@ class Step:
 
 def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | DownloadOptions | AddNamesOptions | SummariseOptions, files=None) -> list[Step]:
     if type(args) == PrepareOptions:
+        is_ictv = args.ictv_vmr is not None
+        mapping = Step(
+            "Make fastaid2LCAtaxid",
+            supplied=files is not None and files.fastaid2LCAtaxid.is_file(),
+            runner=make_ictv_reference_mapping if is_ictv else make_fastaid2LCAtaxid_file,
+        )
         return [
             Step("Input validation"),
+            *([mapping] if is_ictv else []),
             Step("Make DIAMOND database",
                  supplied=files is not None and files.diamond_database.is_file(),
                  runner=make_diamond_database),
@@ -72,12 +79,13 @@ def build_plan(args: CatOptions | BatOptions | RatOptions | PrepareOptions | Dow
             *([Step("Make MMseqs2 GPU database",
                     supplied=files is not None and files.mmseqs2_gpu_database.is_file(),
                     runner=make_mmseqs2_gpu_database)] if args.build_mmseqs2 and args.gpu else []),
-            Step("Make fastaid2LCAtaxid",
-                 supplied=files is not None and files.fastaid2LCAtaxid.is_file(),
-                 runner=make_fastaid2LCAtaxid_file),
+            *([] if is_ictv else [mapping]),
             Step("Make taxids with multiple offspring",
                  supplied=files is not None and files.taxids_with_multiple_offspring.is_file(),
                  runner=write_taxids_with_multiple_offspring_file),
+            *([Step("Create ICTV database",
+                    runner=lambda settings, report: copy_ictv_database(settings.files, args.db_dir))]
+              if is_ictv else []),
         ]
     if isinstance(args, (CatOptions, BatOptions)):
         return [
@@ -332,6 +340,7 @@ def run(args: CatOptions | BatOptions | RatOptions | PrepareOptions | AddNamesOp
     log = logging.getLogger("CAT_pack")
 
     is_prepare = isinstance(args, PrepareOptions)
+    is_ictv = is_prepare and args.ictv_vmr is not None
     is_add_names = isinstance(args, AddNamesOptions)
     is_summarise = isinstance(args, SummariseOptions)
     if is_prepare: args = make_prefix(args)
@@ -371,7 +380,16 @@ def run(args: CatOptions | BatOptions | RatOptions | PrepareOptions | AddNamesOp
         if is_prepare:
             locks.enter_context(lock_outputs([log_path.with_name(f".{log_path.name}.lock")]))
         locks.enter_context(file_logging(log, log_path, args.debug))
-        if is_prepare: copy_taxonomy(settings)
+        if is_ictv:
+            work_dir = Path(locks.enter_context(TemporaryDirectory(prefix=".ictv-", dir=args.db_dir)))
+            files = get_file_names(replace(args, db_dir=work_dir))
+            settings = replace(
+                settings, files=files,
+                diamond=replace(settings.diamond, database=files.diamond_database),
+                mmseqs=(replace(settings.mmseqs, database=files.mmseqs2_database) if settings.mmseqs else None),
+            )
+        elif is_prepare:
+            copy_taxonomy(settings)
 
         plan = build_plan(args, settings.files)
         report(current_step.name, Status.COMPLETE, 1, 1)
@@ -391,7 +409,7 @@ def run(args: CatOptions | BatOptions | RatOptions | PrepareOptions | AddNamesOp
             log.info(f"Completed: {current_step.name}")
             completed_steps.append(current_step)
         if is_prepare:
-            log.info("Preparation complete. Use -d %s with CAT_pack7 CAT or BAT.", settings.files.data_folder)
+            log.info("Preparation complete. Use -d %s with CAT_pack7 CAT or BAT.", args.db_dir)
             return 0
         if isinstance(args, (SummariseOptions, AddNamesOptions)):
             return {

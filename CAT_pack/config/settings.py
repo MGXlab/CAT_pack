@@ -304,11 +304,13 @@ class PrepareOutputs:
 class PrepareSettings(ExecutionSettings):
     files: PrepareOutputs
     db_fasta: Path
-    names: Path
-    nodes: Path
-    acc2tax: Path
+    names: Path | None
+    nodes: Path | None
+    acc2tax: Path | None
     diamond: DiamondPrepareSettings | None
     mmseqs: MMseqsPrepareSettings | None = None
+    ictv_vmr: Path | None = None
+    protein2isolate: Path | None = None
 
 
 
